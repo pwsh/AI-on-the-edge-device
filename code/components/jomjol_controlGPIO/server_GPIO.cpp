@@ -108,7 +108,10 @@ void GpioPin::init()
     gpio_config(&io_conf);
 
 //    if (_interruptType != GPIO_INTR_DISABLE) {                // ohne GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X, wenn das genutzt wird, dann soll auch der Handler hier nicht initialisiert werden, da das dann über SmartLED erfolgt.
-    if ((_interruptType != GPIO_INTR_DISABLE) && (_interruptType != GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X)) {
+    // Note: GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X is a gpio_pin_mode_t value compared numerically
+    // against the gpio_int_type_t interrupt type; cast to int to keep the original behavior
+    // (GCC 15 rejects the cross-enum comparison under -Werror=enum-compare).
+    if ((_interruptType != GPIO_INTR_DISABLE) && ((int)_interruptType != (int)GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X)) {
         //hook isr handler for specific gpio pin
         ESP_LOGD(TAG, "GpioPin::init add isr handler for GPIO %d", _gpio);
         gpio_isr_handler_add(_gpio, gpio_isr_handler, (void*)&_gpio);

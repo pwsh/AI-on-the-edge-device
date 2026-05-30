@@ -4,6 +4,7 @@ list(APPEND EXTRA_COMPONENT_DIRS $ENV{IDF_PATH}/examples/common_components/proto
 
 idf_component_register(SRCS ${app_sources}
                     INCLUDE_DIRS "." "../../include"
-                    REQUIRES esp_http_server jomjol_logfile jomjol_configfile jomjol_mqtt jomjol_flowcontroll)
+                    REQUIRES esp_http_server jomjol_logfile jomjol_configfile jomjol_mqtt jomjol_flowcontroll
+                             esp_driver_gpio esp_driver_rmt esp_driver_spi)
 
 

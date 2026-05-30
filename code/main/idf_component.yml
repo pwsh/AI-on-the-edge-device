@@ -1,0 +1,5 @@
+## IDF Component Manager manifest.
+## esp-mqtt was removed from ESP-IDF core in v6.0 and is now a managed component.
+dependencies:
+  espressif/mqtt: "*"
+  espressif/cjson: "*"

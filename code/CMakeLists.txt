@@ -19,4 +19,18 @@ if(EXISTS "${SDKCONFIG}.defaults")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+# Board selection. Under PlatformIO this is provided via platformio.ini build_flags
+# (-D BOARD_ESP32CAM_AITHINKER). For native idf.py builds (no PLATFORMIO env) inject a
+# default board as a global IDF compile definition (must use idf_build_set_property so it
+# propagates to every component) so include/defines.h does not hit "Board not selected".
+if(NOT DEFINED ENV{PLATFORMIO})
+    idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32CAM_AITHINKER" APPEND)
+    # ESP-IDF 6.0 hardcodes -Werror in build.cmake (no Kconfig toggle) with only a small
+    # exemption list. This project vendors third-party C/C++ (stb, miniz, SmartLeds, ...)
+    # that is not warning-clean under GCC 15. The PlatformIO build did not treat warnings as
+    # errors; append a bare -Wno-error (after the base -Werror) to match that globally.
+    idf_build_set_property(COMPILE_OPTIONS "-Wno-error" APPEND)
+endif()
+
 project(AI-on-the-edge)

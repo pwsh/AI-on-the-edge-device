@@ -23,6 +23,12 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 
+// ESP-IDF 6.0 renamed the enum WIFI_REASON_NOT_AUTHED to WIFI_REASON_ASSOC_NOT_AUTHED.
+// Enum constants are invisible to the preprocessor, so gate on the IDF version instead.
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#define WIFI_REASON_NOT_AUTHED WIFI_REASON_ASSOC_NOT_AUTHED
+#endif
+
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #ifdef ENABLE_MQTT

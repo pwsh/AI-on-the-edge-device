@@ -152,6 +152,7 @@ esp_err_t RmtDriver::registerIsr(bool isFirstRegisteredChannel) {
         .resolution_hz = RMT_RESOLUTION_HZ,
         .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,
         .trans_queue_depth = 1,
+        .intr_priority = 0,   // field added to rmt_tx_channel_config_t in newer ESP-IDF
         .flags = {},
     };
 

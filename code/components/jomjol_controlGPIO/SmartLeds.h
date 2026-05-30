@@ -222,7 +222,8 @@ private:
 #define _SMARTLEDS_SPI_HOST SPI2_HOST
 #define _SMARTLEDS_SPI_DMA_CHAN SPI_DMA_CH_AUTO
 #else
-#define _SMARTLEDS_SPI_HOST HSPI_HOST
+// ESP-IDF 6.0 removed the legacy HSPI_HOST alias; on classic ESP32 HSPI == SPI3_HOST.
+#define _SMARTLEDS_SPI_HOST SPI3_HOST
 #define _SMARTLEDS_SPI_DMA_CHAN 1
 #endif
 

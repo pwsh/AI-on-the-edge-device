@@ -43,6 +43,16 @@
 
 namespace detail {
 
+// ESP-IDF 6.0 removed the detailed RMT channel-count caps from the public soc_caps.h
+// (the new RMT driver manages channels from a pool). Provide ESP32 fallbacks
+// (1 group x 8 channels) so SmartLeds can still size its channel table.
+#ifndef SOC_RMT_GROUPS
+#define SOC_RMT_GROUPS 1
+#endif
+#ifndef SOC_RMT_CHANNELS_PER_GROUP
+#define SOC_RMT_CHANNELS_PER_GROUP 8
+#endif
+
 constexpr const int CHANNEL_COUNT = SOC_RMT_GROUPS * SOC_RMT_CHANNELS_PER_GROUP;
 
 class RmtDriver;

@@ -31,7 +31,10 @@ extern "C"
 #include "ClassLogFile.h"
 
 #include "esp_vfs_fat.h"
-#include "../sdmmc_common.h"
+// Public sdmmc API header (provides sdmmc_card_t / sdmmc_cid_t / sdmmc_csd_t).
+// Previously reached into private "../sdmmc_common.h", which moved to esp_private/
+// in ESP-IDF 6.0; the public header is the portable replacement.
+#include "sdmmc_cmd.h"
 
 static const char *TAG = "HELPER";
 

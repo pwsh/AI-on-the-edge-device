@@ -294,7 +294,14 @@ static esp_err_t mount_to_vfs_fat_mh(const esp_vfs_fat_mount_config_t *mount_con
     char drv[3] = {(char)('0' + pdrv), ':', 0};
 
     // connect FATFS to VFS
-    err = esp_vfs_fat_register(base_path, drv, mount_config->max_files, &fs);
+    // ESP-IDF 6.0: esp_vfs_fat_register() now takes an esp_vfs_fat_conf_t struct
+    // (was base_path, fat_drive, max_files positional args).
+    const esp_vfs_fat_conf_t conf = {
+        .base_path = base_path,
+        .fat_drive = drv,
+        .max_files = mount_config->max_files,
+    };
+    err = esp_vfs_fat_register_cfg(&conf, &fs);
     *out_fs = fs;
 
     if (err == ESP_ERR_INVALID_STATE) {
@@ -414,7 +421,7 @@ esp_err_t esp_vfs_fat_sdmmc_mount_mh(const char* base_path, const sdmmc_host_t* 
         s_saved_ctx_id = 0;
     }
 
-    ctx = calloc(sizeof(mh_vfs_fat_sd_ctx_t), 1);
+    ctx = calloc(1, sizeof(mh_vfs_fat_sd_ctx_t));
 
     if (!ctx) {
         CHECK_EXECUTE_RESULT(ESP_ERR_NO_MEM, "no mem");
@@ -509,7 +516,7 @@ esp_err_t esp_vfs_fat_sdspi_mount_mh(const char* base_path, const sdmmc_host_t* 
         s_saved_ctx_id = 0;
     }
 
-    ctx = calloc(sizeof(mh_vfs_fat_sd_ctx_t), 1);
+    ctx = calloc(1, sizeof(mh_vfs_fat_sd_ctx_t));
 
     if (!ctx) {
         CHECK_EXECUTE_RESULT(ESP_ERR_NO_MEM, "no mem");

@@ -66,4 +66,9 @@ FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/main/*.*)
 
 idf_component_register(SRCS ${app_sources}
                     INCLUDE_DIRS "."
-                    REQUIRES esp_psram)
+                    REQUIRES esp_psram esp_driver_sdmmc esp_wifi
+                             nvs_flash esp_event esp_netif esp_eth esp_http_server
+                             esp_pm esp-tls fatfs esp_hw_support esp_system
+                             jomjol_configfile jomjol_controlcamera jomjol_controlGPIO
+                             jomjol_fileserver_ota jomjol_flowcontroll jomjol_helper
+                             jomjol_logfile jomjol_mqtt jomjol_time_sntp jomjol_wlan)
