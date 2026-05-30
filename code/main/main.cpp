@@ -989,21 +989,38 @@ bool setCpuFrequency(void) {
         return false;
     }
 
-    if (cpuFrequency == "160") { // 160 is the default
-        // No change needed
+    int maxFreq;
+    if (cpuFrequency == "160") {
+        maxFreq = 160;
     }
     else if (cpuFrequency == "240") {
-        pm_config.max_freq_mhz = 240;
-        pm_config.min_freq_mhz = pm_config.max_freq_mhz;
-        if (esp_pm_configure(&pm_config) != ESP_OK) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to set new CPU frequency!");
-            return false;
-        }
+        maxFreq = 240;
     }
     else {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Unknown CPU frequency: " + cpuFrequency + "! "
                 "It must be 160 or 240!");
         return false;
+    }
+
+    pm_config.max_freq_mhz = maxFreq;
+#ifdef ENABLE_DYNAMIC_FREQ_SCALING
+    // DFS (opt-in, see defines.h): let the CPU down-clock to 80 MHz when idle to save power between
+    // rounds. Light sleep is intentionally NOT enabled (web server / MQTT stay responsive).
+    // VALIDATE ON HARDWARE: DFS scales the APB clock and the camera XCLK (LEDC) can drift, which may
+    // cause image artifacts -> bad reads. Disable this if image quality degrades.
+    pm_config.min_freq_mhz = 80;
+    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Dynamic Frequency Scaling ENABLED (min 80 MHz). "
+            "Verify camera image quality - DFS can affect the camera XCLK.");
+#else
+    pm_config.min_freq_mhz = maxFreq;   // fixed frequency (no scaling) - default behavior
+#endif
+
+    // For 160 MHz fixed this matches the boot default; for 240 or DFS it applies the new config.
+    if ((maxFreq != 160) || (pm_config.min_freq_mhz != maxFreq)) {
+        if (esp_pm_configure(&pm_config) != ESP_OK) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to set new CPU frequency / PM config!");
+            return false;
+        }
     }
 
     if (esp_pm_get_configuration(&pm_config) == ESP_OK) {

@@ -604,8 +604,22 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
    - Pairs with the flexible interval (§7) and the per-target sdkconfig work (item 5).
 3. **Wi-Fi** (802.11 k/v/r roaming + connection stability / lower memory) — builds on the existing
    `WLAN_USE_ROAMING_BY_SCANNING` scaffolding.
-4. **Heap allocation** (TLSF allocator + PSRAM tuning) — reduce fragmentation/peaks on the
-   memory-tight CNN workload; measure with the per-step heap diagnostics.
+4. **Heap allocation** (TLSF allocator + PSRAM tuning). 🟡 Profiled on-device (alpha.9):
+   - **Measured:** internal heap ~63 KB free (min 40 KB); **PSRAM ~150 KB free, largest block
+     ~144 KB, min-free dipped to ~12 KB**. Per-round churn is small (hundreds of B – ~10 KB). The
+     ~790 KB `alg_roi` overview path is *already* avoided (`ALGROI_LOAD_FROM_MEM_AS_JPG` on); the
+     earlier crash was the null-deref fallback (fixed), not that allocation.
+   - **Finding: memory is already well-architected, not wasteful.** The dominant consumer is a single
+     **shared 2.1 MB PSRAM region** (`TENSOR_ARENA_SIZE` 800 KB + `MAX_MODEL_SIZE` 1.3 MB) allocated
+     once and time-multiplexed between the tflite arena/model and the image (STBI) buffers; camera is
+     `fb_count=1`. Those sizes are **worst-case** (largest supported model ~1.1 MB), so they can't be
+     globally shrunk without breaking large-model users. Tightness is inherent to the ESP32's
+     **~4 MB-mapped PSRAM** (the other 4 MB of the 8 MB needs himem/bank-switching).
+   - **No safe blanket cut on ESP32.** Real headroom levers: (a) **himem** to map the upper 4 MB
+     (complex; was a special env) or (b) **ESP32-S3** which maps 8 MB+ directly → ~2× headroom. So
+     this item largely **rolls into item 5 (S3)**. Optional safe follow-ups: auto-size the arena to
+     the loaded model (frees PSRAM when small models are used), and a low-PSRAM early-warning log.
+   - TLSF is already the IDF default allocator; no change needed there.
 5. **Multi-platform via the split `esp_driver_*` drivers — once the above are stable.** Targets, in
    priority: **ESP32-S3 (highest — adds USB camera support)** → **ESP32-P4** → **ESP32-C3**.
    - Per-target `sdkconfig.defaults.<target>`, partition tables, and board pin maps (`defines.h`).
