@@ -483,16 +483,31 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				StatusLED(WLAN_CONN, 4, false);
 			}
 			WIFIReconnectCnt++;
+
+			// Exponential backoff before retrying: the first few attempts are immediate (covers a
+			// transient blip / single missed beacon), then the delay grows 1,2,4,8,16 s capped at
+			// 15 s so a down or unreachable AP isn't hammered and the log isn't spammed. The counter
+			// resets to 0 on a successful connection (IP_EVENT_STA_GOT_IP).
+			if (WIFIReconnectCnt >= 4) {
+				int shift = WIFIReconnectCnt - 4;
+				if (shift > 4) {
+					shift = 4;
+				}
+				int backoffMs = (1 << shift) * 1000;   // 1s, 2s, 4s, 8s, 16s
+				if (backoffMs > 15000) {
+					backoffMs = 15000;                  // hard cap
+				}
+				if ((WIFIReconnectCnt % 5) == 0) {      // periodic summary instead of one line per attempt
+					LogFile.WriteToFile(ESP_LOG_WARN, TAG, "WiFi reconnect attempt " + std::to_string(WIFIReconnectCnt) +
+															" still failing (reason " + std::to_string(disconn->reason) +
+															"); backing off " + std::to_string(backoffMs / 1000) + "s");
+				}
+				vTaskDelay(backoffMs / portTICK_PERIOD_MS);
+			}
+
 			esp_wifi_connect(); // Try to connect again
 		}
-
-		if (WIFIReconnectCnt >= 10) {
-			WIFIReconnectCnt = 0;
-			LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Disconnected, multiple reconnect attempts failed (" + 
-													 std::to_string(disconn->reason) + "), retrying after 5s");
-			vTaskDelay(5000 / portTICK_PERIOD_MS); // Delay between the reconnections
-		}
-	}	
+	}
 	else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) 
 	{
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Connected to: " + wlan_config.ssid + ", RSSI: " + 

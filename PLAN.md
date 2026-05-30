@@ -602,8 +602,17 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      `CONFIG_FREERTOS_USE_TICKLESS_IDLE`. Expose as a config/build option, not a forced default.
      Needs a **power meter** to quantify benefit (not measurable remotely).
    - Pairs with the flexible interval (§7) and the per-target sdkconfig work (item 5).
-3. **Wi-Fi** (802.11 k/v/r roaming + connection stability / lower memory) — builds on the existing
-   `WLAN_USE_ROAMING_BY_SCANNING` scaffolding.
+3. **Wi-Fi** (roaming + connection stability). 🟢 Done for now.
+   - ✅ **Exponential-backoff reconnect** (`connect_wlan.cpp`): replaced the "immediate reconnect ×10
+     then 5 s" loop with first-few-immediate then 1/2/4/8/16 s capped at 15 s, resetting on a
+     successful connect. Gentler on a down/unreachable AP, far less log spam, lower power during an
+     outage. (Status-LED + per-reason logging preserved.)
+   - ℹ️ **Roaming already scaffolded:** `WLAN_USE_ROAMING_BY_SCANNING` (scan-based, RSSI-triggered) is
+     **on**; full **802.11k/v** (RRM/BTM via `esp_rrm`/`esp_wnm`) is present but **opt-in**
+     (`WLAN_USE_MESH_ROAMING`, off) because it needs ~6–8 KB of the scarce **internal** RAM and only
+     helps multi-AP/mesh deployments. Leave opt-in; revisit on the S3 (more internal RAM headroom).
+   - 💡 802.11r (FT fast-transition) and lower WiFi static-buffer counts are possible but env-specific
+     / RAM-throughput trade-offs — not pursued by default.
 4. **Heap allocation** (TLSF allocator + PSRAM tuning). 🟡 Profiled on-device (alpha.9):
    - **Measured:** internal heap ~63 KB free (min 40 KB); **PSRAM ~150 KB free, largest block
      ~144 KB, min-free dipped to ~12 KB**. Per-round churn is small (hundreds of B – ~10 KB). The
