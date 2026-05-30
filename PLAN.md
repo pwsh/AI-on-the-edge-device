@@ -356,6 +356,24 @@ between v16 and v17:
   APIs the zip backup/restore actually uses; large surface to carry.
 - 💡 No fully-unused *components*: all 15 are wired into the firmware.
 
+### SD / flash write-wear review (2026-05-30)
+- ✅ **Internal flash (NVS) is not worn per round** — no `nvs_set`/`nvs_commit` in the flow path;
+  NVS is only initialized at boot. Config/wlan/prevalue all live on the **SD card**, not flash.
+- ✅ **New features are write-safe**: Status LED (LED hardware only; config written on Save),
+  Pause (in-memory; `/pause` poll is read-only, only logs on an actual state change), per-step
+  Diagnostics (DEBUG-gated → zero SD writes at the default INFO level), Live log viewer (GET `/log`
+  every 3 s = reads only, opt-in, auto-stops when hidden), Timezone dropdown (client-side).
+- ✅ **Heaviest writer (per-round images) is OFF by default** — `SaveAllFiles=false`, so
+  `/sdcard/img_tmp/*.jpg` are not rewritten each round unless the debug option is enabled.
+- ⬜ **Main SD write-amplifier: per-line log open/append/close.** `KEEP_LOGFILE_OPEN_FOR_APPENDING`
+  is **off** (`code/include/defines.h:52`), so every `WriteToFile` does `fopen("a+")` + write +
+  `fclose` → a FAT/dir metadata update **per log line**. Fine at 5-min intervals, but multiplies
+  ~30–60× at FastRead's 5–10 s target. Options: buffer log lines and flush periodically, lower
+  default verbosity, or enable keep-open+`fsync`. Pairs with the filtered-log-string item above.
+- ⬜ Other per-round SD writes are small/bounded: data CSV (1 append, gated by `DataLogActive`) and
+  `prevalue.ini` (rewritten only when the value changes, tens of bytes). Consider buffering both
+  if sub-minute intervals become common (tie-in with FastRead §1).
+
 ---
 
 ## 6. Image processing efficiency (investigate)
