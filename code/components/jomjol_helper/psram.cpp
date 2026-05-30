@@ -13,15 +13,16 @@ uint32_t allocatedBytesForSTBI = 0;
 uint32_t peakBytesForSTBI = 0;   // MEM-PROFILE: high-water mark of shared-region use during TakeImage
 std::string sharedMemoryInUseFor = "";
 
-// The TakeImage step decodes into the shared region and holds MULTIPLE large buffers concurrently
-// (output RGB + alignment crop planes). MEASURED peak = 1,536,046 bytes at VGA - and it scales with
-// the configured camera resolution (the JPEG decode), so it is NOT a fixed value. Because that peak
-// (and the higher peaks of larger-resolution configs) can exceed arena+model, the region must be
-// floored to cover it. We keep the floor at the long-proven safe size (== old region: the image
-// step always fit in it), so reducing MAX_MODEL_SIZE causes no regression but also no static saving.
-// To actually reclaim PSRAM, size the region at boot from the configured model + the real image-step
-// need for the configured resolution (PLAN sec 9.3 item 4) instead of this static floor.
-#define SHARED_REGION_IMAGE_FLOOR  (TENSOR_ARENA_SIZE + (size_t)(1.3 * 1024 * 1024))  // == old region; known-good, resolution-safe
+// Boot-time region sizing keyed to the analyzed-image footprint (IMAGE_SIZE), which is the real
+// binding constraint - NOT the model (the region is image-bound: no shipped model makes
+// arena+model exceed the image need). The camera output is fixed at VGA (FRAMESIZE_VGA, hardcoded),
+// so IMAGE_SIZE is constant and the image-step peak is deterministic: MEASURED TakeImage STBI peak =
+// 1,536,046 B ~= 1.67 x IMAGE_SIZE (one IMAGE_SIZE RGB decode + ~0.67x of alignment crop planes).
+// Floor at 2 x IMAGE_SIZE gives ~20% headroom over the measured peak and is resolution-correct
+// because it tracks IMAGE_SIZE: when cropping/masking (the analyzed area) reduces IMAGE_SIZE, the
+// region shrinks with it automatically. (Earlier static guess of ~921 KB undersized this -> boot
+// loop; this floor is firmly above the measured 1.54 MB peak.)
+#define SHARED_REGION_IMAGE_FLOOR  ((size_t)IMAGE_SIZE * 2)   // VGA: 1,843,200 B (measured peak 1,536,046)
 
 
 /** Reserve a large block in the PSRAM which will be shared between the different steps.

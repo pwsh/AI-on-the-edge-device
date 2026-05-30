@@ -1,7 +1,17 @@
-# [17.0.0-alpha.12] - 2026-05-30
+# [17.0.0-alpha.13] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet.
+
+### Since alpha.12
+
+- **PSRAM: boot-time region sizing keyed to the analyzed-image footprint (~330 KB freed, safely).**
+  Verified the camera output is fixed VGA (`FRAMESIZE_VGA`, not config-driven), so the image-decode
+  step is deterministic — the on-device measurement showed the TakeImage peak is **1.54 MB** (≈1.67×
+  `IMAGE_SIZE`). The shared region is bounded by that image step (not the model), so its floor is now
+  `2 × IMAGE_SIZE` = 1.84 MB (20% headroom over the measured peak) instead of the old 2.10 MB worst-
+  case-model size. Frees **~330 KB** of PSRAM (≈150 KB → ≈480 KB free). The floor tracks `IMAGE_SIZE`,
+  so a future crop/mask of the analyzed area (smaller `IMAGE_SIZE`) shrinks the region automatically.
 
 ### Since alpha.10
 
