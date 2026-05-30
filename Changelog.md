@@ -1,12 +1,19 @@
-# [17.0.0-alpha.5] - 2026-05-30
+# [17.0.0-alpha.6] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.5)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.6)
 
 ### :bug: Fixes since alpha.2
+
+- **SoftAP restored.** `ENABLE_SOFTAP` (the Wi-Fi setup access point shown when no `wlan.ini` is
+  present) was also lost in the build migration. Re-enabled; the blocker was a stale unused
+  `protocol_examples_common.h` include in `softAP.h`, now removed.
+- **Hot-path logging perf.** New guarded `LOGD()` macro only builds debug message strings when the
+  log level is DEBUG; the 32 such calls in the CNN inference loop no longer churn the heap each
+  cycle at the default INFO level. Removed the unused `protocol_examples_common` component dir.
 
 - **MQTT / InfluxDB / Webhook were entirely disabled (migration regression).** The feature flags
   `ENABLE_MQTT`, `ENABLE_INFLUXDB`, `ENABLE_WEBHOOK` (and the MQTT SSL flags) were only provided by

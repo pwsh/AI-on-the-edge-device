@@ -329,12 +329,12 @@ between v16 and v17:
   firmware, so no change needed (earlier "dead weight" note was incorrect).
 
 ### To do ⬜
-- ⬜ **Eliminate filtered-out log string construction (bigger win).** Callers still build
-  `"..." + std::to_string(x) + ...` before `WriteToFile` even when the level is filtered
-  (~23 such calls in `ClassFlowCNNGeneral.cpp` alone, in the inference loop). Add a
-  level-checking macro, e.g. `LOGD(tag,msg)` →
-  `if (LogFile.getLogLevel() >= ESP_LOG_DEBUG) LogFile.WriteToFile(...)`, and convert the
-  hot-path debug calls. Removes per-cycle heap churn in production.
+- ✅ **Eliminate filtered-out log string construction (bigger win).** Added the guarded
+  `LOGD(tag,msg)` macro in `ClassLogFile.h` (only evaluates the message when file log level is
+  DEBUG+) and converted the 32 string-building `WriteToFile(ESP_LOG_DEBUG, TAG, …)` calls in the
+  CNN inference loop (`ClassFlowCNNGeneral.cpp`). Removes per-cycle heap churn at the default INFO
+  level; identical behavior under DEBUG. The macro is reusable for other hot paths
+  (`ClassFlowPostProcessing` / `ClassFlowAlignment`) if needed later.
 - ⬜ **`std::string` pass-by-value across signatures** (configFile, ClassControllCamera,
   server_*). Convert hot ones to `const std::string&` to cut heap alloc/free churn.
   Note: the per-cycle virtual `doFlow(string time)` (14 sites) was assessed and **skipped**
@@ -536,11 +536,11 @@ The native `idf.py` build does **not** read `platformio.ini build_flags`. Audite
   `MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK`, `ENABLE_INFLUXDB`, `ENABLE_WEBHOOK`. Without
   these, MQTT/InfluxDB/Webhook were compiled out (device published nothing). Must be **global**
   (not in defines.h) because several files test `#ifdef ENABLE_MQTT` before including defines.h.
-- ⬜ **`ENABLE_SOFTAP` still off.** Provides the Wi-Fi setup access point when no `wlan.ini` is
-  present (first-time / recovery setup). `softAP.h` pulls `protocol_examples_common.h`; needs that
-  example component wired into the owning component's `REQUIRES` (it is already on
-  `EXTRA_COMPONENT_DIRS`). Only matters for un-provisioned devices; provisioned meters are
-  unaffected. Restore before a real v17 release.
+- ✅ **`ENABLE_SOFTAP` restored.** The blocker was a stale `#include "protocol_examples_common.h"`
+  in `softAP.h` that nothing actually used (softAP.cpp only calls `esp_netif_create_default_wifi_ap()`).
+  Dropped the include, set `ENABLE_SOFTAP` as a global IDF compile definition, and removed the now-
+  unused `protocol_examples_common` from `EXTRA_COMPONENT_DIRS` (root + 2 component CMakeLists).
+  The Wi-Fi setup AP (shown when no `wlan.ini`) is back.
 - 💤 **Inert** (not referenced in source): `USE_ESP32`, `USE_ESP_IDF`, `USE_ESP32_FRAMEWORK_ESP_IDF`,
   `BOARD_HAS_PSRAM`.
 - 🔧 **Non-default envs only** (not in `[env:esp32cam]`): the `CONFIG_*` power-management / task-WDT
