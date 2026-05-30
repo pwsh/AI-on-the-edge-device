@@ -1,12 +1,26 @@
-# [17.0.0-alpha.4] - 2026-05-30
+# [17.0.0-alpha.5] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.4)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.5)
 
 ### :bug: Fixes since alpha.2
+
+- **MQTT / InfluxDB / Webhook were entirely disabled (migration regression).** The feature flags
+  `ENABLE_MQTT`, `ENABLE_INFLUXDB`, `ENABLE_WEBHOOK` (and the MQTT SSL flags) were only provided by
+  `platformio.ini build_flags`, which the native ESP-IDF (`idf.py`) build does not read — so those
+  flow steps were compiled out and the device never published anything (no Home Assistant / MQTT
+  updates, no InfluxDB, no webhooks). They are now set as **global IDF compile definitions** in
+  `code/CMakeLists.txt`. Also fixed a stale `NumberPost::ErrorMessage` reference in the webhook code
+  that this exposed. (Diagnostics like uptime/RSSI are published by the MQTT step unconditionally;
+  only the meter reading is withheld on a consistency error, per "Skip Messages on Error".)
+  `ENABLE_SOFTAP` is still pending (needs `protocol_examples_common` wired into the component).
+- **Config pages no longer get stuck on a stale cached version.** HTML pages were sent with
+  `Cache-Control: max-age=43200` (12 h); a plain browser refresh (which doesn't carry the
+  `?v=<hash>` cache-buster) could keep serving an old page after an update. HTML/HTM now use
+  `no-cache` (revalidate); versioned assets (js/css/images) keep the long cache.
 
 - **Status LED colour pickers showed black on load.** The pickers are synced from their hidden
   R/G/B inputs by `syncStatusColorsFromValues()`, which was only called on the save path, not when

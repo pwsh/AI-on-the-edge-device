@@ -54,7 +54,9 @@ bool WebhookPublish(std::vector<NumberPost*>* numbers)
         
         cJSON_AddItemToArray(jsonArray, json);
 
-        if ((*numbers)[i]->ErrorMessage) {
+        // NumberPost::ErrorMessage (a bool) was removed; derive the error state from the
+        // error text instead ("no error" / empty means OK).
+        if (!(*numbers)[i]->ErrorMessageText.empty() && ((*numbers)[i]->ErrorMessageText != "no error")) {
             numbersWithError = true;
         }
     }

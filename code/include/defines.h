@@ -53,6 +53,12 @@
 
   //****************************************
 
+    // NOTE: feature flags (ENABLE_MQTT, ENABLE_INFLUXDB, ENABLE_WEBHOOK, MQTT_ENABLE_SSL, ...) are
+    // set as *global* compile definitions in code/CMakeLists.txt for the native ESP-IDF build,
+    // mirroring the platformio.ini build_flags. They must be global (not defined in this header),
+    // because several files test `#ifdef ENABLE_MQTT` before they include defines.h.
+  //****************************************
+
     //compiler optimization for esp-tflite-micro
     #define XTENSA
     //#define CONFIG_IDF_TARGET_ARCH_XTENSA     //not needed with platformio/espressif32 @ 5.2.0
