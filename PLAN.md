@@ -573,10 +573,15 @@ Opportunities the 5.3→6.0 jump opens up for this project (each TBD / measure b
 
 ### 9.3 🟡 Adoption roadmap — agreed priority order (2026-05-30)
 Work the IDF-6 opportunities in this order, keeping the device stable at each step:
-1. **Newer toolchain** (GCC 15 / C++23-26). 🟡 In progress. The toolchain is already active via
-   IDF 6.0 (xtensa-esp-elf 15.2.0, `-std=gnu++26`). Leverage it: build the perf-critical components
-   (CNN inference + image processing) at `-O2` instead of the global `-Os`, and adopt modern-C++
-   hot-path idioms (`std::string_view`/`const&`, `constexpr`) — ties into §5.
+1. **Newer toolchain** (GCC 15 / C++23-26). 🟢 Largely done. Toolchain active via IDF 6.0
+   (xtensa-esp-elf **15.2.0**, `-std=gnu++26`).
+   - ✅ Perf-critical components (`esp-tflite-micro`, `esp-nn`, `jomjol_image_proc`,
+     `jomjol_tfliteclass`) now build at **`-O2`** (vs global `-Os`), applied post-`project()` so the
+     vendored submodules need no edits. **Measured: CNN digitize ~5520 ms → ~5330 ms (~3.4% faster/
+     round), +11 KB flash, numerics unchanged** (esp-nn conv kernels are already asm).
+   - ⬜ Follow-up: modern-C++ hot-path idioms (`std::string_view`/`const&`, `constexpr`) per §5.
+   - 💡 The real round-time lever is TakeImage (~9.8 s, dominated by `WaitBeforePicture` config, not
+     CPU) — separate from the toolchain.
 2. **Power management** (`esp_pm` DFS + tickless idle / light sleep) — idle-power savings between
    rounds for battery/solar installs; pairs with the flexible interval (§7).
 3. **Wi-Fi** (802.11 k/v/r roaming + connection stability / lower memory) — builds on the existing
