@@ -501,6 +501,7 @@ updates the UI; keep models, logs, and config on the SD card for portability.
 4. Package the web partition image in the release flow; OTA-update it via a second OTA image
    (data-OTA) so the UI can still be updated without a full SD swap.
 
-**Open decision (needs user):** which target? (a) keep 4 MB + dual-OTA and leave UI on SD
-[status quo]; (b) 4 MB single-slot to fit UI in flash, giving up A/B OTA; (c) target 8 MB+ boards
-with a dedicated web partition (recommended if hardware allows). Implementation differs per choice.
+**Decision (2026-05-30): keep the UI on the SD card (status quo).** The web UI stays on SD and is
+updated via the existing OTA Update page (no card swap needed); flash space is reserved for the
+firmware + dual-OTA rollback safety. Revisit only if the project targets 8 MB+ boards, where a
+dedicated `web` LittleFS partition (option c above) becomes the clean path.
