@@ -81,6 +81,9 @@ bool isSetupModusActive(void);
 
 int getCountFlowRounds(void);
 
+bool getFlowPaused(void);
+void setFlowPaused(bool _paused);
+
 #ifdef ENABLE_MQTT
 esp_err_t MQTTCtrlFlowStart(std::string _topic);
 #endif // ENABLE_MQTT

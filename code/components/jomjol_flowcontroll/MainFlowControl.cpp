@@ -45,6 +45,12 @@ bool flowisrunning = false;
 long auto_interval = 0;
 bool autostartIsEnabled = false;
 
+// Pause processing: when true, the auto-flow task finishes any in-progress
+// round and then waits (without starting new rounds) until resumed. In-memory
+// only (resets on reboot) and intentionally leaves the last "Flow finished"
+// status untouched so reference/ROI setup stays available while paused.
+bool flowPaused = false;
+
 int countRounds = 0;
 bool isPlannedReboot = false;
 
@@ -77,6 +83,25 @@ bool getIsPlannedReboot(void)
 int getCountFlowRounds(void)
 {
     return countRounds;
+}
+
+bool getFlowPaused(void)
+{
+    return flowPaused;
+}
+
+void setFlowPaused(bool _paused)
+{
+    if (flowPaused == _paused)
+        return;
+
+    flowPaused = _paused;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, flowPaused ? "Processing paused" : "Processing resumed");
+
+    // Wake the auto-flow task so it reacts immediately (e.g. resume starts the
+    // next round without waiting out the remaining interval delay).
+    if (xHandletask_autodoFlow != NULL)
+        xTaskAbortDelay(xHandletask_autodoFlow);
 }
 
 esp_err_t GetJPG(std::string _filename, httpd_req_t *req)
@@ -428,6 +453,51 @@ esp_err_t handler_flow_start(httpd_req_t *req)
 
 #ifdef DEBUG_DETAIL_ON
     LogFile.WriteHeapInfo("handler_flow_start - Done");
+#endif
+
+    return ESP_OK;
+}
+
+esp_err_t handler_pause(httpd_req_t *req)
+{
+#ifdef DEBUG_DETAIL_ON
+    LogFile.WriteHeapInfo("handler_pause - Start");
+#endif
+
+    ESP_LOGD(TAG, "handler_pause uri: %s", req->uri);
+
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_type(req, "text/plain");
+
+    char _query[50];
+    char _value[16];
+
+    // No query parameter -> just report the current state (used by the UI on load).
+    if (httpd_req_get_url_query_str(req, _query, sizeof(_query)) == ESP_OK)
+    {
+        if (httpd_query_key_value(_query, "status", _value, sizeof(_value)) == ESP_OK)
+        {
+            std::string _v = std::string(_value);
+            if (_v == "toggle")
+            {
+                setFlowPaused(!getFlowPaused());
+            }
+            else if (_v == "1" || _v == "true" || _v == "pause")
+            {
+                setFlowPaused(true);
+            }
+            else if (_v == "0" || _v == "false" || _v == "resume")
+            {
+                setFlowPaused(false);
+            }
+        }
+    }
+
+    const char *resp_str = getFlowPaused() ? "paused" : "running";
+    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+
+#ifdef DEBUG_DETAIL_ON
+    LogFile.WriteHeapInfo("handler_pause - Done");
 #endif
 
     return ESP_OK;
@@ -1681,6 +1751,21 @@ void task_autodoFlow(void *pvParameter)
 
     while (autostartIsEnabled)
     {
+        // Honor a pause request: wait here without starting a new round. The last
+        // status (e.g. "Flow finished") is left untouched so reference image /
+        // alignment / ROI setup keeps working while paused.
+        if (flowPaused)
+        {
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Processing is paused - waiting for resume");
+            while (flowPaused && autostartIsEnabled)
+            {
+                vTaskDelay(500 / portTICK_PERIOD_MS);
+            }
+            if (!autostartIsEnabled)
+                break;
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Resumed - continuing processing");
+        }
+
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "----------------------------------------------------------------"); // Clear separation between runs
         time_t roundStartTime = getUpTime();
 
@@ -1801,6 +1886,11 @@ void register_server_main_flow_task_uri(httpd_handle_t server)
     camuri.uri = "/flow_start";
     camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_flow_start);
     camuri.user_ctx = (void *)"Flow Start";
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.uri = "/pause";
+    camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_pause);
+    camuri.user_ctx = (void *)"Pause";
     httpd_register_uri_handler(server, &camuri);
 
     camuri.uri = "/statusflow.html";

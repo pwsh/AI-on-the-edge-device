@@ -94,6 +94,12 @@
             height: 20px;
             margin-right: 5px;
         }
+        /* Highlight the Pause/Resume menu item while processing is paused */
+        #PauseToggle.paused > a {
+            background-color: #d39e00;
+            color: #1b1b1b;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -114,6 +120,7 @@
 <div class="menu" onmouseover="resetMenu()">
   <ul>
     <li><a href="#" onclick="loadPage('overview.html?v=$COMMIT_HASH');">Overview</a></li>
+    <li id="PauseToggle"><a href="#" onclick="togglePause(); return false;" title="Pause / resume the automatic processing loop"><span id="PauseToggleLabel">Pause processing</span></a></li>
     <li><a>Settings <i class="arrow down"></i></a>
       <ul class="submenu" style="width: 260px">
         <li style="width: 260px"><a href="#" onclick="loadPage('prevalue_set.html?v=$COMMIT_HASH');">Set "Previous Value"</a></li>
@@ -208,6 +215,10 @@
     console.log("Loading page: " + getCookie("page"));
     document.getElementById('maincontent').src = getCookie("page");
 
+    // Reflect the current pause state in the menu, then keep it in sync.
+    refreshPauseState();
+    setInterval(refreshPauseState, 10000);
+
     
     function flow_start() {
     var url = getDomainname() + '/flow_start'; 
@@ -230,7 +241,44 @@
 		xhttp.open("GET", url, true);
 		xhttp.send();
     }
-    
+
+    // ---- Pause / resume processing -----------------------------------------
+    function applyPauseState(state) {
+        // state: "paused" or "running"
+        var paused = (state == "paused");
+        var label = document.getElementById("PauseToggleLabel");
+        var item = document.getElementById("PauseToggle");
+        if (label) label.textContent = paused ? "Resume processing" : "Pause processing";
+        if (item) item.classList.toggle("paused", paused);
+    }
+
+    function refreshPauseState() {
+        var url = getDomainname() + '/pause';
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                applyPauseState(xhttp.responseText.trim());
+            }
+        }
+        xhttp.open("GET", url, true);
+        xhttp.send();
+    }
+
+    function togglePause() {
+        var url = getDomainname() + '/pause?status=toggle';
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                var state = xhttp.responseText.trim();
+                applyPauseState(state);
+                firework.launch(state == "paused" ? "Processing paused" : "Processing resumed",
+                    state == "paused" ? "warning" : "success", 4000);
+            }
+        }
+        xhttp.open("GET", url, true);
+        xhttp.send();
+    }
+
 
     function HA_send_discovery_visibility()	{
 		loadConfig(domainname); 
