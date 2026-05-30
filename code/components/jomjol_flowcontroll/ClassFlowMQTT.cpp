@@ -231,6 +231,9 @@ bool ClassFlowMQTT::Start(float AutoInterval)
 {
     roundInterval = AutoInterval; // Minutes
     keepAlive = roundInterval * 60 * 2.5; // Seconds, make sure it is greater thatn 2 rounds!
+    if (keepAlive < 60) {
+        keepAlive = 60; // floor: sub-minute intervals must not produce an overly aggressive MQTT keep-alive / LWT timeout
+    }
 
     std::stringstream stream;
     stream << std::fixed << std::setprecision(1) << "Digitizer interval is " << roundInterval <<

@@ -2084,8 +2084,14 @@
                 <class id="AutoTimer_Interval_text" style="color:black;">Round Interval</class>
             </td>
             <td>
-                <input required type="number" id="AutoTimer_Interval_value1" size="13" min="1" step="any"
-                    oninput="(!validity.rangeUnderflow||(value=1));">Minutes
+                <input required type="number" id="AutoTimer_Interval_value1" size="8" min="1" step="1"
+                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                <select id="AutoTimer_Interval_value2">
+                    <option value="seconds">seconds</option>
+                    <option value="minutes" selected>minutes</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                </select>
             </td>
             <td>$TOOLTIP_AutoTimer_Interval</td>
         </tr>

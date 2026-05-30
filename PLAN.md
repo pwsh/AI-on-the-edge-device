@@ -24,10 +24,12 @@ Status legend: ✅ done · ⬜ todo · 💡 idea/future
 ✅ Default **off** — runtime behavior unchanged until enabled in config.ini
 
 ### Immediate TODO
-⬜ Wire `TriggerFullEval()` into `ClassFlowPostProcessing` so a full re-read is forced on:
-   - digit carry / rollover (lowest digit wraps 9→0)
-   - consistency-check failure (`CheckDigitConsistency`, negative/over-max rate)
-   - see `ClassFlowPostProcessing.cpp` ~line 739 (rollover) for the hook point
+🟡 Wire `TriggerFullEval()` into `ClassFlowPostProcessing`:
+   - ✅ **consistency-check failure** (negative rate / rate-too-high) now calls
+     `flowDigit->TriggerFullEval()` before `continue`, so a rejected reading forces a full
+     re-read of every digit on the next cycle (recovers a stale per-digit cache).
+   - 💡 digit carry / rollover is already covered by the per-digit pixel gate (the carried digit's
+     pixels change → it is re-inferred), so no explicit trigger is needed there.
 ✅ Added `FastRead` / `FastReadThreshold` / `FastReadFullInterval` to the web config UI
    (expert rows in `edit_config_template.html` Digits section, `ParamAddValue` registration
    in `readconfigparam.js`, Write/ReadParameter wiring). Tooltips auto-generate from the
@@ -458,16 +460,16 @@ between v16 and v17:
      prompts for a reboot when actually necessary.
    - Keep a safe fallback: if live-reload of a given change isn't supported, fall back to the
      current "reboot to apply" behavior rather than applying a partial/invalid state.
-- ⬜ **Flexible processing interval (sub-minute + unit dropdown).** The auto-timer interval is
-   currently whole minutes (`[AutoTimer] AutoStart`/`Intervall` in minutes). Allow finer and
-   coarser granularity:
-   - UI: an integer entry + a **unit dropdown (seconds / minutes / hours / days)**; store the
-     resulting interval (convert to a common unit, e.g. seconds, internally).
-   - Allow **sub-minute** intervals (seconds) — pairs naturally with FastRead (§1) for the
-     5–10 s target; guard against intervals shorter than one flow round can complete.
-   - **Default: 5 minutes** in the base configuration (unchanged default behavior).
-   - Firmware: widen the interval type/parsing (currently minutes) to seconds and update the
-     auto-timer loop; keep config back-compat (treat a bare number as minutes if no unit).
+- ✅ **Flexible processing interval (sub-minute + unit dropdown).** Implemented:
+   - UI: integer entry + **unit dropdown (seconds / minutes / hours / days)** on the Round Interval
+     row (`edit_config_template.html`); `Interval` registered with `anzParam=2` and a back-compat
+     unit default of `minutes` in `readconfigparam.js`.
+   - Firmware (`ClassFlowControll::ReadParameter`): parses `Interval = <number> [unit]`, converts to
+     minutes in the existing `float AutoInterval` (which already supports sub-minute), guards against
+     a 0/negative value; a bare number stays minutes (back-compat). The auto-timer loop is unchanged
+     (it already skips the delay when a round runs longer than the interval).
+   - MQTT keep-alive/LWT timeout gets a 60 s floor so short intervals don't make it too aggressive.
+   - Tooltip doc updated (`param-docs/.../AutoTimer/Interval.md`). Default stays **5 minutes**.
 - 🟡 **Live log viewer (auto-scroll / tail).** The log viewer page currently requires a manual
    reload (or button press) to see new entries. Add a "Live / auto-scroll" checkbox that polls
    (or streams) new log lines and appends them, auto-scrolling to the bottom; unchecking pauses

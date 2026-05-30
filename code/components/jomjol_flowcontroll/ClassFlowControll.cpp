@@ -610,7 +610,25 @@ bool ClassFlowControll::ReadParameter(FILE* pfile, string& aktparamgraph)
 
         if ((toUpper(splitted[0]) == "INTERVAL") && (splitted.size() > 1)) {
             if (isStringNumeric(splitted[1])) {
-                AutoInterval = std::stof(splitted[1]);
+                // Interval = <number> [unit]. An optional unit (seconds/minutes/hours/days, or
+                // their s/m/h/d abbreviations) is converted to minutes. A bare number stays
+                // minutes (back-compat). AutoInterval is a float, so sub-minute (seconds) works.
+                float _val = std::stof(splitted[1]);
+                float _minutes = _val;   // default unit: minutes
+                if (splitted.size() > 2) {
+                    std::string _unit = toUpper(splitted[2]);
+                    if (_unit == "S" || _unit == "SEC" || _unit == "SECOND" || _unit == "SECONDS")
+                        _minutes = _val / 60.0f;
+                    else if (_unit == "H" || _unit == "HR" || _unit == "HOUR" || _unit == "HOURS")
+                        _minutes = _val * 60.0f;
+                    else if (_unit == "D" || _unit == "DAY" || _unit == "DAYS")
+                        _minutes = _val * 1440.0f;
+                    // minutes / unknown -> already minutes
+                }
+                if (_minutes <= 0.0f) {
+                    _minutes = 5.0f;   // guard against a zero/negative interval
+                }
+                AutoInterval = _minutes;
             }
         }
 
@@ -736,7 +754,7 @@ esp_err_t ClassFlowControll::GetJPGStream(std::string _fn, httpd_req_t *req)
     bool _sendDelete = false;
 
     if (_fn == "alg.jpg") {
-        if (flowalignment && flowalignment->ImageBasis->ImageOkay()) {
+        if (flowalignment && flowalignment->ImageBasis && flowalignment->ImageBasis->ImageOkay()) {
             _send = flowalignment->ImageBasis;
         }
         else {
@@ -840,7 +858,7 @@ esp_err_t ClassFlowControll::GetJPGStream(std::string _fn, httpd_req_t *req)
                 }
                 else {
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ClassFlowControll::GetJPGStream: alg_roi.jpg cannot be served -> alg.jpg is going to be served!");
-                    if (flowalignment && flowalignment->ImageBasis->ImageOkay()) {
+                    if (flowalignment && flowalignment->ImageBasis && flowalignment->ImageBasis->ImageOkay()) {
                         _send = flowalignment->ImageBasis;
                     }
                     else {
@@ -856,7 +874,7 @@ esp_err_t ClassFlowControll::GetJPGStream(std::string _fn, httpd_req_t *req)
                 }
                 else {
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ClassFlowControll::GetJPGStream: alg_roi.jpg cannot be served -> alg.jpg is going to be served!");
-                    if (flowalignment && flowalignment->ImageBasis->ImageOkay()) {
+                    if (flowalignment && flowalignment->ImageBasis && flowalignment->ImageBasis->ImageOkay()) {
                         _send = flowalignment->ImageBasis;
                     }
                     else {
@@ -883,7 +901,7 @@ esp_err_t ClassFlowControll::GetJPGStream(std::string _fn, httpd_req_t *req)
             else {
                 LogFile.WriteToFile(ESP_LOG_WARN, TAG, "ClassFlowControll::GetJPGStream: Not enough memory to create alg_roi.jpg -> alg.jpg is going to be served!");
                 
-                if (flowalignment && flowalignment->ImageBasis->ImageOkay()) {
+                if (flowalignment && flowalignment->ImageBasis && flowalignment->ImageBasis->ImageOkay()) {
                     _send = flowalignment->ImageBasis;
                 }
                 else {

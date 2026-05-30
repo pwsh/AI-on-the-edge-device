@@ -1,7 +1,9 @@
 # Parameter `Interval`
-Default Value: `5`
+Default Value: `5 minutes`
 
-Unit: Minutes
+Choose a number and a unit (**seconds / minutes / hours / days**). Sub-minute intervals
+(seconds) are supported and pair well with FastRead. A bare number with no unit (e.g. a legacy
+`Interval = 5`) is interpreted as **minutes** for backward compatibility.
 
 Interval in which the Flow (Digitization Round) is run.
 It will run immediately on startup and then the next time after the given interval.
@@ -10,4 +12,5 @@ If a round takes longer than this interval, the next round gets postponed until 
 If the flow gets started by a MQTT message or the REST API call, the interval automatically gets reset.
 
 !!! Note
-    If you want the flow to be disabled, set an interval which is high enough (eg. 1440 = 24h).
+    Very short intervals run rounds nearly back-to-back (a round won't be cut short). If you want
+    the flow effectively disabled, set a long interval (e.g. `1 days`).

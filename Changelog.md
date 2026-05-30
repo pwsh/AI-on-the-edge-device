@@ -1,12 +1,22 @@
-# [17.0.0-alpha.6] - 2026-05-30
+# [17.0.0-alpha.7] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.6)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.7)
 
 ### :bug: Fixes since alpha.2
+
+- **Crash fixed: null-pointer dereference serving `alg_roi.jpg`.** `GetJPGStream` checked
+  `flowalignment` but then dereferenced `flowalignment->ImageBasis->ImageOkay()` without
+  null-checking `ImageBasis` (4 sites). Loading the info/overview page before alignment had run
+  (or when the image buffer couldn't be allocated) panicked the device. It now falls back to an
+  empty response instead.
+- **More robust camera init.** The boot-time camera initialization now retries up to 3 times
+  (was 2) with a power-down reset between attempts, to recover a sensor left stuck after a
+  software reset. (A software reset does not power-cycle the camera, so a physical power cycle may
+  still be needed in the worst case — the error message now says so.)
 
 - **SoftAP restored.** `ENABLE_SOFTAP` (the Wi-Fi setup access point shown when no `wlan.ini` is
   present) was also lost in the build migration. Re-enabled; the blocker was a stale unused
@@ -140,6 +150,14 @@ No software is perfect. We know that our software has some quirks. If you have a
   instead of requiring a manual reload.
 - **Time Zone is now a searchable dropdown** (region/city) generated from the IANA tz database;
   selecting a zone applies its POSIX string automatically. Removes the separate `timezones.html`.
+- **Flexible round interval (sub-minute + unit dropdown).** The Round Interval is now an integer
+  plus a unit selector (**seconds / minutes / hours / days**) instead of whole minutes only.
+  Seconds-level intervals are supported (pairs with FastRead). Config format is
+  `Interval = <number> <unit>`; a bare number (legacy `Interval = 5`) is still read as minutes.
+  The MQTT keep-alive/LWT timeout has a 60 s floor so short intervals don't make it too aggressive.
+- **FastRead self-corrects on rejected readings.** When a reading is rejected by a consistency
+  check (negative rate / rate-too-high), the digit CNN is told to do a full re-read of every digit
+  on the next cycle (`TriggerFullEval`), so a stale per-digit FastRead cache can't get stuck.
 
 
 # [16.1.0] - 2026-01-11

@@ -289,7 +289,11 @@ function ParseConfig() {
     category[catname]["found"] = false;
     param[catname] = new Object();
     //ParamAddValue(param, catname, "AutoStart");
-    ParamAddValue(param, catname, "Interval");     
+    // Interval = <number> <unit>. value1 = number, value2 = unit (seconds/minutes/hours/days).
+    // A legacy "Interval = 5" (no unit) is read as minutes for back-compat (default below).
+    ParamAddValue(param, catname, "Interval", 2);
+    param[catname]["Interval"]["value1"] = "5";
+    param[catname]["Interval"]["value2"] = "minutes";
 
     var catname = "DataLogging";
     category[catname] = new Object();
@@ -689,6 +693,14 @@ function getCamConfig() {
             param["GPIO"][_stage].value1 = _statusLedDefaults[_stage][0];
             param["GPIO"][_stage].value2 = _statusLedDefaults[_stage][1];
             param["GPIO"][_stage].value3 = _statusLedDefaults[_stage][2];
+        }
+    }
+
+    // Round Interval back-compat: a legacy "Interval = 5" (no unit) parses with value2 undefined;
+    // default the unit to minutes so the dropdown shows a valid selection.
+    if (param["AutoTimer"] && param["AutoTimer"]["Interval"]) {
+        if (!param["AutoTimer"]["Interval"]["value2"]) {
+            param["AutoTimer"]["Interval"]["value2"] = "minutes";
         }
     }
 

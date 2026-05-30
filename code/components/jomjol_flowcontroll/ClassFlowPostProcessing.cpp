@@ -924,6 +924,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, _zw);
                     WriteDataLog(j);
+                    // FastRead: a rejected reading may stem from a stale per-digit cache; force a
+                    // full re-read of every digit on the next cycle to recover.
+                    if (flowDigit) flowDigit->TriggerFullEval();
                     continue;
                 }
             }
@@ -963,6 +966,8 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, _zw);
                     WriteDataLog(j);
+                    // FastRead: rejected reading -> force a full re-read of every digit next cycle.
+                    if (flowDigit) flowDigit->TriggerFullEval();
                     continue;
                 }
             }

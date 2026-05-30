@@ -327,21 +327,12 @@ extern "C" void app_main(void)
                 else { // PSRAM OK
                     // Init camera
                     // ********************************************
-                    PowerResetCamera();
-                    esp_err_t camStatus = Camera.InitCam();
-                    Camera.LightOnOff(false);
-
-                    xDelay = 2000 / portTICK_PERIOD_MS;
-                    ESP_LOGD(TAG, "After camera initialization: sleep for: %ldms", (long) xDelay * CONFIG_FREERTOS_HZ/portTICK_PERIOD_MS);
-                    vTaskDelay( xDelay );
-
-                    // Check camera init
-                    // ********************************************
-                    if (camStatus != ESP_OK) { // Camera init failed, retry to init
-                        char camStatusHex[33];
-                        sprintf(camStatusHex,"0x%02x", camStatus);
-                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Camera init failed (" + std::string(camStatusHex) + "), retrying...");
-
+                    // Retry a few times with a power-down reset between attempts. A sensor left in
+                    // a stuck state (e.g. after a software-exception reset, which does NOT power-
+                    // cycle the camera) can need several PWDN cycles before it probes correctly.
+                    const int CAM_INIT_MAX_ATTEMPTS = 3;
+                    esp_err_t camStatus = ESP_FAIL;
+                    for (int attempt = 1; attempt <= CAM_INIT_MAX_ATTEMPTS; ++attempt) {
                         PowerResetCamera();
                         camStatus = Camera.InitCam();
                         Camera.LightOnOff(false);
@@ -350,10 +341,22 @@ extern "C" void app_main(void)
                         ESP_LOGD(TAG, "After camera initialization: sleep for: %ldms", (long) xDelay * CONFIG_FREERTOS_HZ/portTICK_PERIOD_MS);
                         vTaskDelay( xDelay );
 
-                        if (camStatus != ESP_OK) { // Camera init failed again
-                            sprintf(camStatusHex,"0x%02x", camStatus);
+                        if (camStatus == ESP_OK) {
+                            break;
+                        }
+
+                        char camStatusHex[33];
+                        sprintf(camStatusHex,"0x%02x", camStatus);
+                        if (attempt < CAM_INIT_MAX_ATTEMPTS) {
+                            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Camera init failed (" + std::string(camStatusHex) +
+                                                                    "), retrying (" + std::to_string(attempt) + "/" +
+                                                                    std::to_string(CAM_INIT_MAX_ATTEMPTS - 1) + ")...");
+                        }
+                        else { // Camera init failed on the final attempt
                             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Camera init failed (" + std::string(camStatusHex) +
-                                                                    ")! Check camera module and/or proper electrical connection");
+                                                                    ")! Check camera module and/or proper electrical connection. "
+                                                                    "A software reset does not power-cycle the camera - a physical "
+                                                                    "power cycle may be required to recover a stuck sensor");
                             setSystemStatusFlag(SYSTEM_STATUS_CAM_BAD);
                             Camera.LightOnOff(false);   // make sure flashlight is off
                             StatusLED(CAM_INIT, 1, true);
