@@ -314,7 +314,7 @@ void ClassFlowPostProcessing::SavePreValue() {
 ClassFlowPostProcessing::ClassFlowPostProcessing(std::vector<ClassFlow*>* lfc, ClassFlowCNNGeneral *_analog, ClassFlowCNNGeneral *_digit) {
     PreValueUse = false;
     PreValueAgeStartup = 30;
-    ErrorMessage = false;
+    ErrorMessage = true;   // "Skip Messages on Error": default true (documented default) -> skip transmission on error
     ListFlowControll = NULL;
     FilePreValue = FormatFileName("/sdcard/config/prevalue.ini");
     ListFlowControll = lfc;
@@ -914,9 +914,11 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                                                     + ", preToll=" + std::to_string(NUMBERS[j]->PreValue-(2/pow(10, NUMBERS[j]->Nachkomma))));
                     } 
 
-                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Neg. Rate - Read: " + zwvalue + " - Raw: " + NUMBERS[j]->ReturnRawValue + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " "; 
+                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Neg. Rate - Read: " + zwvalue + " - Raw: " + NUMBERS[j]->ReturnRawValue + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " ";
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
-                    NUMBERS[j]->ReturnValue = "";
+                    // "Skip Messages on Error" (ErrorMessage): when true (default) skip the transmission
+                    // for this reading (empty value); when false, transmit the last valid value instead.
+                    NUMBERS[j]->ReturnValue = ErrorMessage ? "" : RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->timeStampLastValue = imagetime;
 
                     string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
@@ -952,8 +954,10 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 if (abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) {
                     NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate too high - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
-                    NUMBERS[j]->ReturnValue = "";
-                    NUMBERS[j]->ReturnRateValue = "";
+                    // "Skip Messages on Error" (ErrorMessage): when true (default) skip the transmission
+                    // for this reading (empty value); when false, transmit the last valid value instead.
+                    NUMBERS[j]->ReturnValue = ErrorMessage ? "" : RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
+                    NUMBERS[j]->ReturnRateValue = "";   // rate itself was rejected -> always omitted
                     NUMBERS[j]->timeStampLastValue = imagetime;
 
                     string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
