@@ -526,3 +526,45 @@ updates the UI; keep models, logs, and config on the SD card for portability.
 updated via the existing OTA Update page (no card swap needed); flash space is reserved for the
 firmware + dual-OTA rollback safety. Revisit only if the project targets 8 MB+ boards, where a
 dedicated `web` LittleFS partition (option c above) becomes the clean path.
+
+## 9. ESP-IDF 6.0 build-flag parity + opportunities
+
+### 9.1 ✅/⬜ Build-flag parity audit (platformio.ini → native idf.py)
+The native `idf.py` build does **not** read `platformio.ini build_flags`. Audited every `-D` flag:
+- ✅ **Restored as global IDF compile definitions** (`code/CMakeLists.txt`, non-PLATFORMIO block):
+  `BOARD_ESP32CAM_AITHINKER`, `ENABLE_MQTT`, `MQTT_ENABLE_SSL`,
+  `MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK`, `ENABLE_INFLUXDB`, `ENABLE_WEBHOOK`. Without
+  these, MQTT/InfluxDB/Webhook were compiled out (device published nothing). Must be **global**
+  (not in defines.h) because several files test `#ifdef ENABLE_MQTT` before including defines.h.
+- ⬜ **`ENABLE_SOFTAP` still off.** Provides the Wi-Fi setup access point when no `wlan.ini` is
+  present (first-time / recovery setup). `softAP.h` pulls `protocol_examples_common.h`; needs that
+  example component wired into the owning component's `REQUIRES` (it is already on
+  `EXTRA_COMPONENT_DIRS`). Only matters for un-provisioned devices; provisioned meters are
+  unaffected. Restore before a real v17 release.
+- 💤 **Inert** (not referenced in source): `USE_ESP32`, `USE_ESP_IDF`, `USE_ESP32_FRAMEWORK_ESP_IDF`,
+  `BOARD_HAS_PSRAM`.
+- 🔧 **Non-default envs only** (not in `[env:esp32cam]`): the `CONFIG_*` power-management / task-WDT
+  flags live in `esp32cam-power-management` / `esp32cam-dev`. In a native idf build these belong in
+  `sdkconfig.defaults` (Kconfig), not as `-D`. Port them if/when those build variants are recreated.
+- 🚫 **Commented out** (never active): `MQTT_PROTOCOL_311`, `MQTT_ENABLE_WS`, `MQTT_ENABLE_WSS`,
+  `MQTT_SUPPORTED_FEATURE_CRT_CMN_NAME`, `MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD`, the `DEBUG_*`
+  and `HEAP_TRACING_*` / `TASK_ANALYSIS_ON` switches.
+- ⬜ **Recreate the alternate build envs** for the native toolchain (board-rev3, cpu-freq-240,
+  power-management, no-softap, himem, task-analysis) as idf.py build profiles / sdkconfig variants.
+
+### 9.2 ⬜ IDF 6.0 features worth adopting (evaluate)
+Opportunities the 5.3→6.0 jump opens up for this project (each TBD / measure before adopting):
+- **Power management / light sleep** (`esp_pm` DFS + tickless idle): meaningful idle-power savings
+  for battery/solar meter installs between rounds. Pairs with the flexible-interval work (§7).
+- **Wi-Fi 802.11k/v/r roaming + connection-stability** improvements: the project already has roaming
+  scaffolding (`WLAN_USE_ROAMING_BY_SCANNING`); 6.0's stack is more robust and lower-memory.
+- **Newer toolchain (GCC 15, C++23/26)**: better optimization and `constexpr`/`std::string_view`
+  opportunities in the hot CNN/post-processing paths (ties into the perf items in §5).
+- **mbedTLS 4.x / PSA crypto**: stronger, smaller TLS for MQTTS / HTTPS / webhook endpoints.
+- **Heap allocator (TLSF) + PSRAM refinements**: relevant to the memory-tight CNN workload; could
+  reduce fragmentation/peaks (measure with the new per-step heap diagnostics).
+- **New `esp_driver_*` split drivers** (RMT already used for the WS281x status LED): cleaner APIs,
+  smaller link footprint if legacy drivers are dropped.
+- **Secure Boot v2 / flash encryption** maturity: optional hardening for production deployments.
+- **Larger-flash / ESP32-S3 targets**: 6.0's better S3 support pairs with the "web UI in flash"
+  idea (§8) and more PSRAM/where a bigger CNN or higher-res capture becomes feasible.
