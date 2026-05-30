@@ -5,20 +5,22 @@
 
 ### Since alpha.10
 
-- **PSRAM: right-size the model buffer to the shipped models.** The shared PSRAM region reserved
-  `MAX_MODEL_SIZE` = 1.3 MB for a worst-case model, but the largest model actually shipped is
-  `dig-class11_1701_s2.tflite` = 356 KB → reduced `MAX_MODEL_SIZE` to **512 KB** (largest shipped +
-  margin; a larger custom model is still rejected gracefully at load). The region is now sized as
-  `max(TENSOR_ARENA_SIZE + MAX_MODEL_SIZE, image-decode floor)`.
-- **Added `MEM-PROFILE` instrumentation** (tensor-arena `arena_used_bytes` per model, TakeImage STBI
-  high-water mark) to size the region from real data. Confirmed the tiny arena need: the in-use
-  model uses only **28 KB of the reserved 800 KB** tensor arena — a large further opportunity.
-- **⚠️ Important correction (alpha.11 → alpha.12):** alpha.11 set the image-decode floor from a single
-  921 KB measurement, but the TakeImage step holds **multiple** large buffers concurrently (decode
-  ~921 KB + crop ~615 KB), so 1.31 MB was too small → `psram_reserve_shared_stbi_memory` returned
-  NULL → **boot loop**. alpha.12 floors the region at the **known-good old size** until the true STBI
-  peak is measured on hardware, then it will be tightened to `peak + margin` to safely reclaim PSRAM.
-  Net PSRAM saving is therefore **pending the on-device peak measurement** (not yet realized).
+- **PSRAM: right-size the model buffer to the shipped models.** `MAX_MODEL_SIZE` reserved 1.3 MB for
+  a worst-case model, but the largest model actually shipped is `dig-class11_1701_s2.tflite` = 356 KB
+  → reduced to **512 KB** (largest shipped + margin; a larger custom model is still rejected
+  gracefully at load). Correct and safe, but see the finding below.
+- **Added `MEM-PROFILE` instrumentation** (`arena_used_bytes` per model, TakeImage STBI high-water
+  mark) and measured on-device. Two findings: the in-use model needs only **28 KB of the 800 KB**
+  tensor arena, and the **TakeImage STBI peak = 1.46 MB at VGA** (it scales with camera resolution).
+- **Honest result: the model right-sizing does *not* free PSRAM on its own.** The shared region is
+  bounded by the image-decode step (~1.46 MB), which already exceeds arena(800 KB)+model(512 KB)=
+  1.31 MB, so the region stays at the known-good ~2.1 MB size (kept for resolution-safety). A static
+  region cut isn't safe across camera resolutions — actually reclaiming PSRAM needs **per-config
+  boot-time sizing** (measure model + image-step need at boot), tracked in PLAN §9.3 item 4.
+- **⚠️ Process note (alpha.11):** an earlier attempt sized the region from a single 921 KB sample and
+  undersized it → `psram_reserve_shared_stbi_memory` returned NULL → boot loop; and firmware-only OTA
+  zips (no `html/`) corrupted `/sdcard/html` via the update's folder-rename. Both fixed; lesson:
+  always deploy a **full** update zip, and size memory from the *peak*, not a single sample.
 
 # [17.0.0-alpha.10] - 2026-05-30
 

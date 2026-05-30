@@ -209,9 +209,12 @@
 // Buffer for the model in the shared PSRAM region. Sized for the largest model actually shipped
 // with the project (dig-class11_1701_s2.tflite = 356 KB; all current models are <= 360 KB) plus a
 // safe margin. A model larger than this is rejected gracefully at load (see CTfLiteClass:
-// "does not fit in the reserved shared memory"). Reduced from the old worst-case 1.3 MB to reclaim
-// ~0.79 MB of PSRAM; the shared region never shrinks below the ~900 KB image-decode peak (enforced
-// in psram.cpp reserve_psram_shared_region). If you run a much larger custom model, raise this.
+// "does not fit in the reserved shared memory"). Reduced from the old worst-case 1.3 MB so the
+// model slot matches reality. NOTE: this does NOT shrink the shared region by itself - the region
+// is floored at the image-decode peak (measured ~1.46 MB at VGA, and it scales with camera
+// resolution), which is larger than arena(800 KB)+model(512 KB)=1.31 MB. Actually reclaiming PSRAM
+// needs per-config boot-time sizing (PLAN sec 9.3 item 4). If you run a much larger custom model,
+// raise this.
 #define MAX_MODEL_SIZE            (unsigned int)(512 * 1024) // 524288 bytes (largest shipped model ~356 KB + margin)
 #define TENSOR_ARENA_SIZE         800 * 1024 // Space for the Tensor Arena, (819200 Bytes)
 #define IMAGE_SIZE                640 * 480 * 3 // Space for a extracted image (921600 Bytes)

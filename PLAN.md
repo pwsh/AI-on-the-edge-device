@@ -624,22 +624,24 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      `fb_count=1`. Those sizes are **worst-case** (largest supported model ~1.1 MB), so they can't be
      globally shrunk without breaking large-model users. Tightness is inherent to the ESP32's
      **~4 MB-mapped PSRAM** (the other 4 MB of the 8 MB needs himem/bank-switching).
-   - ⭐ **Real ESP32 win — right-size the shared region to the *chosen* model (not the worst case).**
-     The 2.1 MB shared region is sized for the worst-case Digitization step: `TENSOR_ARENA_SIZE`
-     (800 KB) + `MAX_MODEL_SIZE` (1.3 MB, the largest model *any* user might load). The actually
-     configured model is known at boot from `config.ini` (`[Digits]`/`[Analog] Model=`) and its size
-     from the file — e.g. `dig-class100` ≈ 226 KB. Size the region to
-     `max(TENSOR_ARENA_SIZE + largest_configured_model, IMAGE_SIZE)`:
-     `max(800 KB + 226 KB, 900 KB) ≈ 1.03 MB` vs 2.10 MB → **frees ~1.05 MB PSRAM (~150 KB → ~1.2 MB,
-     ~8×)**. Enough to make the ~790 KB `alg_roi` overview image allocate again and remove the
-     tight-PSRAM allocation-failure fragility.
-     - Bounded below by the **~900 KB `IMAGE_SIZE` floor** (the region is time-shared with the image
-       decode), so model-only sizing already hits the floor; an `arena_used_bytes()` probe adds
-       little. Implementation: stat the configured model file(s) **before**
-       `reserve_psram_shared_region()` (move it after a small config peek), `+margin`, and **fall back
-       to the current worst-case** if a model can't be read. Model changes already require a reboot,
-       so the size re-derives on boot. **Needs careful on-device validation** (image capture must
-       still fit the smaller region).
+   - ⭐ **Right-size the shared region to the *chosen* model — MEASURED (alpha.11/12).** Attempted the
+     static cut; the on-device `MEM-PROFILE` data corrected the design:
+     - `MAX_MODEL_SIZE` reduced to **512 KB** (largest shipped model 356 KB + margin) — correct & safe.
+     - Tensor arena: in-use model needs only **28 KB of the reserved 800 KB**.
+     - **TakeImage STBI peak = 1,536,046 B (~1.46 MB) at VGA**, and it **scales with camera
+       resolution** (the JPEG decode), so it is not a fixed value.
+     - **Key correction:** the region is bounded by the *image-decode step* (~1.46 MB), which already
+       exceeds arena(800 KB)+model(512 KB)=1.31 MB → the model right-sizing **does not free PSRAM by
+       itself**, and a *static* region cut isn't safe across resolutions (a higher-res config would
+       crash on the NULL STBI alloc — which is exactly the alpha.11 boot loop). Region kept at the
+       known-good ~2.1 MB for safety.
+   - ➡️ **To actually reclaim PSRAM: per-config boot-time sizing.** Determine the configured model
+     size (stat `[Digits]`/`[Analog] Model=` files) **and** the image-step need for the configured
+     camera resolution at boot, then `reserve_psram_shared_region()` to
+     `max(arena+model, image_peak_for_this_res) + margin`. This is per-config (safe for all
+     resolutions) where the static approach is not. Also make the STBI NULL path degrade gracefully
+     (failed round + clear log) instead of crashing, as a safety net. The `MEM-PROFILE` logs stay in
+     to drive this.
    - Other headroom levers: **himem** (upper 4 MB; complex) or the **ESP32-S3** (8 MB+ mapped). TLSF
      is already the IDF default allocator; no change needed there.
 5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**

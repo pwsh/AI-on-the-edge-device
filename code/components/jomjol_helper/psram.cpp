@@ -14,11 +14,14 @@ uint32_t peakBytesForSTBI = 0;   // MEM-PROFILE: high-water mark of shared-regio
 std::string sharedMemoryInUseFor = "";
 
 // The TakeImage step decodes into the shared region and holds MULTIPLE large buffers concurrently
-// (output RGB + JPEG component planes), so its true peak is well above one IMAGE_SIZE. Until that
-// peak is measured on-device (the MEM-PROFILE "TakeImage STBI peak" log), keep the region at the
-// known-good size (>= the old TENSOR_ARENA_SIZE + 1.3 MB) so capture can never be starved. Once the
-// real peak is known this floor will be tightened to (peak + margin).
-#define SHARED_REGION_IMAGE_FLOOR  (TENSOR_ARENA_SIZE + (size_t)(1.3 * 1024 * 1024))  // == old region; identical PSRAM use, known-good
+// (output RGB + alignment crop planes). MEASURED peak = 1,536,046 bytes at VGA - and it scales with
+// the configured camera resolution (the JPEG decode), so it is NOT a fixed value. Because that peak
+// (and the higher peaks of larger-resolution configs) can exceed arena+model, the region must be
+// floored to cover it. We keep the floor at the long-proven safe size (== old region: the image
+// step always fit in it), so reducing MAX_MODEL_SIZE causes no regression but also no static saving.
+// To actually reclaim PSRAM, size the region at boot from the configured model + the real image-step
+// need for the configured resolution (PLAN sec 9.3 item 4) instead of this static floor.
+#define SHARED_REGION_IMAGE_FLOOR  (TENSOR_ARENA_SIZE + (size_t)(1.3 * 1024 * 1024))  // == old region; known-good, resolution-safe
 
 
 /** Reserve a large block in the PSRAM which will be shared between the different steps.
