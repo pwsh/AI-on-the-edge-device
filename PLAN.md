@@ -624,11 +624,24 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      `fb_count=1`. Those sizes are **worst-case** (largest supported model ~1.1 MB), so they can't be
      globally shrunk without breaking large-model users. Tightness is inherent to the ESP32's
      **~4 MB-mapped PSRAM** (the other 4 MB of the 8 MB needs himem/bank-switching).
-   - **No safe blanket cut on ESP32.** Real headroom levers: (a) **himem** to map the upper 4 MB
-     (complex; was a special env) or (b) **ESP32-S3** which maps 8 MB+ directly → ~2× headroom. So
-     this item largely **rolls into item 5 (S3)**. Optional safe follow-ups: auto-size the arena to
-     the loaded model (frees PSRAM when small models are used), and a low-PSRAM early-warning log.
-   - TLSF is already the IDF default allocator; no change needed there.
+   - ⭐ **Real ESP32 win — right-size the shared region to the *chosen* model (not the worst case).**
+     The 2.1 MB shared region is sized for the worst-case Digitization step: `TENSOR_ARENA_SIZE`
+     (800 KB) + `MAX_MODEL_SIZE` (1.3 MB, the largest model *any* user might load). The actually
+     configured model is known at boot from `config.ini` (`[Digits]`/`[Analog] Model=`) and its size
+     from the file — e.g. `dig-class100` ≈ 226 KB. Size the region to
+     `max(TENSOR_ARENA_SIZE + largest_configured_model, IMAGE_SIZE)`:
+     `max(800 KB + 226 KB, 900 KB) ≈ 1.03 MB` vs 2.10 MB → **frees ~1.05 MB PSRAM (~150 KB → ~1.2 MB,
+     ~8×)**. Enough to make the ~790 KB `alg_roi` overview image allocate again and remove the
+     tight-PSRAM allocation-failure fragility.
+     - Bounded below by the **~900 KB `IMAGE_SIZE` floor** (the region is time-shared with the image
+       decode), so model-only sizing already hits the floor; an `arena_used_bytes()` probe adds
+       little. Implementation: stat the configured model file(s) **before**
+       `reserve_psram_shared_region()` (move it after a small config peek), `+margin`, and **fall back
+       to the current worst-case** if a model can't be read. Model changes already require a reboot,
+       so the size re-derives on boot. **Needs careful on-device validation** (image capture must
+       still fit the smaller region).
+   - Other headroom levers: **himem** (upper 4 MB; complex) or the **ESP32-S3** (8 MB+ mapped). TLSF
+     is already the IDF default allocator; no change needed there.
 5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**
    Scope is deliberately limited to **ESP32 (ESP32-CAM) + ESP32-S3**. P4/C6/C3 are **out of scope**
    (C3/C6 verified non-viable — no PSRAM / no camera / no USB host; P4 dropped to keep focus).
