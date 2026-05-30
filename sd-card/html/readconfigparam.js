@@ -261,8 +261,10 @@ function ParseConfig() {
     param[catname]["LEDColor"]["value1"] = "50";
     param[catname]["LEDColor"]["value2"] = "50";
     param[catname]["LEDColor"]["value3"] = "50";
-    // Status LED: show the current processing stage as a colour (defaults match the firmware)
-    ParamAddValue(param, catname, "StatusLED", 1, true, "false");
+    // Status LED: show the current processing stage as a colour (defaults match the firmware).
+    // Global GPIO param (NOT per-number) -> _isNUMBER must be false, otherwise it gets written
+    // as "main.StatusLED"/"rate.StatusLED" instead of a single "StatusLED" line.
+    ParamAddValue(param, catname, "StatusLED", 1, false, "false");
     ParamAddValue(param, catname, "StatusLEDIdle", 3);
     ParamAddValue(param, catname, "StatusLEDTakeImage", 3);
     ParamAddValue(param, catname, "StatusLEDAlign", 3);
@@ -663,7 +665,34 @@ function getCamConfig() {
         param["TakeImage"]["LEDIntensity"].value1 = '50';
     }
 
-    return param;	
+    // Status LED (GPIO): keep these always editable (like the LED/cam params) so the controls
+    // are not greyed out when the parameters are absent from an older config.ini. Defaults match
+    // the firmware (server_GPIO.cpp initStatusLedDefaults).
+    param["GPIO"]["StatusLED"]["enabled"] = true;
+    if (!param["GPIO"]["StatusLED"]["found"]) {
+        param["GPIO"]["StatusLED"]["found"] = true;
+        param["GPIO"]["StatusLED"].value1 = 'false';
+    }
+    var _statusLedDefaults = {
+        StatusLEDIdle:      ["0",  "10",  "0"],
+        StatusLEDTakeImage: ["0",   "0", "80"],
+        StatusLEDAlign:     ["90", "30",  "0"],
+        StatusLEDDigitize:  ["80", "80",  "0"],
+        StatusLEDPostProc:  ["60",  "0", "80"],
+        StatusLEDTransmit:  ["0",  "80", "80"],
+        StatusLEDError:     ["120", "0",  "0"]
+    };
+    for (var _stage in _statusLedDefaults) {
+        param["GPIO"][_stage]["enabled"] = true;
+        if (!param["GPIO"][_stage]["found"]) {
+            param["GPIO"][_stage]["found"] = true;
+            param["GPIO"][_stage].value1 = _statusLedDefaults[_stage][0];
+            param["GPIO"][_stage].value2 = _statusLedDefaults[_stage][1];
+            param["GPIO"][_stage].value3 = _statusLedDefaults[_stage][2];
+        }
+    }
+
+    return param;
 }
 
 function getConfigParameters() {

@@ -2791,6 +2791,14 @@ function ReadParameterAll() {
     param["GPIO"]["LEDNumbers"]["found"] = true;
     param["GPIO"]["LEDColor"]["found"] = true;
 
+    // Status LED params are always written (kept enabled), like the LED params above.
+    var _statusLedParams = ["StatusLED", "StatusLEDIdle", "StatusLEDTakeImage", "StatusLEDAlign",
+                            "StatusLEDDigitize", "StatusLEDPostProc", "StatusLEDTransmit", "StatusLEDError"];
+    for (var _i = 0; _i < _statusLedParams.length; _i++) {
+        param["GPIO"][_statusLedParams[_i]]["enabled"] = true;
+        param["GPIO"][_statusLedParams[_i]]["found"] = true;
+    }
+
     //ReadParameter(param, "AutoTimer", "AutoStart", false);
     ReadParameter(param, "AutoTimer", "Interval", false);
     

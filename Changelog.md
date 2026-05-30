@@ -1,10 +1,18 @@
-# [17.0.0-alpha.2] - 2026-05-30
+# [17.0.0-alpha.3] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.2)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.3)
+
+### :bug: Fixes since alpha.2
+
+- **Status LED config was greyed out / mis-written.** The `StatusLED` enable was registered as a
+  per-number parameter (`_isNUMBER=true`), so it was written to `config.ini` as
+  `main.StatusLED` / `rate.StatusLED` and its UI control stayed disabled when absent from an
+  existing config. It is now a global `[GPIO]` parameter and is force-enabled on load (like the
+  LED/camera params), so the toggle and the seven stage colour pickers are editable.
 
 ### Known issues
 No software is perfect. We know that our software has some quirks. If you have an issue, please first check the [issues](https://github.com/jomjol/AI-on-the-edge-device/issues) and
