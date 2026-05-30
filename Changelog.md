@@ -48,6 +48,10 @@ No software is perfect. We know that our software has some quirks. If you have a
   - `WIFI_REASON_NOT_AUTHED` → `WIFI_REASON_ASSOC_NOT_AUTHED` (version-gated).
   - GCC-15 fixes: cross-enum comparison cast, transposed `calloc` args.
 - Native-build board define + `-Wno-error` injected via CMake for non-PlatformIO builds.
+- **Critical SD fix:** the redundant `esp_psram_init()` in `app_main` (PSRAM is already
+  initialized at boot) re-maps PSRAM on IDF 6.0 and corrupted the already-mounted SD card's
+  FATFS state (config became unreadable, device couldn't start). Now guarded with
+  `esp_psram_is_initialized()`. Verified on hardware: boots, reads config, camera + CNN run.
 
 ### :package: Dependency / Component Updates (all bumped to latest)
 
@@ -74,9 +78,13 @@ No software is perfect. We know that our software has some quirks. If you have a
 
 ### :art: UI
 
-- No HTML/markup changes in this release. The existing **"Skip Messages on Error"** control
-  (`edit_config_template.html`) is now **functional** (previously had no effect). The new
-  FastRead options are config-only for now (web-UI controls are a follow-up).
+- **Dark mode** for the web UI: a lightweight CSS-variable theme (`theme.css` / `theme.js`)
+  with a 🌙/☀️ toggle in the header, persisted in `localStorage` and following the OS
+  `prefers-color-scheme` by default. Applies across the parent page and all iframe pages;
+  light mode is unchanged.
+- **FastRead** options added to the config page (Digit ROI Processing, expert section).
+- The existing **"Skip Messages on Error"** control is now **functional** (previously had
+  no effect in firmware).
 
 
 # [16.1.0] - 2026-01-11

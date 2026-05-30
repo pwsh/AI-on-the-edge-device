@@ -242,6 +242,66 @@ GCC 15 (xtensa-esp-elf 15.2.0). Full ordered list of every change needed:
   ```
 - Submodules must be initialized: `git submodule update --init --recursive`.
 
+### 3.7 On-device boot test — PASSED ✅ (ESP32-D0WDQ6, 4MB flash, 8MB PSRAM)
+Flashed the IDF 6.0.1 build to real hardware (esptool, /dev/ttyUSB0) and captured serial:
+- Boots clean on **ESP-IDF v6.0.1**, app version **v17.0.0-alpha**, no panics.
+- **PSRAM** init OK (8MB found, 4MB mapped — normal ESP32 limit without himem).
+- **SD card** basic R/W check **successful** — validates the new `esp_vfs_fat_register_cfg`
+  + public `sdmmc_cmd.h` migration on hardware.
+- **Camera** OV2640 detected + configured, frame buffer allocated in PSRAM — validates the
+  esp32-camera v2.1.6 bump + driver-component split.
+- Remaining errors are all "empty SD card" (no config.ini / /html / /config models) since
+  only firmware was flashed — **expected**, not firmware faults. Device finishes init and
+  idles ("SSID empty, init aborted").
+⬜ Full functional test still needs the **SD-card content provisioned** (config + Web UI +
+  CNN models) to exercise WiFi/MQTT, the CNN flow, FastRead, and the dark-mode UI.
+
+### 3.8 ✅ RESOLVED: redundant `esp_psram_init()` corrupted the mounted SD on IDF 6.0
+**Root cause (one line):** `main.cpp` re-calls `esp_psram_init()` after the SD card is already
+mounted. PSRAM is already initialized at boot (`CONFIG_SPIRAM_BOOT_INIT=y`); on IDF 5.x the
+re-init was a harmless no-op, but on **IDF 6.0 it re-maps PSRAM/cache and corrupts the
+already-mounted SD's FATFS in-memory state** → `stat`/directory traversal fails → "Config file
+seems to be missing" → device idles.
+
+**Fix:**
+```c
+esp_err_t PSRAMStatus = esp_psram_is_initialized() ? ESP_OK : esp_psram_init();
+```
+(only init if not already initialized). One line in `code/main/main.cpp`. **Verified on
+hardware:** folder/config checks pass, camera up, "Initialization completed successfully",
+WiFi connects from `wlan.ini`, CNN Round #1 runs — the meter reads on v17.0.0-alpha / IDF 6.0.1.
+
+**Why it took ~27 iterations / what it was NOT:** the symptom *appeared* to be camera-triggered
+because `Camera.InitCam()`'s ~2 s of `vTaskDelay`s sit right after `esp_psram_init()`, so the
+break surfaced "after the camera." Disabling camera init entirely proved config read **still**
+failed → camera was a red herring. Bracketing `esp_psram_init()` with `stat` probes pinned it
+exactly (`before=OK`, `after=FAIL`). Also conclusively ruled out (each on-device): SD card/data
+(Linux reads it fine), read hardware (raw `sdmmc_read_sectors` returns correct data at every
+sector, identical checksums before/after), FATFS partition detection, sector size, PM, GPIO,
+SD clock, DMA-RAM, and **card layout — MBR *and* SFD both failed** before the real fix.
+
+Lesson: don't fixate on the first plausible trigger (camera) — bisect with probes. The 2 s
+delay between the real cause and the visible symptom sent the investigation down a long detour.
+
+### 3.9 ⬜ Interim setup / provisioning process (v16→v17 migration + new installs)
+With v17 working, define a clean way for users to get the SD-card content (config + `/html` +
+`/config/*.tflite`) onto a card without pulling it, since the on-disk layout/Web-UI changes
+between v16 and v17:
+- **Flash firmware first** (USB/esptool or OTA), then **provision the SD over the air or via
+  USB** rather than requiring a card reader.
+- Reuse the existing release artifacts: `update.zip` (OTA: firmware + Web UI + models) and
+  `remote_setup.zip` (firmware + Web UI + full config). The device already exposes an
+  OTA/file-server path (`register_server_ota_sdcard_uri`, `/fileserver`) — wire a guided
+  flow around it.
+- **Migration guard:** the firmware already warns on a Web-UI/firmware version mismatch
+  (`getHTMLcommit()` vs `GIT_REV`) and recommends re-running `update__*.zip` — make this the
+  one-click migration step.
+- **New install / empty card:** SoftAP setup mode (`CheckStartAPMode`) already starts when
+  `wlan.ini`/`config.ini` are missing — ensure it can serve the minimal UI to upload the
+  rest, or document the USB-serial / OTA bootstrap.
+- Note: any SD card layout works now (MBR or SFD) — the SD bug was `esp_psram_init`, not the
+  card, so no special card formatting is required for users.
+
 ---
 
 ## 4. Open questions
@@ -323,13 +383,42 @@ GCC 15 (xtensa-esp-elf 15.2.0). Full ordered list of every change needed:
 
 ## 7. UI / front-end
 
-⬜ **Dark mode option for the web UI.** Add a user-selectable dark theme (config page +
-   main pages). Considerations:
-   - Implement via a CSS theme (CSS variables / `prefers-color-scheme` with a manual
-     override toggle), persisted in `localStorage` so it survives reloads.
-   - Cover all served pages (`index.html`, `edit_config(.template).html`, `edit_reference`,
-     log/overview pages) and shared stylesheets in `sd-card/html/`.
-   - Keep it lightweight — these pages are served from the ESP32/SD card, so avoid heavy
-     frameworks; plain CSS + a small toggle script.
-   - Optional: expose a "Theme" setting so the choice can also be set server-side.
+- ✅ **Dark mode for the web UI.** Implemented as a lightweight CSS-variable theme:
+   - New `sd-card/html/theme.css` — dark palette + overrides gated on `html[data-theme="dark"]`
+     (attribute-prefixed selectors out-specify the existing light rules; a few `!important`
+     guards cover inline `style="color:black"` labels). `color-scheme: dark` themes native
+     controls/scrollbars. Light mode is untouched (rules only apply when the attribute is set).
+   - New `sd-card/html/theme.js` — applies the saved theme on parse (before paint, no flash),
+     persists to `localStorage` (`aiotedge-theme`), falls back to `prefers-color-scheme`,
+     and live-propagates a toggle from the parent into the open iframe.
+   - `index.html` — includes theme.css/theme.js early in `<head>` + a fixed-position 🌙/☀️
+     toggle button; theme.css/js auto-injected into all 28 content/iframe pages (and the
+     config template) so each picks up the shared theme.
+   - Packaged automatically by the release flow (copied + gzipped like the other assets).
+   - Validated: no JS name collisions, `node --check` clean, light mode unchanged.
+   - ⬜ Follow-up (optional): expose a server-side "Theme" config so the default can be set
+     in `config.ini`; on-device visual pass across every page.
 - ✅ FastRead config options added to the UI (see §1).
+- ⬜ **"Pause processing" menu item.** Add a control in the web UI to pause/resume the flow
+   (CNN reading loop). Very useful while setting up reference image, alignment, and ROIs so
+   the device doesn't keep capturing/processing mid-setup. Implementation: a flag checked by
+   the flow task (`MainFlowControl`/`server_tflite`) + a REST endpoint
+   (e.g. `/pause?status=1`) + a menu/toolbar toggle; persist across the current session and
+   show the paused state clearly. Tie in with the existing "trigger single round" handler.
+- ⬜ **LED status + countdown to next processing.** Use the onboard/external LED(s) to show
+   processing state and count down to the next round:
+   - Countdown: e.g. blink rate or a fading ramp as the next round approaches.
+   - Per-step status via RGB color (capture / align / digit CNN / analog CNN / post-process /
+     transmit), so the device's state is glanceable without the web UI.
+   - Build on the existing GPIO/LED + WS281x (`SmartLeds`) support in `jomjol_controlGPIO`;
+     make it configurable (off / status-only / countdown+status) since not all boards have an
+     addressable LED. Honor the existing flash-LED usage so it doesn't conflict with capture.
+- ⬜ **UI cleanup / modernization + responsiveness.** The web UI is legacy (table layouts,
+   hardcoded colors, fixed widths, per-page `<style>`). Modernize incrementally:
+   - Consolidate styles into shared CSS variables (the dark-mode `theme.css` is a starting
+     point) and remove inline `style="color:black"` etc.
+   - Responsive layout (fl/grid, mobile-friendly) — the menu, config tables, and overview
+     should work on phones; replace fixed `min-width:688px` constraints.
+   - Modern component styling (cards, spacing, typography), consistent across pages.
+   - Keep it dependency-light (served from ESP32/SD, gzipped) — plain CSS/JS, no heavy
+     frameworks. Coordinate with the dark-mode variables so both themes stay consistent.
