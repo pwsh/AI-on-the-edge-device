@@ -39,6 +39,7 @@ if(NOT DEFINED ENV{PLATFORMIO})
     idf_build_set_property(COMPILE_DEFINITIONS "MQTT_SUPPORTED_FEATURE_SKIP_CRT_CMN_NAME_CHECK" APPEND)
     idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_INFLUXDB" APPEND)
     idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_WEBHOOK" APPEND)
+    idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_SOFTAP" APPEND)
 
     # ESP-IDF 6.0 hardcodes -Werror in build.cmake (no Kconfig toggle) with only a small
     # exemption list. This project vendors third-party C/C++ (stb, miniz, SmartLeds, ...)
