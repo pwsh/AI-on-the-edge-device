@@ -214,9 +214,13 @@ bool CTfLiteClass::MakeAllocate()
         if (allocate_status != kTfLiteOk) {
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "AllocateTensors() failed");
 
-            this->GetInputDimension();   
+            this->GetInputDimension();
             return false;
         }
+        // MEM-PROFILE: actual tensor-arena bytes this model needs (vs the reserved TENSOR_ARENA_SIZE).
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "MEM-PROFILE: tensor arena used " +
+                std::to_string(this->interpreter->arena_used_bytes()) + " of reserved " +
+                std::to_string(this->kTensorArenaSize) + " bytes");
     }
     else 
     {
