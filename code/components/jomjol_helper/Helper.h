@@ -112,4 +112,26 @@ int clipInt(int input, int high, int low);
 bool numericStrToBool(std::string input);
 bool stringToBoolean(std::string input);
 
+// ---------------------------------------------------------------------------
+// Status-LED processing stages.
+// Decoupled hook so the flow (jomjol_flowcontroll) can signal the current
+// processing stage without depending on jomjol_controlGPIO (which would be a
+// circular dependency). jomjol_controlGPIO registers a callback that drives
+// the addressable (WS281x) status LED with the per-stage colour.
+// ---------------------------------------------------------------------------
+enum ProcessingStage {
+    PROC_STAGE_IDLE      = 0,   // between rounds / flow finished
+    PROC_STAGE_TAKEIMAGE = 1,   // capturing image
+    PROC_STAGE_ALIGN     = 2,   // aligning
+    PROC_STAGE_DIGITIZE  = 3,   // digit / analog CNN
+    PROC_STAGE_POSTPROC  = 4,   // post-processing
+    PROC_STAGE_TRANSMIT  = 5,   // sending (MQTT / InfluxDB / Webhook)
+    PROC_STAGE_ERROR     = 6,   // error / retry
+    PROC_STAGE_COUNT     = 7
+};
+
+typedef void (*tStatusLedStageCb)(int stage);
+void registerStatusLedStageCallback(tStatusLedStageCb cb);
+void setProcessingStage(int stage);   // no-op if no callback registered
+
 #endif //HELPER_H

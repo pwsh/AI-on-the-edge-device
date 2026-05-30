@@ -40,6 +40,19 @@ static const char *TAG = "HELPER";
 
 using namespace std;
 
+// ---- Status-LED processing-stage hook (see Helper.h) ----
+static tStatusLedStageCb s_statusLedStageCb = NULL;
+
+void registerStatusLedStageCallback(tStatusLedStageCb cb) {
+    s_statusLedStageCb = cb;
+}
+
+void setProcessingStage(int stage) {
+    if (s_statusLedStageCb != NULL) {
+        s_statusLedStageCb(stage);
+    }
+}
+
 unsigned int systemStatus = 0;
 
 sdmmc_cid_t SDCardCid;

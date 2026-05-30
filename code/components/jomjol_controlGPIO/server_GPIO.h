@@ -75,6 +75,7 @@ public:
     void taskHandler();
     void gpioInterrupt(GpioResult* gpioResult);  
     void flashLightEnable(bool value);
+    void setStatusStageLED(int stage);   // drive the WS281x status LED for a ProcessingStage
     bool isEnabled() { return _isEnabled; }
 #ifdef ENABLE_MQTT
     void handleMQTTconnect();
@@ -93,6 +94,12 @@ private:
 #ifdef __LEDGLOBAL
     SmartLed *leds_global = NULL;
 #endif
+
+    // Status LED: show the current processing stage as a colour on the WS281x LED.
+    bool statusLedEnabled = false;
+    Rgb statusLedColors[8];   // indexed by ProcessingStage (>= PROC_STAGE_COUNT)
+    void initStatusLedDefaults();
+    void driveWs281x(Rgb color);   // shared low-level WS281x writer
 
     bool readConfig();
     void clear();

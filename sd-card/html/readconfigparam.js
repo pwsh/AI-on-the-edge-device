@@ -261,6 +261,25 @@ function ParseConfig() {
     param[catname]["LEDColor"]["value1"] = "50";
     param[catname]["LEDColor"]["value2"] = "50";
     param[catname]["LEDColor"]["value3"] = "50";
+    // Status LED: show the current processing stage as a colour (defaults match the firmware)
+    ParamAddValue(param, catname, "StatusLED", 1, true, "false");
+    ParamAddValue(param, catname, "StatusLEDIdle", 3);
+    ParamAddValue(param, catname, "StatusLEDTakeImage", 3);
+    ParamAddValue(param, catname, "StatusLEDAlign", 3);
+    ParamAddValue(param, catname, "StatusLEDDigitize", 3);
+    ParamAddValue(param, catname, "StatusLEDPostProc", 3);
+    ParamAddValue(param, catname, "StatusLEDTransmit", 3);
+    ParamAddValue(param, catname, "StatusLEDError", 3);
+    function _statusDefault(name, r, g, b) {
+        param[catname][name]["value1"] = r; param[catname][name]["value2"] = g; param[catname][name]["value3"] = b;
+    }
+    _statusDefault("StatusLEDIdle",        "0",  "10",  "0");   // dim green
+    _statusDefault("StatusLEDTakeImage",   "0",   "0", "80");   // blue
+    _statusDefault("StatusLEDAlign",      "90",  "30",  "0");   // orange
+    _statusDefault("StatusLEDDigitize",   "80",  "80",  "0");   // yellow
+    _statusDefault("StatusLEDPostProc",   "60",   "0", "80");   // purple
+    _statusDefault("StatusLEDTransmit",    "0",  "80", "80");   // cyan
+    _statusDefault("StatusLEDError",     "120",   "0",  "0");   // red
 
     var catname = "AutoTimer";
     category[catname] = new Object();

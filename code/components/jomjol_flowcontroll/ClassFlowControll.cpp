@@ -388,6 +388,19 @@ void ClassFlowControll::doFlowTakeImageOnly(string time)
     }
 }
 
+// Map a flow-step class name to a status-LED ProcessingStage (Helper.h).
+static int stageFromFlowName(const std::string& name)
+{
+    if (name == "ClassFlowTakeImage")      return PROC_STAGE_TAKEIMAGE;
+    if (name == "ClassFlowAlignment")      return PROC_STAGE_ALIGN;
+    if (name == "ClassFlowCNNGeneral")     return PROC_STAGE_DIGITIZE;
+    if (name == "ClassFlowPostProcessing") return PROC_STAGE_POSTPROC;
+    if (name == "ClassFlowMQTT" || name == "ClassFlowInfluxDB" ||
+        name == "ClassFlowInfluxDBv2" || name == "ClassFlowWebhook")
+        return PROC_STAGE_TRANSMIT;
+    return PROC_STAGE_IDLE;
+}
+
 bool ClassFlowControll::doFlow(string time)
 {
     bool result = true;
@@ -411,6 +424,7 @@ bool ClassFlowControll::doFlow(string time)
         zw_time = getCurrentTimeString("%H:%M:%S");
         aktstatus = TranslateAktstatus(FlowControll[i]->name());
         aktstatusWithTime = aktstatus + " (" + zw_time + ")";
+        setProcessingStage(stageFromFlowName(FlowControll[i]->name()));   // status LED
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Status: " + aktstatusWithTime);
         #ifdef ENABLE_MQTT
             MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);
@@ -423,6 +437,7 @@ bool ClassFlowControll::doFlow(string time)
 
         if (!FlowControll[i]->doFlow(time)) {
             repeat++;
+            setProcessingStage(PROC_STAGE_ERROR);   // status LED: step failed / retrying
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Fehler im vorheriger Schritt - wird zum " + to_string(repeat) + ". Mal wiederholt");
             if (i) { i -= 1; }   // vPrevious step must be repeated (probably take pictures)
             result = false;
@@ -444,6 +459,7 @@ bool ClassFlowControll::doFlow(string time)
     zw_time = getCurrentTimeString("%H:%M:%S");
     aktstatus = "Flow finished";
     aktstatusWithTime = aktstatus + " (" + zw_time + ")";
+    setProcessingStage(PROC_STAGE_IDLE);   // status LED: idle until next round
     //LogFile.WriteToFile(ESP_LOG_INFO, TAG, aktstatusWithTime);
     #ifdef ENABLE_MQTT
         MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);

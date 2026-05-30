@@ -218,6 +218,8 @@ GpioHandler::~GpioHandler()  {
     }
 }
 
+static void statusLedStageTrampoline(int stage);   // defined below
+
 void GpioHandler::init()
 {
     // TickType_t xDelay = 60000 / portTICK_PERIOD_MS;
@@ -225,6 +227,9 @@ void GpioHandler::init()
     // vTaskDelay( xDelay );
 
     ESP_LOGD(TAG, "*************** Start GPIOHandler_Init *****************");
+
+    initStatusLedDefaults();   // set defaults; config (if present) overrides in readConfig()
+    registerStatusLedStageCallback(statusLedStageTrampoline);   // let the flow drive the status LED
 
     if (gpioMap == NULL) {
         gpioMap = new std::map<gpio_num_t, GpioPin*>();
@@ -414,6 +419,32 @@ bool GpioHandler::readConfig()
             if (splitted[1] == "WS2813")
                 LEDType = LED_WS2813;
         }
+        // ---- Status LED: per-stage colours (show current processing step) ----
+        if (toUpper(splitted[0]) == "STATUSLED" && splitted.size() > 1)
+        {
+            statusLedEnabled = alphanumericToBoolean(splitted[1]);
+        }
+        {
+            // map "StatusLEDColor<Stage>" key -> ProcessingStage index
+            static const struct { const char* key; int stage; } _stageKeys[] = {
+                { "STATUSLEDIDLE",      PROC_STAGE_IDLE },
+                { "STATUSLEDTAKEIMAGE", PROC_STAGE_TAKEIMAGE },
+                { "STATUSLEDALIGN",     PROC_STAGE_ALIGN },
+                { "STATUSLEDDIGITIZE",  PROC_STAGE_DIGITIZE },
+                { "STATUSLEDPOSTPROC",  PROC_STAGE_POSTPROC },
+                { "STATUSLEDTRANSMIT",  PROC_STAGE_TRANSMIT },
+                { "STATUSLEDERROR",     PROC_STAGE_ERROR },
+            };
+            std::string _k = toUpper(splitted[0]);
+            for (unsigned _i = 0; _i < sizeof(_stageKeys)/sizeof(_stageKeys[0]); ++_i) {
+                if (_k == _stageKeys[_i].key && splitted.size() >= 4) {
+                    statusLedColors[_stageKeys[_i].stage] = Rgb{ (uint8_t)stoi(splitted[1]),
+                                                                 (uint8_t)stoi(splitted[2]),
+                                                                 (uint8_t)stoi(splitted[3]) };
+                    break;
+                }
+            }
+        }
     }
 
     if (registerISR) {
@@ -562,7 +593,72 @@ esp_err_t GpioHandler::handleHttpRequest(httpd_req_t *req)
     return ESP_OK;    
 };
 
-void GpioHandler::flashLightEnable(bool value) 
+// Meaningful default colours per processing stage (moderate brightness to avoid glare).
+void GpioHandler::initStatusLedDefaults()
+{
+    statusLedColors[PROC_STAGE_IDLE]      = Rgb{   0,  10,   0 };   // dim green  : idle / ready
+    statusLedColors[PROC_STAGE_TAKEIMAGE] = Rgb{   0,   0,  80 };   // blue       : capturing image
+    statusLedColors[PROC_STAGE_ALIGN]     = Rgb{  90,  30,   0 };   // orange     : aligning
+    statusLedColors[PROC_STAGE_DIGITIZE]  = Rgb{  80,  80,   0 };   // yellow     : digit/analog CNN
+    statusLedColors[PROC_STAGE_POSTPROC]  = Rgb{  60,   0,  80 };   // purple     : post-processing
+    statusLedColors[PROC_STAGE_TRANSMIT]  = Rgb{   0,  80,  80 };   // cyan       : sending
+    statusLedColors[PROC_STAGE_ERROR]     = Rgb{ 120,   0,   0 };   // red        : error / retry
+}
+
+// Low-level: write a single colour to all pixels of the configured WS281x LED.
+void GpioHandler::driveWs281x(Rgb color)
+{
+    if (gpioMap == NULL) {
+        return;
+    }
+    for (std::map<gpio_num_t, GpioPin*>::iterator it = gpioMap->begin(); it != gpioMap->end(); ++it) {
+        if (it->second->getMode() != GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X) {
+            continue;
+        }
+#ifdef __LEDGLOBAL
+        if (leds_global == NULL) {
+            leds_global = new SmartLed(LEDType, LEDNumbers, it->second->getGPIO(), 0, DoubleBuffer);
+        } else {
+            leds_global->wait();   // see SmartLeds issue #10
+        }
+        for (int i = 0; i < LEDNumbers; ++i) {
+            (*leds_global)[i] = color;
+        }
+        leds_global->show();
+#else
+        SmartLed leds(LEDType, LEDNumbers, it->second->getGPIO(), 0, DoubleBuffer);
+        for (int i = 0; i < LEDNumbers; ++i) {
+            leds[i] = color;
+        }
+        leds.show();
+#endif
+        return;   // only one WS281x LED chain is supported
+    }
+}
+
+// Show the colour for the given ProcessingStage (no-op if status LED disabled / not configured).
+void GpioHandler::setStatusStageLED(int stage)
+{
+    if (!statusLedEnabled) {
+        return;
+    }
+    if (stage < 0 || stage >= PROC_STAGE_COUNT) {
+        return;
+    }
+    driveWs281x(statusLedColors[stage]);
+}
+
+// Free-function trampoline registered with jomjol_helper so the flow can signal stages
+// without jomjol_controlGPIO <-> jomjol_flowcontroll forming a circular dependency.
+static void statusLedStageTrampoline(int stage)
+{
+    GpioHandler* h = gpio_handler_get();
+    if (h != NULL) {
+        h->setStatusStageLED(stage);
+    }
+}
+
+void GpioHandler::flashLightEnable(bool value)
 {
     ESP_LOGD(TAG, "GpioHandler::flashLightEnable %s", value ? "true" : "false");
 

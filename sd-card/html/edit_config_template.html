@@ -1915,6 +1915,79 @@
                         (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
         </tr>
+
+        <!------------- Status LED (processing-stage colours) ------------------>
+        <tr class="GPIO_item expert">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_StatusLED_text">Status LED (show processing stage)</span>
+            </td>
+            <td>
+                <select class="GPIO_item" id="GPIO_StatusLED_value1">
+                    <option value="true">enabled (true)</option>
+                    <option value="false" selected>disabled (false)</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLED</td>
+        </tr>
+
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDIdle_text">&nbsp;&nbsp;Colour: Idle / ready</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDIdle_color" oninput="syncStatusColorToRgb('StatusLEDIdle')">
+                <input type="hidden" id="GPIO_StatusLEDIdle_value1"><input type="hidden" id="GPIO_StatusLEDIdle_value2"><input type="hidden" id="GPIO_StatusLEDIdle_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDIdle</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDTakeImage_text">&nbsp;&nbsp;Colour: Take image</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDTakeImage_color" oninput="syncStatusColorToRgb('StatusLEDTakeImage')">
+                <input type="hidden" id="GPIO_StatusLEDTakeImage_value1"><input type="hidden" id="GPIO_StatusLEDTakeImage_value2"><input type="hidden" id="GPIO_StatusLEDTakeImage_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDTakeImage</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDAlign_text">&nbsp;&nbsp;Colour: Aligning</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDAlign_color" oninput="syncStatusColorToRgb('StatusLEDAlign')">
+                <input type="hidden" id="GPIO_StatusLEDAlign_value1"><input type="hidden" id="GPIO_StatusLEDAlign_value2"><input type="hidden" id="GPIO_StatusLEDAlign_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDAlign</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDDigitize_text">&nbsp;&nbsp;Colour: Digitizing (CNN)</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDDigitize_color" oninput="syncStatusColorToRgb('StatusLEDDigitize')">
+                <input type="hidden" id="GPIO_StatusLEDDigitize_value1"><input type="hidden" id="GPIO_StatusLEDDigitize_value2"><input type="hidden" id="GPIO_StatusLEDDigitize_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDDigitize</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDPostProc_text">&nbsp;&nbsp;Colour: Post-processing</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDPostProc_color" oninput="syncStatusColorToRgb('StatusLEDPostProc')">
+                <input type="hidden" id="GPIO_StatusLEDPostProc_value1"><input type="hidden" id="GPIO_StatusLEDPostProc_value2"><input type="hidden" id="GPIO_StatusLEDPostProc_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDPostProc</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDTransmit_text">&nbsp;&nbsp;Colour: Transmitting</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDTransmit_color" oninput="syncStatusColorToRgb('StatusLEDTransmit')">
+                <input type="hidden" id="GPIO_StatusLEDTransmit_value1"><input type="hidden" id="GPIO_StatusLEDTransmit_value2"><input type="hidden" id="GPIO_StatusLEDTransmit_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDTransmit</td>
+        </tr>
+        <tr class="GPIO_item expert">
+            <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDError_text">&nbsp;&nbsp;Colour: Error / retry</span></td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_StatusLEDError_color" oninput="syncStatusColorToRgb('StatusLEDError')">
+                <input type="hidden" id="GPIO_StatusLEDError_value1"><input type="hidden" id="GPIO_StatusLEDError_value2"><input type="hidden" id="GPIO_StatusLEDError_value3">
+            </td>
+            <td>$TOOLTIP_GPIO_StatusLEDError</td>
+        </tr>
+        <!------------- Status LED end ------------------>
+
         <!------------- GPIO12 end ------------------>
 
         <!------------- GPIO13 begin ------------------>
@@ -2445,6 +2518,14 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "LEDType", false);
     WriteParameter(param, category, "GPIO", "LEDNumbers", false);
     WriteParameter(param, category, "GPIO", "LEDColor", false);
+    WriteParameter(param, category, "GPIO", "StatusLED", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDIdle", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDTakeImage", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDAlign", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDDigitize", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDPostProc", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDTransmit", false);
+    WriteParameter(param, category, "GPIO", "StatusLEDError", false);
 
     //WriteParameter(param, category, "AutoTimer", "AutoStart", false);	
     WriteParameter(param, category, "AutoTimer", "Interval", false);
@@ -2506,8 +2587,36 @@ function WriteModelFiles() {
         }
     }
 
-    WriteParameter(param, category, "Analog", "Model", false);		
-    WriteParameter(param, category, "Digits", "Model", false);		
+    WriteParameter(param, category, "Analog", "Model", false);
+    WriteParameter(param, category, "Digits", "Model", false);
+}
+
+// --- Status-LED colour pickers <-> hidden R/G/B value inputs -----------------
+function syncStatusColorToRgb(name) {
+    var picker = document.getElementById('GPIO_' + name + '_color');
+    if (!picker) return;
+    var hex = picker.value;   // "#rrggbb"
+    document.getElementById('GPIO_' + name + '_value1').value = parseInt(hex.substr(1, 2), 16);
+    document.getElementById('GPIO_' + name + '_value2').value = parseInt(hex.substr(3, 2), 16);
+    document.getElementById('GPIO_' + name + '_value3').value = parseInt(hex.substr(5, 2), 16);
+}
+
+function syncStatusColorsFromValues() {
+    var stages = ['StatusLEDIdle', 'StatusLEDTakeImage', 'StatusLEDAlign', 'StatusLEDDigitize',
+                  'StatusLEDPostProc', 'StatusLEDTransmit', 'StatusLEDError'];
+    for (var i = 0; i < stages.length; i++) {
+        var name = stages[i];
+        var picker = document.getElementById('GPIO_' + name + '_color');
+        if (!picker) continue;
+        var rgb = [];
+        for (var c = 1; c <= 3; c++) {
+            var e = document.getElementById('GPIO_' + name + '_value' + c);
+            var v = e ? parseInt(e.value) : 0;
+            if (isNaN(v)) v = 0;
+            rgb.push(Math.max(0, Math.min(255, v)));
+        }
+        picker.value = '#' + rgb.map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    }
 }
 
 function ReadParameterAll() {
@@ -2616,6 +2725,15 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "LEDType", false);
     ReadParameter(param, "GPIO", "LEDNumbers", false);
     ReadParameter(param, "GPIO", "LEDColor", false);
+    ReadParameter(param, "GPIO", "StatusLED", false);
+    ReadParameter(param, "GPIO", "StatusLEDIdle", false);
+    ReadParameter(param, "GPIO", "StatusLEDTakeImage", false);
+    ReadParameter(param, "GPIO", "StatusLEDAlign", false);
+    ReadParameter(param, "GPIO", "StatusLEDDigitize", false);
+    ReadParameter(param, "GPIO", "StatusLEDPostProc", false);
+    ReadParameter(param, "GPIO", "StatusLEDTransmit", false);
+    ReadParameter(param, "GPIO", "StatusLEDError", false);
+    syncStatusColorsFromValues();   // update the colour pickers from the loaded RGB values
 	
     // Folgende Zeilen sind für Abwärtskompatibität < v9.0.0 notwendig (manchmal parameter auskommentiert)
     param["GPIO"]["LEDType"]["enabled"] = true;
