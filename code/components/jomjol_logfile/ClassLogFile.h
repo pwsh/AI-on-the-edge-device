@@ -53,4 +53,10 @@ public:
 
 extern ClassLogFile LogFile;
 
+// Guarded DEBUG logging for hot paths (e.g. the CNN inference loop). The message expression is
+// only evaluated when the file log level is DEBUG+, so `"..." + std::to_string(x) + ...` argument
+// strings are not built and thrown away on every cycle in production (default INFO level). When
+// DEBUG is active it behaves exactly like LogFile.WriteToFile(ESP_LOG_DEBUG, tag, msg).
+#define LOGD(tag, msg) do { if (LogFile.getLogLevel() >= ESP_LOG_DEBUG) { LogFile.WriteToFile(ESP_LOG_DEBUG, (tag), (msg)); } } while (0)
+
 #endif //CLASSLOGFILE_H

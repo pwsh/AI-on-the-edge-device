@@ -108,14 +108,14 @@ string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution
         return result;
     }
     
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout _analog=" + std::to_string(_analog) + ", _extendedResolution=" + std::to_string(_extendedResolution) + ", prev=" + std::to_string(prev));
+    LOGD(TAG, "getReadout _analog=" + std::to_string(_analog) + ", _extendedResolution=" + std::to_string(_extendedResolution) + ", prev=" + std::to_string(prev));
  
     if (CNNType == Analogue || CNNType == Analogue100) {
         float number = GENERAL[_analog]->ROI[GENERAL[_analog]->ROI.size() - 1]->result_float;
         int result_after_decimal_point = ((int) floor(number * 10) + 10) % 10;
         
         prev = PointerEvalAnalogNew(GENERAL[_analog]->ROI[GENERAL[_analog]->ROI.size() - 1]->result_float, prev);
-//        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout(analog) number=" + std::to_string(number) + ", result_after_decimal_point=" + std::to_string(result_after_decimal_point) + ", prev=" + std::to_string(prev));
+//        LOGD(TAG, "getReadout(analog) number=" + std::to_string(number) + ", result_after_decimal_point=" + std::to_string(result_after_decimal_point) + ", prev=" + std::to_string(prev));
         result = std::to_string(prev);
 
         if (_extendedResolution) {
@@ -152,7 +152,7 @@ string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution
 
                 result = std::to_string(result_before_decimal_point) + std::to_string(result_after_decimal_point);
                 prev = result_before_decimal_point;
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout(dig100-ext) result_before_decimal_point=" + std::to_string(result_before_decimal_point) + ", result_after_decimal_point=" + std::to_string(result_after_decimal_point) + ", prev=" + std::to_string(prev));
+                LOGD(TAG, "getReadout(dig100-ext) result_before_decimal_point=" + std::to_string(result_before_decimal_point) + ", result_after_decimal_point=" + std::to_string(result_after_decimal_point) + ", prev=" + std::to_string(prev));
             }
             else {
                 if (_before_narrow_Analog >= 0) {
@@ -165,7 +165,7 @@ string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution
                 // is necessary because a number greater than 9.994999 returns a 10! (for further details see check in PointerEvalHybridNew)
                 if ((prev >= 0) && (prev < 10)) {
                     result = std::to_string(prev);
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout(dig100)  prev=" + std::to_string(prev));
+                    LOGD(TAG, "getReadout(dig100)  prev=" + std::to_string(prev));
                 }
                 else {
                     result = "N";
@@ -182,14 +182,14 @@ string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution
         for (int i = GENERAL[_analog]->ROI.size() - 2; i >= 0; --i) {
             if ((GENERAL[_analog]->ROI[i]->result_float >= 0) && (GENERAL[_analog]->ROI[i]->result_float < 10)) {
                 prev = PointerEvalHybridNew(GENERAL[_analog]->ROI[i]->result_float, GENERAL[_analog]->ROI[i+1]->result_float, prev);
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout#PointerEvalHybridNew()= " + std::to_string(prev));
+                LOGD(TAG, "getReadout#PointerEvalHybridNew()= " + std::to_string(prev));
                 result = std::to_string(prev) + result;
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout#result= " + result);
+                LOGD(TAG, "getReadout#result= " + result);
             }
             else {
                 prev = -1;
                 result = "N" + result;
-                LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "getReadout(result_float<0 /'N')  result_float=" + std::to_string(GENERAL[_analog]->ROI[i]->result_float));
+                LOGD(TAG, "getReadout(result_float<0 /'N')  result_float=" + std::to_string(GENERAL[_analog]->ROI[i]->result_float));
             }
         }
         return result;
@@ -227,14 +227,14 @@ int ClassFlowCNNGeneral::PointerEvalHybridNew(float number, float number_of_pred
         // Another alternative would be "result = (int) ((int) trunc(round((number+10 % 10)*1000))) / 1000;", which could, however, lead to other errors?
         result = (int) ((int) trunc(round((number+10 % 10)*100)) )  / 100;
 
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalHybridNew - No predecessor - Result = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalHybridNew - No predecessor - Result = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " number_of_predecessors = " + std::to_string(number_of_predecessors)+ " eval_predecessors = " + std::to_string(eval_predecessors) + " Digit_Uncertainty = " +  std::to_string(Digit_Uncertainty));
         return result;
     }
 
     if (Analog_Predecessors) {
         result = PointerEvalAnalogToDigitNew(number, number_of_predecessors, eval_predecessors, digitAnalogTransitionStart);
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalHybridNew - Analog predecessor, evaluation over PointerEvalAnalogNew = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalHybridNew - Analog predecessor, evaluation over PointerEvalAnalogNew = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " number_of_predecessors = " + std::to_string(number_of_predecessors)+ " eval_predecessors = " + std::to_string(eval_predecessors) + " Digit_Uncertainty = " +  std::to_string(Digit_Uncertainty));
         return result;
     }
@@ -249,7 +249,7 @@ int ClassFlowCNNGeneral::PointerEvalHybridNew(float number, float number_of_pred
             result = ((int) trunc(number) + 10) % 10;
         }
 
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalHybridNew - NO analogue predecessor, no change of digits, as pre-decimal point far enough away = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalHybridNew - NO analogue predecessor, no change of digits, as pre-decimal point far enough away = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " number_of_predecessors = " + std::to_string(number_of_predecessors)+ " eval_predecessors = " + std::to_string(eval_predecessors) + " Digit_Uncertainty = " +  std::to_string(Digit_Uncertainty));
         return result;
     }  
@@ -266,7 +266,7 @@ int ClassFlowCNNGeneral::PointerEvalHybridNew(float number, float number_of_pred
             // Act. digit and predecessor have zero crossing
             result =  result_before_decimal_point % 10;
         }
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalHybridNew - NO analogue predecessor, zero crossing has taken placen = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalHybridNew - NO analogue predecessor, zero crossing has taken placen = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " number_of_predecessors = " + std::to_string(number_of_predecessors)+ " eval_predecessors = " + std::to_string(eval_predecessors) + " Digit_Uncertainty = " +  std::to_string(Digit_Uncertainty));
         return result;
     }
@@ -286,7 +286,7 @@ int ClassFlowCNNGeneral::PointerEvalHybridNew(float number, float number_of_pred
         result =  (result_before_decimal_point - 1 + 10) % 10;
     }
 
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalHybridNew - O analogue predecessor, >= 9.5 --> no zero crossing yet = " + std::to_string(result) +
+    LOGD(TAG, "PointerEvalHybridNew - O analogue predecessor, >= 9.5 --> no zero crossing yet = " + std::to_string(result) +
                                                 " number: " + std::to_string(number) + " number_of_predecessors = " + std::to_string(number_of_predecessors)+ " eval_predecessors = " + std::to_string(eval_predecessors) + " Digit_Uncertainty = " +  std::to_string(Digit_Uncertainty) + " result_after_decimal_point = " + std::to_string(result_after_decimal_point));
     return result;
 }
@@ -305,14 +305,14 @@ int ClassFlowCNNGeneral::PointerEvalAnalogToDigitNew(float number, float numeral
         // before/ after decimal point, because we adjust the number based on the uncertainty.
         result_after_decimal_point = ((int) floor(result * 10)) % 10;
         result_before_decimal_point = ((int) floor(result) + 10) % 10;
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogToDigitNew - Digit Uncertainty - Result = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalAnalogToDigitNew - Digit Uncertainty - Result = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " numeral_preceder: " + std::to_string(numeral_preceder) +
                                                     " erg before comma: " + std::to_string(result_before_decimal_point) + 
                                                     " erg after comma: " + std::to_string(result_after_decimal_point));
     } 
     else {
         result = (int) ((int) trunc(number) + 10) % 10;
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogToDigitNew - NO digit Uncertainty - Result = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalAnalogToDigitNew - NO digit Uncertainty - Result = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " numeral_preceder = " + std::to_string(numeral_preceder));
     }
 
@@ -321,7 +321,7 @@ int ClassFlowCNNGeneral::PointerEvalAnalogToDigitNew(float number, float numeral
     // numeral_preceder<=0.1 & eval_predecessors=9 corresponds to analogue was reset because of previous analogue that are not yet at 0.
     if ((eval_predecessors>=6 && (numeral_preceder>AnalogToDigitTransitionStart || numeral_preceder<=0.2) && roundedUp)) {
         result =  ((result_before_decimal_point+10) - 1) % 10;
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogToDigitNew - Nulldurchgang noch nicht stattgefunden = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalAnalogToDigitNew - Nulldurchgang noch nicht stattgefunden = " + std::to_string(result) +
                                     " number: " + std::to_string(number) + 
                                     " numeral_preceder = " + std::to_string(numeral_preceder) + 
                                     " eerg after comma = " +  std::to_string(result_after_decimal_point));
@@ -336,7 +336,7 @@ int ClassFlowCNNGeneral::PointerEvalAnalogNew(float number, int numeral_preceder
 
     if (numeral_preceder == -1) {
         result = (int) floor(number);
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogNew - No predecessor - Result = " + std::to_string(result) +
+        LOGD(TAG, "PointerEvalAnalogNew - No predecessor - Result = " + std::to_string(result) +
                                                     " number: " + std::to_string(number) + " numeral_preceder = " + std::to_string(numeral_preceder) + " Analog_error = " +  std::to_string(Analog_error));
         return result;
     }
@@ -347,20 +347,20 @@ int ClassFlowCNNGeneral::PointerEvalAnalogNew(float number, int numeral_preceder
     if ((int) floor(number_max) - (int) floor(number_min) != 0) {
         if (numeral_preceder <= Analog_error) {
             result = ((int) floor(number_max) + 10) % 10;
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogNew - number ambiguous, correction upwards - result = " + std::to_string(result) +
+            LOGD(TAG, "PointerEvalAnalogNew - number ambiguous, correction upwards - result = " + std::to_string(result) +
                                                         " number: " + std::to_string(number) + " numeral_preceder = " + std::to_string(numeral_preceder) + " Analog_error = " +  std::to_string(Analog_error));
             return result;
         }
         if (numeral_preceder >= 10 - Analog_error) {
             result = ((int) floor(number_min) + 10) % 10;
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogNew - number ambiguous, downward correction - result = " + std::to_string(result) +
+            LOGD(TAG, "PointerEvalAnalogNew - number ambiguous, downward correction - result = " + std::to_string(result) +
                                                         " number: " + std::to_string(number) + " numeral_preceder = " + std::to_string(numeral_preceder) + " Analog_error = " +  std::to_string(Analog_error));
             return result;
         }
     }
     
     result = ((int) floor(number) + 10) % 10;
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "PointerEvalAnalogNew - number unambiguous, no correction necessary - result = " + std::to_string(result) +
+    LOGD(TAG, "PointerEvalAnalogNew - number unambiguous, no correction necessary - result = " + std::to_string(result) +
                                                 " number: " + std::to_string(number) + " numeral_preceder = " + std::to_string(numeral_preceder) + " Analog_error = " +  std::to_string(Analog_error));
 
     return result;
@@ -574,7 +574,7 @@ bool ClassFlowCNNGeneral::doFlow(string time) {
         return false;
     }
 
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "doFlow after alignment");
+    LOGD(TAG, "doFlow after alignment");
 
     doNeuralNetwork(time);
 
@@ -786,28 +786,28 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         fastReadCycle++;
         forceFullEval = false;
         if (forceAllThisCycle) {
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: full validation pass this cycle");
+            LOGD(TAG, "FastRead: full validation pass this cycle");
         }
     }
 
     // For each NUMBER
     for (int n = 0; n < GENERAL.size(); ++n) {
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Processing Number '" + GENERAL[n]->name + "'");
+        LOGD(TAG, "Processing Number '" + GENERAL[n]->name + "'");
         // For each ROI
         for (int roi = 0; roi < GENERAL[n]->ROI.size(); ++roi) {
-            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "ROI #" + std::to_string(roi) + " - TfLite");
+            LOGD(TAG, "ROI #" + std::to_string(roi) + " - TfLite");
             //ESP_LOGD(TAG, "General %d - TfLite", i);
 
             switch (CNNType) {
                 case Analogue:
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: Analogue");
+                    LOGD(TAG, "CNN Type: Analogue");
                     {
                         float f1, f2;
                         f1 = 0; f2 = 0;
 
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
                         tflite->Invoke();
-                        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "After Invoke");
+                        LOGD(TAG, "After Invoke");
 
                         f1 = tflite->GetOutputValue(0);
                         f2 = tflite->GetOutputValue(1);
@@ -827,7 +827,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                     } break;
 
                 case Digit:
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: Digit");
+                    LOGD(TAG, "CNN Type: Digit");
                     {
                         // FastRead gate: if this digit's pixels are unchanged vs the last real
                         // inference, reuse the cached class and skip the tflite Invoke entirely.
@@ -835,7 +835,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             GENERAL[n]->ROI[roi]->fastCacheValid &&
                             (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
                             GENERAL[n]->ROI[roi]->result_klasse = GENERAL[n]->ROI[roi]->fastCacheClass;
-                            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
                                 "' unchanged -> reuse class " + std::to_string(GENERAL[n]->ROI[roi]->result_klasse));
                             break;
                         }
@@ -863,7 +863,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                 case DoubleHyprid10:
                     {
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: DoubleHyprid10");
+                    LOGD(TAG, "CNN Type: DoubleHyprid10");
                         int _num, _numplus, _numminus;
                         float _val, _valplus, _valminus;
                         float _fit;
@@ -871,7 +871,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
                         tflite->Invoke();
-                        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "After Invoke");
+                        LOGD(TAG, "After Invoke");
 
                         _num = tflite->GetOutClassification(0, 9);
                         _numplus = (_num + 1) % 10;
@@ -903,7 +903,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         string zw = "_num (p, m): " + to_string(_num) + " " + to_string(_numplus) + " " + to_string(_numminus);
                         zw = zw + " _val (p, m): " + to_string(_val) + " " + to_string(_valplus) + " " + to_string(_valminus);
                         zw = zw + " result: " + to_string(result) + " _fit: " + to_string(_fit);
-                        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, zw);
+                        LOGD(TAG, zw);
 
                         _result_save_file = result;
 
@@ -936,7 +936,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                 case Digit100:
                 case Analogue100:
                     {
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: Digit100 or Analogue100");
+                    LOGD(TAG, "CNN Type: Digit100 or Analogue100");
                         int _num;
                         float _result_save_file;
 
@@ -946,7 +946,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
                             GENERAL[n]->ROI[roi]->result_float = GENERAL[n]->ROI[roi]->fastCacheFloat;
                             GENERAL[n]->ROI[roi]->isReject = false;
-                            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
                                 "' unchanged -> reuse value " + std::to_string(GENERAL[n]->ROI[roi]->result_float));
                             break;
                         }
