@@ -25,7 +25,13 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # default board as a global IDF compile definition (must use idf_build_set_property so it
 # propagates to every component) so include/defines.h does not hit "Board not selected".
 if(NOT DEFINED ENV{PLATFORMIO})
-    idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32CAM_AITHINKER" APPEND)
+    # Board pin map per target (idf.py set-target sets IDF_TARGET): ESP32 -> AiThinker ESP32-CAM;
+    # ESP32-S3 -> the S3 camera board scaffolding (defines.h BOARD_ESP32S3_CAM).
+    if("$ENV{IDF_TARGET}" STREQUAL "esp32s3")
+        idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32S3_CAM" APPEND)
+    else()
+        idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32CAM_AITHINKER" APPEND)
+    endif()
 
     # Feature flags. Under PlatformIO these come from platformio.ini build_flags (-D ENABLE_MQTT,
     # ...). The native idf.py build does not read platformio.ini, so set them here as *global*

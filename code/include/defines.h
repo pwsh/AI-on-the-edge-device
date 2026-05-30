@@ -324,6 +324,51 @@
     #define FLASH_GPIO GPIO_NUM_4               // PIN for flashlight LED
     #define USE_PWM_LEDFLASH                    // if __LEDGLOBAL is defined, a global variable is used for LED control, otherwise locally and each time a new
 
+#elif defined(BOARD_ESP32S3_CAM) // ESP32-S3 camera board (default pins: Freenove ESP32-S3-WROOM CAM)
+    // NOTE: scaffolding for the ESP32-S3 target. The camera pins below are the Freenove
+    // ESP32-S3-WROOM CAM pinout (a common DVP board). SD-card pins vary by board - VERIFY against
+    // your board's schematic before flashing real hardware. USB-UVC cameras (S3 USB host) are a
+    // separate path that does not use these DVP pins.
+
+    // SD card (SDMMC) - Freenove ESP32-S3-WROOM CAM (1-line); verify per board
+    //-------------------------------------------------
+    #define GPIO_SDCARD_CLK GPIO_NUM_39
+    #define GPIO_SDCARD_CMD GPIO_NUM_38
+    #define GPIO_SDCARD_D0  GPIO_NUM_40
+    #ifndef __SD_USE_ONE_LINE_MODE__
+        #define GPIO_SDCARD_D1 GPIO_NUM_NC
+        #define GPIO_SDCARD_D2 GPIO_NUM_NC
+        #define GPIO_SDCARD_D3 GPIO_NUM_NC
+    #else
+        #define GPIO_SDCARD_D1 GPIO_NUM_NC
+        #define GPIO_SDCARD_D2 GPIO_NUM_NC
+        #define GPIO_SDCARD_D3 GPIO_NUM_NC
+    #endif
+
+    // DVP camera (OV2640/OV3660) - Freenove ESP32-S3-WROOM CAM
+    #define CAM_PIN_PWDN     GPIO_NUM_NC   // not used
+    #define CAM_PIN_RESET    GPIO_NUM_NC   // software reset
+    #define CAM_PIN_XCLK     GPIO_NUM_15
+    #define CAM_PIN_SIOD     GPIO_NUM_4
+    #define CAM_PIN_SIOC     GPIO_NUM_5
+
+    #define CAM_PIN_D7       GPIO_NUM_16   // Y9
+    #define CAM_PIN_D6       GPIO_NUM_17   // Y8
+    #define CAM_PIN_D5       GPIO_NUM_18   // Y7
+    #define CAM_PIN_D4       GPIO_NUM_12   // Y6
+    #define CAM_PIN_D3       GPIO_NUM_10   // Y5
+    #define CAM_PIN_D2       GPIO_NUM_8    // Y4
+    #define CAM_PIN_D1       GPIO_NUM_9    // Y3
+    #define CAM_PIN_D0       GPIO_NUM_11   // Y2
+    #define CAM_PIN_VSYNC    GPIO_NUM_6
+    #define CAM_PIN_HREF     GPIO_NUM_7
+    #define CAM_PIN_PCLK     GPIO_NUM_13
+
+    // Status / flash LED
+    #define BLINK_GPIO GPIO_NUM_2          // onboard LED (verify per board)
+    #define FLASH_GPIO GPIO_NUM_48         // flashlight / RGB LED (verify per board)
+    #define USE_PWM_LEDFLASH
+
 #else
     #error "Board not selected"
 #endif  //Board PIN Map

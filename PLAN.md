@@ -639,7 +639,20 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      header `chip_id`), and the release/web-installer ships the right binary per board.
    - **Why S3:** verified IDF SoC caps — PSRAM (**8 MB+ mapped → ~2× heap headroom**, addresses the §4
      memory tightness), DVP **and** USB-OTG host (**USB-UVC camera support**), dual-core, Wi-Fi.
-   - Work: `sdkconfig.defaults.esp32s3`, S3 partition table (typically 8/16 MB → bigger app slots,
-     room for **web-UI-in-flash** §8), board pin map in `defines.h`, and a **camera interface
-     abstraction** (DVP via esp32-camera vs USB-UVC). Keep the 4 MB ESP32-CAM build green throughout;
-     add an S3 build to CI alongside it.
+   - **🟡 Scaffolding done (this session):**
+     - ✅ `code/sdkconfig.defaults.esp32s3` — 8 MB flash, **octal PSRAM @ 80 MHz**, 240 MHz CPU,
+       custom partition table (auto-merged by IDF on top of `sdkconfig.defaults` for the s3 target).
+     - ✅ `code/partitions_esp32s3.csv` — dual-OTA **3 MB** app slots (vs 1.9 MB on 4 MB), ~2 MB free
+       for a future `web` LittleFS partition (§8).
+     - ✅ `defines.h` `BOARD_ESP32S3_CAM` pin map (Freenove ESP32-S3-WROOM CAM DVP pinout; **SD pins
+       marked verify-per-board**).
+     - ✅ `code/CMakeLists.txt` selects the board by `IDF_TARGET` (esp32 → AiThinker; esp32s3 → S3),
+       and the 4 MB ESP32-CAM build stays green (verified, binary unchanged).
+   - **⬜ Remaining (needs a real S3 board + a debugging pass, like the IDF-6 migration):**
+     - Get the S3 build green: `idf.py -B build_s3 -D SDKCONFIG=build_s3/sdkconfig -D IDF_TARGET=esp32s3 build`
+       (separate build dir/sdkconfig so the esp32 build is untouched). Expect S3-specific fixes
+       (camera LCD_CAM init, PSRAM octal, GPIO/SD pins, USB).
+     - **Camera interface abstraction**: wrap capture behind an interface with a **DVP** backend
+       (esp32-camera, today) and a **USB-UVC** backend (S3 USB host) — the big code item; gate by
+       target/config. Validate image quality + a meter read on hardware.
+     - Per-board pin verification, S3 build in CI next to esp32, web-installer entry.

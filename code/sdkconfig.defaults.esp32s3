@@ -1,0 +1,23 @@
+# ESP32-S3 target overrides (auto-merged by IDF on top of sdkconfig.defaults when the target is
+# esp32s3). Scaffolding for PLAN sec 9.3 item 5 - validate on real S3 hardware before relying on it.
+
+# 8 MB flash (common on S3-WROOM-1 N8R8; bump to 16MB for N16R8 boards)
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=n
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
+CONFIG_ESPTOOLPY_FLASHSIZE_DETECT=y
+
+# Octal PSRAM @ 80 MHz (S3-WROOM-1 N8R8). For quad-PSRAM S3 modules use CONFIG_SPIRAM_MODE_QUAD=y.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# Bigger OTA app slots (see partitions_esp32s3.csv)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_esp32s3.csv"
+
+# S3 can run the camera/CNN at the full clock
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
