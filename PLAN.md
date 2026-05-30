@@ -467,3 +467,40 @@ between v16 and v17:
    points), zoom/pan, selectable time ranges, multiple series (per meter value / rate), and
    clearer styling that respects dark mode. Reduce client-side work and payload size for big
    data logs.
+
+## 8. Serve the web UI from flash instead of the SD card — FEASIBILITY
+
+**Goal (user):** ship the web UI inside the firmware `.bin` so a single compiled image
+updates the UI; keep models, logs, and config on the SD card for portability.
+
+**Numbers (4 MB board — the common ESP32-CAM, incl. this device ESP32-D0WDQ6):**
+- Flash budget 4 MB. Current partitions: `ota_0` 1900 KB + `ota_1` 1900 KB = **3.7 MB** for the
+  dual app slots, plus bootloader (~21 KB) / nvs (16 KB) / otadata (8 KB) / phy (4 KB) / table.
+  → only **~200 KB unallocated** on 4 MB.
+- App binary ≈ 1.48 MB, ~20 % (~395 KB) free inside each 1.9 MB slot.
+- Web assets ≈ **2.4 MB raw / ~530 KB gzipped**, 67 files.
+
+**Verdict by board:**
+- **4 MB + dual-OTA (current default): NOT feasible.** A ~0.5–1 MB LittleFS/SPIFFS web partition
+  doesn't fit in the ~200 KB that's left, and embedding assets in the app (EMBED_FILES) would push
+  each slot past 1.9 MB (counted in *both* OTA slots). The math simply doesn't close on 4 MB while
+  keeping A/B OTA rollback safety.
+- **4 MB, willing to drop to a single app slot:** frees ~1.86 MB → room for a ~1 MB `web`
+  LittleFS partition. Works, but loses safe A/B OTA (a bad flash can brick until re-flashed over
+  serial). Trade-off decision.
+- **8 MB / 16 MB flash boards (incl. most ESP32-S3):** **feasible and clean.** Add a dedicated
+  `web` LittleFS partition (~1–1.5 MB), build its image alongside the app so `idf.py flash` writes
+  one combined image, and serve from it.
+
+**Recommended design (when targeting 8 MB+ or single-slot 4 MB):**
+1. Move `sd-card/html/*` into a build-time **LittleFS image** (`littlefs_create_partition_image`)
+   on a new `web` data partition; keep files gzipped as today.
+2. File server: look up requests in the flash `web` mount **first**, fall back to `/sdcard/html`
+   if absent — so a user can still override/patch a page from SD (portability + emergency edits).
+3. Keep models, `config.ini`, `wlan.ini`, prevalue, logs, and data on SD (unchanged).
+4. Package the web partition image in the release flow; OTA-update it via a second OTA image
+   (data-OTA) so the UI can still be updated without a full SD swap.
+
+**Open decision (needs user):** which target? (a) keep 4 MB + dual-OTA and leave UI on SD
+[status quo]; (b) 4 MB single-slot to fit UI in flash, giving up A/B OTA; (c) target 8 MB+ boards
+with a dedicated web partition (recommended if hardware allows). Implementation differs per choice.

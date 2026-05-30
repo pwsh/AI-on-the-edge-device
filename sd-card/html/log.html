@@ -50,6 +50,9 @@
                 <button class="button" onClick="reload();">Reload</button>
                 <button class="button" onClick="window.open(getDomainname() + '/logfileact');">Show Full Log</button>
                 <button class="button" onClick="window.location.href = getDomainname() + '/fileserver/log/message/'">Show Older Log Files</button>
+                <label style="font-size:16px; margin-left:10px;" title="Automatically refresh the log and scroll to the newest entries">
+                    <input type="checkbox" id="liveToggle" onchange="toggleLive();"> Live (auto-scroll)
+                </label>
             </div>
             <div class="row content" id="log"><br><br><br><b>Loading logfile, please wait...</b></div>
             <div class="row footer">
@@ -60,13 +63,42 @@
           </div>
     </body>
 
-    <script>  
+    <script>
+        var liveTimer = null;
+        var LIVE_INTERVAL_MS = 3000;
+
         function reload() {
           //  document.getElementById('log').innerHTML += "<br><b>Reloading...<b><br><br>";
             document.getElementById('log').innerHTML += "<b>Reloading...</b>";
             window.scrollBy(0,document.body.scrollHeight);
             funcRequest(getDomainname() + '/log');
-        } 
+        }
+
+        function toggleLive() {
+            var on = document.getElementById('liveToggle').checked;
+            if (on) {
+                // Refresh immediately, then keep polling while enabled.
+                funcRequest(getDomainname() + '/log');
+                if (liveTimer === null) {
+                    liveTimer = setInterval(function () {
+                        funcRequest(getDomainname() + '/log');
+                    }, LIVE_INTERVAL_MS);
+                }
+            } else if (liveTimer !== null) {
+                clearInterval(liveTimer);
+                liveTimer = null;
+            }
+        }
+
+        // Stop polling when the page/tab is hidden or unloaded to save resources.
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden && liveTimer !== null) {
+                clearInterval(liveTimer);
+                liveTimer = null;
+            } else if (!document.hidden && document.getElementById('liveToggle').checked && liveTimer === null) {
+                toggleLive();
+            }
+        });
 
 
         function processLogLine(line, index, arr) {

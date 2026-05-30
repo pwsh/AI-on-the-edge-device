@@ -4,6 +4,8 @@
 #include "read_wlanini.h"
 
 #include "freertos/task.h"
+#include <esp_timer.h>
+#include <esp_heap_caps.h>
 
 #include <sys/stat.h>
 
@@ -420,6 +422,9 @@ bool ClassFlowControll::doFlow(string time)
 
     //checkNtpStatus(0);
 
+    // Diagnostics: total round timing for performance monitoring (DEBUG level).
+    int64_t round_start_us = esp_timer_get_time();
+
     for (int i = 0; i < FlowControll.size(); ++i) {
         zw_time = getCurrentTimeString("%H:%M:%S");
         aktstatus = TranslateAktstatus(FlowControll[i]->name());
@@ -434,6 +439,12 @@ bool ClassFlowControll::doFlow(string time)
             string zw = "FlowControll.doFlow - " + FlowControll[i]->name();
             LogFile.WriteHeapInfo(zw);
         #endif
+
+        // Diagnostics: per-step duration + heap usage (DEBUG level), so slow
+        // steps and memory pressure can be spotted without a special build.
+        int64_t step_start_us = esp_timer_get_time();
+        size_t heap_before = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 
         if (!FlowControll[i]->doFlow(time)) {
             repeat++;
@@ -450,11 +461,23 @@ bool ClassFlowControll::doFlow(string time)
         else {
             result = true;
         }
-        
-        #ifdef DEBUG_DETAIL_ON  
+
+        // Diagnostics (DEBUG): step duration in ms and internal/PSRAM heap delta.
+        int64_t step_ms = (esp_timer_get_time() - step_start_us) / 1000;
+        long heap_delta = (long)heap_before - (long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        long psram_delta = (long)psram_before - (long)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Diag: " + FlowControll[i]->name() +
+            " took " + to_string(step_ms) + " ms, heap " + to_string(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024) +
+            " KB (d" + to_string(heap_delta) + "), psram " + to_string(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) +
+            " KB (d" + to_string(psram_delta) + ")");
+
+        #ifdef DEBUG_DETAIL_ON
             LogFile.WriteHeapInfo("ClassFlowControll::doFlow");
         #endif
     }
+
+    int64_t round_ms = (esp_timer_get_time() - round_start_us) / 1000;
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Diag: full flow round took " + to_string(round_ms) + " ms");
 
     zw_time = getCurrentTimeString("%H:%M:%S");
     aktstatus = "Flow finished";
