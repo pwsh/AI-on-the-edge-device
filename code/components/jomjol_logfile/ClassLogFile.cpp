@@ -6,6 +6,10 @@
 #include <sys/stat.h>
 #include <algorithm>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include <esp_timer.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -139,6 +143,50 @@ bool ClassLogFile::GetDataLogToSD(){
 static FILE* logFileAppendHandle = NULL;
 std::string fileNameDate;
 
+// --- Buffered logging --------------------------------------------------------
+// Log lines are accumulated in RAM and flushed to the SD card in batches, to
+// avoid an fopen/append/fclose (and FAT metadata write) per single line. This
+// matters most at short processing intervals (FastRead), where per-line writes
+// would otherwise multiply SD wear ~30-60x. Durability trade-off: up to one
+// flush window of log lines may be lost on a hard power loss.
+static std::string s_logBuffer;             // pending lines not yet written to SD
+static std::string s_logBufferFileName;     // date-stamped file the buffer belongs to
+static SemaphoreHandle_t s_logMutex = NULL; // guards the buffer (WriteToFile runs on many tasks)
+static int64_t s_lastFlushUs = 0;
+static const size_t LOGBUF_FLUSH_BYTES = 4096;              // flush when the buffer reaches this size
+static const int64_t LOGBUF_FLUSH_US = 10LL * 1000 * 1000;  // ...or when it is older than 10 s
+static const size_t LOGBUF_MAX_RETAIN = 16384;             // cap retained bytes if writes keep failing
+
+static inline void ensureLogMutex()
+{
+    if (s_logMutex == NULL) {
+        s_logMutex = xSemaphoreCreateMutex();
+    }
+}
+
+// Append buffered bytes to their target file. Caller must hold s_logMutex.
+static void flushLogBufferLocked(const std::string& logroot)
+{
+    if (s_logBuffer.empty()) {
+        return;
+    }
+
+    std::string path = logroot + "/" + s_logBufferFileName;
+    FILE* f = fopen(path.c_str(), "a+");
+    if (f != NULL) {
+        fputs(s_logBuffer.c_str(), f);
+        fclose(f);
+        s_logBuffer.clear();
+    }
+    else {
+        // Couldn't write (e.g. SD busy/removed): keep the lines but bound memory.
+        if (s_logBuffer.size() > LOGBUF_MAX_RETAIN) {
+            s_logBuffer.erase(0, s_logBuffer.size() - LOGBUF_MAX_RETAIN);
+        }
+    }
+    s_lastFlushUs = esp_timer_get_time();
+}
+
 void ClassLogFile::WriteToFile(esp_log_level_t level, const std::string& tag, const std::string& message, bool _time)
 {
     // Flatten newlines once (local copy; params are const refs to avoid per-call copies).
@@ -201,39 +249,39 @@ void ClassLogFile::WriteToFile(esp_log_level_t level, const std::string& tag, co
 
     std::string fullmessage = "[" + formatedUptime + "] "  + ntpTime + "\t<" + loglevelString + ">\t" + msg + "\n";
 
-
-#ifdef KEEP_LOGFILE_OPEN_FOR_APPENDING
-    if (fileNameDateNew != fileNameDate) { // Filename changed
-        // Make sure each day gets its own logfile
-        // Also we need to re-open it in case it needed to get closed for reading
-        std::string logpath = logroot + "/" + fileNameDateNew; 
-
-        ESP_LOGI(TAG, "Opening logfile %s for appending", logpath.c_str());
-        logFileAppendHandle = fopen(logpath.c_str(), "a+");
-        if (logFileAppendHandle==NULL) {
-            ESP_LOGE(TAG, "Can't open log file %s", logpath.c_str());
-            return;
-        }
-
-        fileNameDate = fileNameDateNew;
-    }
-#else
-    std::string logpath = logroot + "/" + fileNameDateNew; 
-    logFileAppendHandle = fopen(logpath.c_str(), "a+");
-    if (logFileAppendHandle==NULL) {
-        ESP_LOGE(TAG, "Can't open log file %s", logpath.c_str());
+    // Buffer the line and flush in batches (size- or time-triggered) instead of
+    // doing an fopen/append/fclose per line, which wears the SD card at short
+    // processing intervals. Explicit flushes also happen at round end, before a
+    // reboot, and whenever the log is read back (see FlushLogBuffer callers).
+    ensureLogMutex();
+    if (s_logMutex == NULL) {
+        // Mutex unavailable (should not happen): fall back to a direct write so
+        // the line is never silently dropped.
+        std::string logpath = logroot + "/" + fileNameDateNew;
+        FILE* f = fopen(logpath.c_str(), "a+");
+        if (f != NULL) { fputs(fullmessage.c_str(), f); fclose(f); }
         return;
     }
-  #endif
 
-    fputs(fullmessage.c_str(), logFileAppendHandle);
-    
-#ifdef KEEP_LOGFILE_OPEN_FOR_APPENDING
-    fflush(logFileAppendHandle);
-    fsync(fileno(logFileAppendHandle));
-#else
-    CloseLogFileAppendHandle();
-#endif
+    xSemaphoreTake(s_logMutex, portMAX_DELAY);
+
+    // If the date rolled over, persist the previous day's lines to their file first.
+    if (!s_logBuffer.empty() && s_logBufferFileName != fileNameDateNew) {
+        flushLogBufferLocked(logroot);
+    }
+    s_logBufferFileName = fileNameDateNew;
+    s_logBuffer += fullmessage;
+
+    if (s_lastFlushUs == 0) {
+        s_lastFlushUs = esp_timer_get_time();
+    }
+
+    if ((s_logBuffer.size() >= LOGBUF_FLUSH_BYTES) ||
+        ((esp_timer_get_time() - s_lastFlushUs) >= LOGBUF_FLUSH_US)) {
+        flushLogBufferLocked(logroot);
+    }
+
+    xSemaphoreGive(s_logMutex);
 }
 
 
@@ -243,6 +291,17 @@ void ClassLogFile::CloseLogFileAppendHandle() {
         logFileAppendHandle = NULL;
         fileNameDate = "";
     }
+}
+
+
+void ClassLogFile::FlushLogBuffer() {
+    ensureLogMutex();
+    if (s_logMutex == NULL) {
+        return;
+    }
+    xSemaphoreTake(s_logMutex, portMAX_DELAY);
+    flushLogBufferLocked(logroot);
+    xSemaphoreGive(s_logMutex);
 }
 
 
@@ -418,4 +477,6 @@ ClassLogFile::ClassLogFile(std::string _logroot, std::string _logfile, std::stri
     dataLogRetentionInDays = 3;
     doDataLogToSD = true;
     loglevel = ESP_LOG_INFO;
+    ensureLogMutex();
+    s_lastFlushUs = esp_timer_get_time();
 }

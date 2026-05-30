@@ -365,11 +365,14 @@ between v16 and v17:
   every 3 s = reads only, opt-in, auto-stops when hidden), Timezone dropdown (client-side).
 - ✅ **Heaviest writer (per-round images) is OFF by default** — `SaveAllFiles=false`, so
   `/sdcard/img_tmp/*.jpg` are not rewritten each round unless the debug option is enabled.
-- ⬜ **Main SD write-amplifier: per-line log open/append/close.** `KEEP_LOGFILE_OPEN_FOR_APPENDING`
-  is **off** (`code/include/defines.h:52`), so every `WriteToFile` does `fopen("a+")` + write +
-  `fclose` → a FAT/dir metadata update **per log line**. Fine at 5-min intervals, but multiplies
-  ~30–60× at FastRead's 5–10 s target. Options: buffer log lines and flush periodically, lower
-  default verbosity, or enable keep-open+`fsync`. Pairs with the filtered-log-string item above.
+- ✅ **Main SD write-amplifier fixed: log lines are now buffered.** Previously every `WriteToFile`
+  did `fopen("a+")` + write + `fclose` → a FAT/dir metadata update **per log line** (multiplying
+  ~30–60× at FastRead's 5–10 s target). Now lines accumulate in a mutex-guarded RAM buffer in
+  `ClassLogFile` and flush in batches: when the buffer reaches 4 KB, after 10 s, on date rollover,
+  at the end of each flow round, when the log is read back (so the viewer is current), and before
+  any reboot/OTA. Net: ~one SD write per round instead of one per line. Trade-off: up to one flush
+  window of logs may be lost on a hard power loss (documented in code). Also made concurrent
+  logging thread-safe (the old per-call `fopen`/`fclose` raced on a shared static handle).
 - ⬜ Other per-round SD writes are small/bounded: data CSV (1 append, gated by `DataLogActive`) and
   `prevalue.ini` (rewritten only when the value changes, tens of bytes). Consider buffering both
   if sub-minute intervals become common (tie-in with FastRead §1).

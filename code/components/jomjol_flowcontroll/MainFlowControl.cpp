@@ -1820,6 +1820,10 @@ void task_autodoFlow(void *pvParameter)
         wifiRoamByScanning();
 #endif
 
+        // Persist this round's buffered log lines once, before sleeping. Batching
+        // per round (instead of per line) is the main SD-wear reduction.
+        LogFile.FlushLogBuffer();
+
         fr_delta_ms = (esp_timer_get_time() - fr_start) / 1000;
 
         if (auto_interval > fr_delta_ms)

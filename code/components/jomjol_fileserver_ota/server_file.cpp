@@ -433,6 +433,8 @@ static esp_err_t send_logfile(httpd_req_t *req, bool send_full_file)
 
     // Since the log file is still could open for writing, we need to close it first
     LogFile.CloseLogFileAppendHandle();
+    // Persist any buffered log lines so the reader sees the most recent entries.
+    LogFile.FlushLogBuffer();
 
     fd = fopen(currentfilename.c_str(), "r");
     if (!fd) {

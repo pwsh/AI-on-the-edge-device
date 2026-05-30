@@ -36,6 +36,9 @@ public:
 
     void CloseLogFileAppendHandle();
 
+    // Flush any buffered log lines to the SD card. Safe to call from any task.
+    void FlushLogBuffer();
+
     bool CreateLogDirectories();
     void RemoveOldLogFile();
     void RemoveOldDataLog();

@@ -624,6 +624,9 @@ void task_reboot(void *DeleteMainFlow)
     esp_camera_deinit();
     WIFIDestroy();
 
+    // Persist any buffered log lines before the SD card goes away with the reset.
+    LogFile.FlushLogBuffer();
+
     vTaskDelay(3000 / portTICK_PERIOD_MS);
     esp_restart();      // Reset type: CPU reset (Reset both CPUs)
 
@@ -657,6 +660,7 @@ void doRebootOTA()
     Camera.LightOnOff(false);
     StatusLEDOff();
     esp_camera_deinit();
+    LogFile.FlushLogBuffer();   // persist buffered log lines before the reset
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);
     esp_restart();      // Reset type: CPU reset (Reset both CPUs)

@@ -68,6 +68,15 @@ No software is perfect. We know that our software has some quirks. If you have a
   `const std::string&` (was by value → 2 copies/call) and defers all
   time/format/filename work until *after* the log-level guard, so filtered messages skip it.
   Added `getLogLevel()`.
+- **Buffered log writes (SD-card wear).** Log lines were written with an `fopen`/append/`fclose`
+  per line (a FAT metadata write each time) — fine at minute intervals, but heavy at FastRead's
+  5–10 s target. Lines now accumulate in a thread-safe RAM buffer and flush in batches (4 KB / 10 s
+  / date rollover / end of each round / before reboot / when the log is read), turning ~one write
+  per line into ~one per round. Concurrent logging is now mutex-guarded (the previous per-call
+  open/close raced on a shared static handle). Per-round flush keeps logs durable to within one
+  round; a hard power loss may drop the current buffer window.
+- Added per-step flow **diagnostics** at DEBUG level (duration, internal/PSRAM heap free + delta,
+  total round time) so performance can be monitored from the normal log without a special build.
 
 ### :broom: Code Quality / Cleanup
 
@@ -85,6 +94,17 @@ No software is perfect. We know that our software has some quirks. If you have a
 - **FastRead** options added to the config page (Digit ROI Processing, expert section).
 - The existing **"Skip Messages on Error"** control is now **functional** (previously had
   no effect in firmware).
+- **Status LED** (addressable WS281x on GPIO12): show the current processing stage as a colour
+  (idle / take image / align / digitize / post-process / transmit / error). New enable toggle and
+  seven colour pickers in the config page, with sensible defaults; driven via a decoupled
+  stage callback so it doesn't conflict with the capture flash.
+- **Pause / Resume processing** as an always-visible top-menu item (new `/pause` endpoint). Stops
+  new rounds without interrupting an in-progress one and keeps the last status so reference/ROI
+  setup still works while paused.
+- **Live log viewer**: a "Live (auto-scroll)" checkbox that tails new log entries automatically
+  instead of requiring a manual reload.
+- **Time Zone is now a searchable dropdown** (region/city) generated from the IANA tz database;
+  selecting a zone applies its POSIX string automatically. Removes the separate `timezones.html`.
 
 
 # [16.1.0] - 2026-01-11
