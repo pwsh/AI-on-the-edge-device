@@ -1,12 +1,18 @@
-# [17.0.0-alpha.3] - 2026-05-30
+# [17.0.0-alpha.4] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.3)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.4)
 
 ### :bug: Fixes since alpha.2
+
+- **Status LED colour pickers showed black on load.** The pickers are synced from their hidden
+  R/G/B inputs by `syncStatusColorsFromValues()`, which was only called on the save path, not when
+  the config page loads — so the pickers defaulted to black even though the stored values were
+  correct (the LED worked, and values reappeared after a reboot/save). The sync now also runs at
+  the end of `UpdateInput()` (load path), so the pickers show the right colours immediately.
 
 - **Status LED config was greyed out / mis-written.** The `StatusLED` enable was registered as a
   per-number parameter (`_isNUMBER=true`), so it was written to `config.ini` as

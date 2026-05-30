@@ -2529,8 +2529,9 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "StatusLEDPostProc", false);
     WriteParameter(param, category, "GPIO", "StatusLEDTransmit", false);
     WriteParameter(param, category, "GPIO", "StatusLEDError", false);
+    syncStatusColorsFromValues();   // load path: set the colour pickers from the just-populated RGB values
 
-    //WriteParameter(param, category, "AutoTimer", "AutoStart", false);	
+    //WriteParameter(param, category, "AutoTimer", "AutoStart", false);
     WriteParameter(param, category, "AutoTimer", "Interval", false);
 
     WriteParameter(param, category, "DataLogging", "DataLogActive", false);	
