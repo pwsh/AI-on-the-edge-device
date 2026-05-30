@@ -1,18 +1,24 @@
-# [17.0.0-alpha.11] - 2026-05-30
+# [17.0.0-alpha.12] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet.
 
 ### Since alpha.10
 
-- **PSRAM: right-size the model buffer to the shipped models (~0.79 MB freed).** The shared PSRAM
-  region reserved `MAX_MODEL_SIZE` = 1.3 MB for a worst-case model, but the largest model actually
-  shipped is `dig-class11_1701_s2.tflite` = 356 KB. Reduced `MAX_MODEL_SIZE` to **512 KB** (largest
-  shipped + margin; a larger custom model is still rejected gracefully at load). The shared region is
-  now `max(arena+model, image-decode floor)` = ~1.31 MB (was 2.10 MB), measured image-step peak
-  ~921 KB. Frees ~0.79 MB of PSRAM (≈150 KB → ≈940 KB free) — enough headroom for the ~790 KB
-  `alg_roi` overview image that previously couldn't allocate. Added `MEM-PROFILE` log lines
-  (tensor-arena used bytes per model, TakeImage STBI peak) to verify sizing on-device.
+- **PSRAM: right-size the model buffer to the shipped models.** The shared PSRAM region reserved
+  `MAX_MODEL_SIZE` = 1.3 MB for a worst-case model, but the largest model actually shipped is
+  `dig-class11_1701_s2.tflite` = 356 KB → reduced `MAX_MODEL_SIZE` to **512 KB** (largest shipped +
+  margin; a larger custom model is still rejected gracefully at load). The region is now sized as
+  `max(TENSOR_ARENA_SIZE + MAX_MODEL_SIZE, image-decode floor)`.
+- **Added `MEM-PROFILE` instrumentation** (tensor-arena `arena_used_bytes` per model, TakeImage STBI
+  high-water mark) to size the region from real data. Confirmed the tiny arena need: the in-use
+  model uses only **28 KB of the reserved 800 KB** tensor arena — a large further opportunity.
+- **⚠️ Important correction (alpha.11 → alpha.12):** alpha.11 set the image-decode floor from a single
+  921 KB measurement, but the TakeImage step holds **multiple** large buffers concurrently (decode
+  ~921 KB + crop ~615 KB), so 1.31 MB was too small → `psram_reserve_shared_stbi_memory` returned
+  NULL → **boot loop**. alpha.12 floors the region at the **known-good old size** until the true STBI
+  peak is measured on hardware, then it will be tightened to `peak + margin` to safely reclaim PSRAM.
+  Net PSRAM saving is therefore **pending the on-device peak measurement** (not yet realized).
 
 # [17.0.0-alpha.10] - 2026-05-30
 

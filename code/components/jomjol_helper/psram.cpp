@@ -13,10 +13,12 @@ uint32_t allocatedBytesForSTBI = 0;
 uint32_t peakBytesForSTBI = 0;   // MEM-PROFILE: high-water mark of shared-region use during TakeImage
 std::string sharedMemoryInUseFor = "";
 
-// The TakeImage/Aligning step decodes one full RGB image (IMAGE_SIZE) into the shared region
-// (measured peak ~921 KB). Floor the region at IMAGE_SIZE + a margin so shrinking MAX_MODEL_SIZE can
-// never starve image capture.
-#define SHARED_REGION_IMAGE_FLOOR  (IMAGE_SIZE + (128 * 1024))
+// The TakeImage step decodes into the shared region and holds MULTIPLE large buffers concurrently
+// (output RGB + JPEG component planes), so its true peak is well above one IMAGE_SIZE. Until that
+// peak is measured on-device (the MEM-PROFILE "TakeImage STBI peak" log), keep the region at the
+// known-good size (>= the old TENSOR_ARENA_SIZE + 1.3 MB) so capture can never be starved. Once the
+// real peak is known this floor will be tightened to (peak + margin).
+#define SHARED_REGION_IMAGE_FLOOR  (TENSOR_ARENA_SIZE + (size_t)(1.3 * 1024 * 1024))  // == old region; identical PSRAM use, known-good
 
 
 /** Reserve a large block in the PSRAM which will be shared between the different steps.
