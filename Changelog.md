@@ -1,3 +1,84 @@
+# [17.0.0-alpha] - 2026-05-29
+
+> :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
+> still-experimental features. Not recommended for production meters yet. On-device testing
+> (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
+
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha)
+
+### Known issues
+No software is perfect. We know that our software has some quirks. If you have an issue, please first check the [issues](https://github.com/jomjol/AI-on-the-edge-device/issues) and
+[discussions](https://github.com/jomjol/AI-on-the-edge-device/discussions) before reporting a new issue.
+
+### :rocket: New Features
+
+- **FastRead — incremental digit reading** (experimental, default **off**). To support much
+  shorter update intervals (target 5–10 s), the CNN now only re-runs inference on digit ROIs
+  whose cropped image actually changed since the last reading; unchanged digits reuse their
+  previous result. The tflite model is kept resident across cycles (skips the per-cycle
+  load/allocate). A full re-read of all digits is forced periodically and on demand. Only
+  affects digital ROIs (`Digit` / `dig-class100`); analog ROIs are always read in full.
+  - New config options (under `[Digits]`): `FastRead`, `FastReadThreshold`,
+    `FastReadFullInterval`. See the new parameter docs.
+  - :information_source: No web-UI controls yet — configure via `config.ini`.
+- **"Skip Messages on Error" now works** (`PostProcessing` → `ErrorMessage`). This option was
+  exposed in the UI and documented but had **no effect** in firmware. It is now implemented:
+  on a consistency-check rejection (negative rate / rate-too-high), `true` (default) skips the
+  transmission for that reading (empty value to MQTT/InfluxDB/REST), and `false` transmits the
+  **last valid value** instead. The default init was corrected (`false` → `true`) to match the
+  documented/shipped default, and the contradictory parameter doc was rewritten.
+
+### :building_construction: Build System — migrated to ESP-IDF 6.0.1 (from 5.3)
+
+> :warning: There is currently no PlatformIO platform that ships ESP-IDF 6.0, so the build was
+> validated with the native `idf.py` toolchain. The project is a standard IDF project; CI and
+> board-selection (currently in `platformio.ini`) will need to move accordingly.
+
+- esp-mqtt and cJSON were removed from ESP-IDF core in 6.0 and are now pulled as managed
+  components (`espressif/mqtt`, `espressif/cjson`); added `code/main/idf_component.yml`.
+  `REQUIRES json` → `cjson` in the MQTT and webhook components.
+- ESP-IDF 6.0 enforces include↔requires consistency: added explicit `esp_driver_*`
+  (`gpio`, `rmt`, `spi`, `ledc`, `sdmmc`, `sdspi`), `mdns`, `esp_wifi`, `nvs_flash`, etc.
+  to the affected component `CMakeLists.txt` files and to `main`.
+- API/source updates for 6.0 + GCC 15:
+  - `esp_vfs_fat_register()` now takes a config struct → `esp_vfs_fat_register_cfg()`.
+  - private `sdmmc_common.h` → public `sdmmc_cmd.h`.
+  - `HSPI_HOST` → `SPI3_HOST`; dropped `SOC_RMT_*` caps → ESP32 fallbacks;
+    `rmt_tx_channel_config_t::intr_priority` added.
+  - `WIFI_REASON_NOT_AUTHED` → `WIFI_REASON_ASSOC_NOT_AUTHED` (version-gated).
+  - GCC-15 fixes: cross-enum comparison cast, transposed `calloc` args.
+- Native-build board define + `-Wno-error` injected via CMake for non-PlatformIO builds.
+
+### :package: Dependency / Component Updates (all bumped to latest)
+
+- esp32-camera `v2.0.6` → **`v2.1.6`**
+- esp-tflite-micro `v1.3.1` → **`v1.3.5`** (fixes `std::is_pod` removal under `-std=gnu++26`)
+- esp-nn `v1.1.0` → **`v1.2.0`**
+- esp-protocols / mdns `v1.4.3` → **`v1.11.1`**
+- New managed components: `espressif/mqtt`, `espressif/cjson` (+ transitive `esp_jpeg`,
+  `ethernet_init`)
+
+### :zap: Performance & Memory
+
+- Logging hot path: `ClassLogFile::WriteToFile` now takes `tag`/`message` by
+  `const std::string&` (was by value → 2 copies/call) and defers all
+  time/format/filename work until *after* the log-level guard, so filtered messages skip it.
+  Added `getLogLevel()`.
+
+### :broom: Code Quality / Cleanup
+
+- Removed genuinely-dead `NumberPost::ErrorMessage` struct field.
+- Corrected a misleading comment: `NumberPost::timeStampTimeUTC` is **used** by the InfluxDB
+  v1/v2 exporters (was wrongly marked "not used; can be removed").
+- Removed a commented-out dead MQTT branch in `ClassFlowMQTT`.
+
+### :art: UI
+
+- No HTML/markup changes in this release. The existing **"Skip Messages on Error"** control
+  (`edit_config_template.html`) is now **functional** (previously had no effect). The new
+  FastRead options are config-only for now (web-UI controls are a follow-up).
+
+
 # [16.1.0] - 2026-01-11
 
 For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.0.0...v16.1.0)
