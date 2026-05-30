@@ -1,0 +1,100 @@
+/*
+ * Dark mode theme for the AI-on-the-edge-device web UI.
+ *
+ * Activated by `html[data-theme="dark"]` which theme.js sets from localStorage
+ * (with a prefers-color-scheme fallback). The dark rules use attribute-prefixed
+ * selectors, so they out-specify the existing light element rules regardless of
+ * stylesheet order; a few !important guards cover inline `style="color:black"`.
+ */
+
+html[data-theme="dark"] {
+    --bg:        #1e1e1e;  /* page background            */
+    --fg:        #dcdcdc;  /* primary text               */
+    --panel:     #252526;  /* tables / cards / submenus  */
+    --panel-alt: #2d2d30;  /* alt rows / inputs          */
+    --border:    #3e3e42;  /* borders                    */
+    --input-bg:  #2d2d30;
+    --input-fg:  #e6e6e6;
+    --link:      #4ea3e0;
+    --muted:     #9a9a9a;
+    color-scheme: dark;    /* native form controls / scrollbars go dark */
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+    background-color: var(--bg) !important;
+    color: var(--fg);
+}
+
+/* Generic text containers */
+html[data-theme="dark"] p,
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] label,
+html[data-theme="dark"] li,
+html[data-theme="dark"] dd,
+html[data-theme="dark"] dt {
+    color: var(--fg);
+}
+
+/* Inline `style="color:black"` (used heavily on config-page labels) */
+html[data-theme="dark"] [style*="color:black"],
+html[data-theme="dark"] [style*="color: black"] {
+    color: var(--fg) !important;
+}
+
+/* Tables */
+html[data-theme="dark"] table,
+html[data-theme="dark"] td,
+html[data-theme="dark"] th {
+    background-color: var(--panel);
+    border-color: var(--border) !important;
+    color: var(--fg);
+}
+html[data-theme="dark"] tr:nth-child(even) td {
+    background-color: var(--panel-alt);
+}
+
+/* Form controls */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] button {
+    background-color: var(--input-bg);
+    color: var(--input-fg);
+    border-color: var(--border);
+}
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: var(--muted); }
+
+/* Links */
+html[data-theme="dark"] a { color: var(--link); }
+
+/* style.css top menu is already dark (#333); recolor the LIGHT submenu parts */
+html[data-theme="dark"] .menu li ul { background: var(--panel); }
+html[data-theme="dark"] .menu li:hover li a { background: var(--panel); color: var(--fg); }
+html[data-theme="dark"] .menu ul li ul li:hover ul li a { background: var(--panel-alt); color: var(--fg); }
+
+/* index.html footer (inline #d8d8d8) */
+html[data-theme="dark"] .footer { background-color: var(--panel) !important; color: var(--fg); }
+
+/* file_server.css table stripes (#f2f2f2 / #ddd) */
+html[data-theme="dark"] tr:hover td { background-color: var(--panel-alt); }
+
+/* Floating theme toggle button (defined here so every page can show it if wanted) */
+#themeToggle {
+    position: fixed;
+    top: 6px;
+    right: 10px;
+    z-index: 300;
+    background: transparent;
+    border: 0;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+}
+html[data-theme="dark"] #themeToggle { background: transparent; }

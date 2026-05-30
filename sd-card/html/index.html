@@ -8,6 +8,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="style.css?v=$COMMIT_HASH" type="text/css" >
     <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
+    <script type="text/javascript" src="theme.js?v=$COMMIT_HASH"></script>
 
     <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script>
     <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
@@ -96,6 +98,7 @@
 </head>
 
 <body>
+<button id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
 <div class="main">
 
 <table style="border: none; width:100%">
