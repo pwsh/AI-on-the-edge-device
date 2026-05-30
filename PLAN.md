@@ -405,14 +405,15 @@ between v16 and v17:
    the flow task (`MainFlowControl`/`server_tflite`) + a REST endpoint
    (e.g. `/pause?status=1`) + a menu/toolbar toggle; persist across the current session and
    show the paused state clearly. Tie in with the existing "trigger single round" handler.
-- ⬜ **LED status + countdown to next processing.** Use the onboard/external LED(s) to show
+- 🟡 **LED status + countdown to next processing.** Use the onboard/external LED(s) to show
    processing state and count down to the next round:
-   - Countdown: e.g. blink rate or a fading ramp as the next round approaches.
-   - Per-step status via RGB color (capture / align / digit CNN / analog CNN / post-process /
-     transmit), so the device's state is glanceable without the web UI.
-   - Build on the existing GPIO/LED + WS281x (`SmartLeds`) support in `jomjol_controlGPIO`;
-     make it configurable (off / status-only / countdown+status) since not all boards have an
-     addressable LED. Honor the existing flash-LED usage so it doesn't conflict with capture.
+   - ✅ Per-step status via RGB color (idle / take image / align / digitize CNN / post-process /
+     transmit / error) — implemented: `StatusLED` enable + 7 per-stage colour params, driven via
+     a decoupled stage callback (`jomjol_helper` → `jomjol_controlGPIO`), UI colour pickers +
+     tooltips. Honors the existing flash-LED (same WS281x on GPIO12).
+   - ⬜ Countdown: e.g. blink rate or a fading ramp as the next round approaches (not yet done).
+   - ⬜ Follow-up: a configurable mode (off / status-only / countdown+status); on-device colour
+     visibility pass.
 - ⬜ **UI cleanup / modernization + responsiveness.** The web UI is legacy (table layouts,
    hardcoded colors, fixed widths, per-page `<style>`). Modernize incrementally:
    - Consolidate styles into shared CSS variables (the dark-mode `theme.css` is a starting
@@ -422,3 +423,47 @@ between v16 and v17:
    - Modern component styling (cards, spacing, typography), consistent across pages.
    - Keep it dependency-light (served from ESP32/SD, gzipped) — plain CSS/JS, no heavy
      frameworks. Coordinate with the dark-mode variables so both themes stay consistent.
+- ⬜ **Apply configuration changes live (no reboot) where possible.** Today saving config
+   from the UI requires a restart to take effect (see FeatureRequest #2). Add a path to
+   re-apply settings at runtime:
+   - On save, re-run the relevant `ReadParameter`/init for the affected flow modules instead
+     of forcing a reboot — e.g. ROI/digit/analog config, post-processing, MQTT/InfluxDB
+     endpoints, intervals, FastRead/dark-mode-irrelevant params.
+   - Cleanest hook: pause the flow (see the "Pause processing" item), reload config into the
+     `ClassFlow*` objects (re-`ReadParameter`), then resume — avoids races with an in-flight
+     round. Reuse the config-reload work already needed for MQTT callbacks (FeatureRequest #2).
+   - Classify each parameter as **live-reloadable** vs **reboot-required** (e.g. camera/SD/
+     WiFi/partition changes may still need a restart); the UI shows which applies and only
+     prompts for a reboot when actually necessary.
+   - Keep a safe fallback: if live-reload of a given change isn't supported, fall back to the
+     current "reboot to apply" behavior rather than applying a partial/invalid state.
+- ⬜ **Flexible processing interval (sub-minute + unit dropdown).** The auto-timer interval is
+   currently whole minutes (`[AutoTimer] AutoStart`/`Intervall` in minutes). Allow finer and
+   coarser granularity:
+   - UI: an integer entry + a **unit dropdown (seconds / minutes / hours / days)**; store the
+     resulting interval (convert to a common unit, e.g. seconds, internally).
+   - Allow **sub-minute** intervals (seconds) — pairs naturally with FastRead (§1) for the
+     5–10 s target; guard against intervals shorter than one flow round can complete.
+   - **Default: 5 minutes** in the base configuration (unchanged default behavior).
+   - Firmware: widen the interval type/parsing (currently minutes) to seconds and update the
+     auto-timer loop; keep config back-compat (treat a bare number as minutes if no unit).
+- 🟡 **Live log viewer (auto-scroll / tail).** The log viewer page currently requires a manual
+   reload (or button press) to see new entries. Add a "Live / auto-scroll" checkbox that polls
+   (or streams) new log lines and appends them, auto-scrolling to the bottom; unchecking pauses
+   the tail. Keep it lightweight (periodic fetch of the log tail; avoid re-rendering the whole
+   buffer). *(In progress — see request batch 2026-05-30.)*
+- ⬜ **Improve ROI selection GUI.** The reference/ROI editors (digit & analog) are functional but
+   fiddly: improve the drag/resize handles, snapping/alignment aids, zoom & pan, keyboard nudge,
+   per-ROI add/duplicate/delete ergonomics, and clearer overlay of current vs. proposed ROIs.
+   Make it responsive and touch-friendly. Coordinate with the "Draw from center" analog option
+   already added. Goal: setting up a new meter should be fast and forgiving.
+- ⬜ **Better tooltips / inline documentation.** Expand the per-parameter tooltip docs
+   (`param-docs/parameter-pages/*`) to explain what each setting does *and what it affects*
+   (interactions, when to change it, typical values, side effects). Add inline help to the
+   non-config UIs too (ROI editor, overview, log viewer). Audit for missing/blank tooltips and
+   stale text; keep the markdown→tooltip generator as the single source of truth.
+- ⬜ **Improve graphing functionality & performance.** The data/graph view should be faster and
+   more capable: efficient handling of long history (downsample/window instead of loading all
+   points), zoom/pan, selectable time ranges, multiple series (per meter value / rate), and
+   clearer styling that respects dark mode. Reduce client-side work and payload size for big
+   data logs.
