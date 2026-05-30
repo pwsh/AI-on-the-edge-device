@@ -620,21 +620,17 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      this item largely **rolls into item 5 (S3)**. Optional safe follow-ups: auto-size the arena to
      the loaded model (frees PSRAM when small models are used), and a low-PSRAM early-warning log.
    - TLSF is already the IDF default allocator; no change needed there.
-5. **Multi-platform via the split `esp_driver_*` drivers — once the above are stable.**
-   - **Each chip family needs its own compiled binary** (mandatory: Xtensa vs RISC-V ISA + per-SoC
-     memory map). One codebase, **per-target build configs** + compile-time feature gating
-     (`#if CONFIG_IDF_TARGET_ESP32S3 ...`) so the 4 MB ESP32-CAM is never bloated by features it
-     can't hold. OTA is cross-flash-safe (the image header `chip_id` is validated by the bootloader).
-   - **Viable camera targets (verified against IDF SoC caps — PSRAM + a camera interface required):**
-     | Target | PSRAM | Camera | USB host | Wi-Fi | Role |
-     |---|---|---|---|---|---|
-     | **ESP32** (ESP32-CAM) | ✅ (~4 MB mapped) | DVP | ✅ | ✅ | current baseline |
-     | **ESP32-S3** (top priority) | ✅ 8 MB+ | DVP | ✅ (UVC) | ✅ | USB camera, headroom, web-in-flash |
-     | **ESP32-P4** | ✅ large | DVP + **MIPI-CSI** | ✅ | ❌ | needs a Wi-Fi companion |
-     | **ESP32-C6** | ❌ | ❌ | ❌ | ✅ Wi-Fi 6 | **P4's Wi-Fi/Matter companion** (`esp_hosted` over SDIO), *not* standalone |
-   - ❌ **ESP32-C3 dropped** and ❌ **ESP32-C6 not viable standalone** — both lack PSRAM, a camera
-     peripheral (no LCD_CAM/MIPI), and USB-OTG host, so neither can attach a camera or hold the
-     ~3–4 MB model+image working set. The C6's value is only as the **P4 Wi-Fi companion**.
-   - Per-target `sdkconfig.defaults.<target>`, partition tables, board pin maps (`defines.h`).
-   - Abstract the camera behind an interface: **DVP** (esp32-camera) vs **USB-UVC** (S3, USB host)
-     vs **MIPI-CSI** (P4). CI matrix per target; keep the 4 MB ESP32-CAM building throughout.
+5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**
+   Scope is deliberately limited to **ESP32 (ESP32-CAM) + ESP32-S3**. P4/C6/C3 are **out of scope**
+   (C3/C6 verified non-viable — no PSRAM / no camera / no USB host; P4 dropped to keep focus).
+   - **Each chip needs its own compiled binary** (Xtensa ESP32 vs Xtensa ESP32-S3 differ in ISA
+     extensions + memory map; IDF builds per `set-target`). **One codebase**, per-target build configs
+     + compile-time feature gating (`#if CONFIG_IDF_TARGET_ESP32S3 ...`) so the 4 MB ESP32-CAM is
+     never bloated by S3-only features. OTA is cross-flash-safe (bootloader validates the image
+     header `chip_id`), and the release/web-installer ships the right binary per board.
+   - **Why S3:** verified IDF SoC caps — PSRAM (**8 MB+ mapped → ~2× heap headroom**, addresses the §4
+     memory tightness), DVP **and** USB-OTG host (**USB-UVC camera support**), dual-core, Wi-Fi.
+   - Work: `sdkconfig.defaults.esp32s3`, S3 partition table (typically 8/16 MB → bigger app slots,
+     room for **web-UI-in-flash** §8), board pin map in `defines.h`, and a **camera interface
+     abstraction** (DVP via esp32-camera vs USB-UVC). Keep the 4 MB ESP32-CAM build green throughout;
+     add an S3 build to CI alongside it.
