@@ -151,6 +151,9 @@ function ParseConfig() {
     param[catname] = new Object();
     ParamAddValue(param, catname, "Model");
     ParamAddValue(param, catname, "CNNGoodThreshold", 1);
+    ParamAddValue(param, catname, "FastRead", 1, true, "false");
+    ParamAddValue(param, catname, "FastReadThreshold", 1, true, "8");
+    ParamAddValue(param, catname, "FastReadFullInterval", 1, true, "20");
     ParamAddValue(param, catname, "ROIImagesLocation");
     ParamAddValue(param, catname, "ROIImagesRetention");
 

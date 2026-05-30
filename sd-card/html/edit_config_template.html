@@ -785,6 +785,45 @@
             <td>$TOOLTIP_Digits_CNNGoodThreshold</td>
         </tr>
 
+        <tr class="DigitItem expert">
+            <td class="indent1">
+                <input type="checkbox" id="Digits_FastRead_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "FastRead")' unchecked >
+                <label for=Digits_FastRead_enabled><class id="Digits_FastRead_text" style="color:black;">Fast Read (incremental)</class></label>
+            </td>
+            <td>
+                <select id="Digits_FastRead_value1">
+                    <option value="true">enabled (true)</option>
+                    <option value="false" selected>disabled (false)</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_Digits_FastRead</td>
+        </tr>
+
+        <tr class="DigitItem expert">
+            <td class="indent1">
+                <input type="checkbox" id="Digits_FastReadThreshold_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "FastReadThreshold")' unchecked >
+                <label for=Digits_FastReadThreshold_enabled><class id="Digits_FastReadThreshold_text" style="color:black;">Fast Read Threshold</class></label>
+            </td>
+            <td>
+                <input required type="number" id="Digits_FastReadThreshold_value1" min="0" max="255" step="1"
+                    oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=255)) &&
+                        (!validity.stepMismatch||(value=parseInt(this.value)));">
+            </td>
+            <td>$TOOLTIP_Digits_FastReadThreshold</td>
+        </tr>
+
+        <tr class="DigitItem expert">
+            <td class="indent1">
+                <input type="checkbox" id="Digits_FastReadFullInterval_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "FastReadFullInterval")' unchecked >
+                <label for=Digits_FastReadFullInterval_enabled><class id="Digits_FastReadFullInterval_text" style="color:black;">Fast Read Full Interval</class></label>
+            </td>
+            <td>
+                <input required type="number" id="Digits_FastReadFullInterval_value1" min="1" step="1"
+                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.stepMismatch||(value=parseInt(this.value)));">cycles
+            </td>
+            <td>$TOOLTIP_Digits_FastReadFullInterval</td>
+        </tr>
+
         <tr class="DigitItem">
             <td class="indent1">
                 <input type="checkbox" id="Digits_ROIImagesLocation_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "ROIImagesLocation")' unchecked >
@@ -2348,8 +2387,11 @@ function UpdateInput() {
     WriteParameter(param, category, "Alignment", "InitialRotate", false);
 
     WriteParameter(param, category, "Digits", "CNNGoodThreshold", true);
-    WriteParameter(param, category, "Digits", "ROIImagesLocation", true);		
-    WriteParameter(param, category, "Digits", "ROIImagesRetention", true);		
+    WriteParameter(param, category, "Digits", "FastRead", true);
+    WriteParameter(param, category, "Digits", "FastReadThreshold", true);
+    WriteParameter(param, category, "Digits", "FastReadFullInterval", true);
+    WriteParameter(param, category, "Digits", "ROIImagesLocation", true);
+    WriteParameter(param, category, "Digits", "ROIImagesRetention", true);
     
     WriteParameter(param, category, "Analog", "ROIImagesLocation", true);		
     WriteParameter(param, category, "Analog", "ROIImagesRetention", true);		
@@ -2516,6 +2558,9 @@ function ReadParameterAll() {
 
     ReadParameter(param, "Digits", "Model", false);
     ReadParameter(param, "Digits", "CNNGoodThreshold", true);
+    ReadParameter(param, "Digits", "FastRead", true);
+    ReadParameter(param, "Digits", "FastReadThreshold", true);
+    ReadParameter(param, "Digits", "FastReadFullInterval", true);
     ReadParameter(param, "Digits", "ROIImagesLocation", true);
     ReadParameter(param, "Digits", "ROIImagesRetention", true);
 

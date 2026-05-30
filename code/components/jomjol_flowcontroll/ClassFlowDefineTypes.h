@@ -16,6 +16,14 @@ struct roi {
     bool isReject, CCW;
     string name;
     CImageBasis *image, *image_org;
+
+    // FastRead cache: lets the CNN skip inference on a digit ROI whose pixels
+    // did not change since the last real inference. Only used for digital ROIs
+    // (Digit / Digit100) and only when FastRead is enabled in the config.
+    uint8_t *fastCacheImg = nullptr; // copy of the model-input buffer at last real inference (nullptr = not allocated)
+    int fastCacheClass = -1;         // cached result_klasse (Digit)
+    float fastCacheFloat = -1;       // cached result_float (Digit100)
+    bool fastCacheValid = false;     // true once a real inference has populated the cache
 };
 
 /**
@@ -40,7 +48,6 @@ struct NumberPost {
     float MaxRateValue;         // maxRate; upper bound for the difference between two consecutive readings; affected by maxRateType;
     bool useMaxRateValue;       // consistencyChecksEnabled; enables consistency checks; uses maxRate and maxRateType
     t_RateType MaxRateType;        // maxRateType; affects how the value of maxRate is used for comparing the current and previous value
-    bool ErrorMessage;          // FIXME: not used; can be removed
     int ChangeRateThreshold;  // threshold parameter for negative rate detection
     bool PreValueOkay;          // previousValueValid; indicates that the reading of the previous round has no errors
     bool AllowNegativeRates;    // allowNegativeRate; defines if the consistency checks allow negative rates between consecutive meter readings.
@@ -48,7 +55,7 @@ struct NumberPost {
     bool checkDigitIncreaseConsistency; // extendedConsistencyCheck; performs an additional consistency check to avoid wrong readings
     time_t timeStampLastValue;     // Timestamp for the last read value; is used for the log
     time_t timeStampLastPreValue;  // Timestamp for the last PreValue set; is used for useMaxRateValue
-    time_t timeStampTimeUTC;    // FIXME: not used; can be removed.
+    time_t timeStampTimeUTC;    // UTC timestamp of the reading; set in PostProcessing, read by InfluxDB v1/v2 exporters
     string timeStamp;           // localTimeStr; timestamp of last valid reading formatted as local time
     double FlowRateAct;         // currentRate; ΔValue/min; since usage is not limited to water meters, the physical unit is not known.
     double PreValue;            // lastValidValue; most recent value that could be read w/o any errors

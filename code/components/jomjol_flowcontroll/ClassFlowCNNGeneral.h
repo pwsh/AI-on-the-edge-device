@@ -6,6 +6,7 @@
 #include"ClassFlowDefineTypes.h"
 #include "ClassFlowAlignment.h"
 
+class CTfLiteClass;
 
 enum t_CNNType {
     AutoDetect,
@@ -32,7 +33,19 @@ protected:
     string LogImageSelect;
     ClassFlowAlignment* flowpostalignment;
 
-    bool SaveAllFiles;   
+    bool SaveAllFiles;
+
+    // --- FastRead: only re-run CNN inference on digit ROIs whose image changed ---
+    bool FastReadEnabled;        // master switch (config "FastRead"); default off -> original behavior
+    int FastReadDiffThreshold;   // mean abs per-pixel diff (0-255) below which a ROI counts as "unchanged"
+    int FastReadFullInterval;    // force a full inference of all digits every N cycles (drift backstop)
+    int fastReadCycle;           // cycle counter for the interval backstop
+    bool forceFullEval;          // one-shot external trigger (e.g. carry / consistency failure)
+    CTfLiteClass *residentTflite;// model kept loaded across cycles while FastRead is on
+
+    bool isDigitalCNN();                       // true for Digit / Digit100
+    int  fastReadMeanDiff(roi *r);             // mean abs diff of current cut vs cached buffer
+    void fastReadUpdateCache(roi *r, int klasse, float value); // copy current cut + store result
 
     int PointerEvalAnalogNew(float zahl, int numeral_preceder);
     int PointerEvalAnalogToDigitNew(float zahl, float numeral_preceder,  int eval_predecessors, float AnalogToDigitTransitionStart);
@@ -47,6 +60,11 @@ protected:
 
 public:
     ClassFlowCNNGeneral(ClassFlowAlignment *_flowalign, t_CNNType _cnntype = AutoDetect);
+    ~ClassFlowCNNGeneral();
+
+    // Force the next inference pass to re-read every digit (skip the FastRead cache).
+    // Intended to be called by post-processing on carry / consistency failure.
+    void TriggerFullEval() { forceFullEval = true; };
 
     bool ReadParameter(FILE* pfile, string& aktparamgraph);
     bool doFlow(string time);

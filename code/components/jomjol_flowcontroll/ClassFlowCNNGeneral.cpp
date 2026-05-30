@@ -1,9 +1,11 @@
 #include "ClassFlowCNNGeneral.h"
 
 #include <math.h>
-#include <iomanip> 
+#include <iomanip>
 #include <sys/types.h>
 #include <sstream>      // std::stringstream
+#include <cstring>      // memcpy
+#include <cstdlib>      // malloc / free / abs
 
 #include "CTfLiteClass.h"
 #include "ClassLogFile.h"
@@ -33,6 +35,70 @@ ClassFlowCNNGeneral::ClassFlowCNNGeneral(ClassFlowAlignment *_flowalign, t_CNNTy
     CNNType = _cnntype;
     flowpostalignment = _flowalign;
     imagesRetention = 5;
+
+    FastReadEnabled = false;
+    FastReadDiffThreshold = 8;   // mean abs per-pixel diff; tuned conservatively (false "changed" only costs an inference)
+    FastReadFullInterval = 20;   // full re-read of all digits every 20 cycles as a drift backstop
+    fastReadCycle = 0;
+    forceFullEval = false;
+    residentTflite = NULL;
+}
+
+ClassFlowCNNGeneral::~ClassFlowCNNGeneral() {
+    if (residentTflite != NULL) {
+        delete residentTflite;
+        residentTflite = NULL;
+    }
+    for (int n = 0; n < GENERAL.size(); ++n) {
+        for (int i = 0; i < GENERAL[n]->ROI.size(); ++i) {
+            if (GENERAL[n]->ROI[i]->fastCacheImg != NULL) {
+                free(GENERAL[n]->ROI[i]->fastCacheImg);
+                GENERAL[n]->ROI[i]->fastCacheImg = NULL;
+            }
+        }
+    }
+}
+
+bool ClassFlowCNNGeneral::isDigitalCNN() {
+    return (CNNType == Digit) || (CNNType == Digit100);
+}
+
+// Mean absolute per-pixel difference between the freshly cut model-input image and
+// the cached buffer from the last real inference. Returns 255 (= "fully changed")
+// when no valid cache exists yet.
+int ClassFlowCNNGeneral::fastReadMeanDiff(roi *r) {
+    if (r->fastCacheImg == NULL || r->image == NULL || r->image->rgb_image == NULL) {
+        return 255;
+    }
+    int size = modelxsize * modelysize * modelchannel;
+    if (size <= 0) {
+        return 255;
+    }
+    uint8_t *cur = r->image->rgb_image;
+    uint8_t *cached = r->fastCacheImg;
+    uint32_t acc = 0;
+    for (int i = 0; i < size; ++i) {
+        acc += (uint32_t) abs((int) cur[i] - (int) cached[i]);
+    }
+    return (int) (acc / (uint32_t) size);
+}
+
+// Store the current cut image and inference result so the next cycle can compare against it.
+void ClassFlowCNNGeneral::fastReadUpdateCache(roi *r, int klasse, float value) {
+    int size = modelxsize * modelysize * modelchannel;
+    if (size <= 0 || r->image == NULL || r->image->rgb_image == NULL) {
+        return;
+    }
+    if (r->fastCacheImg == NULL) {
+        r->fastCacheImg = (uint8_t *) malloc(size);
+        if (r->fastCacheImg == NULL) {
+            return; // out of heap -> leave cache invalid, ROI keeps getting inferred
+        }
+    }
+    memcpy(r->fastCacheImg, r->image->rgb_image, size);
+    r->fastCacheClass = klasse;
+    r->fastCacheFloat = value;
+    r->fastCacheValid = true;
 }
 
 string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution, int prev, float _before_narrow_Analog, float AnalogToDigitTransitionStart) {
@@ -369,10 +435,33 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
             neuroi->result_float = -1;
             neuroi->image = NULL;
             neuroi->image_org = NULL;
+            neuroi->fastCacheImg = NULL;
+            neuroi->fastCacheClass = -1;
+            neuroi->fastCacheFloat = -1;
+            neuroi->fastCacheValid = false;
         }
 
         if ((toUpper(splitted[0]) == "SAVEALLFILES") && (splitted.size() > 1)) {
             SaveAllFiles = alphanumericToBoolean(splitted[1]);
+        }
+
+        if ((toUpper(splitted[0]) == "FASTREAD") && (splitted.size() > 1)) {
+            FastReadEnabled = alphanumericToBoolean(splitted[1]);
+        }
+
+        if ((toUpper(splitted[0]) == "FASTREADTHRESHOLD") && (splitted.size() > 1)) {
+            if (isStringNumeric(splitted[1])) {
+                FastReadDiffThreshold = std::stoi(splitted[1]);
+            }
+        }
+
+        if ((toUpper(splitted[0]) == "FASTREADFULLINTERVAL") && (splitted.size() > 1)) {
+            if (isStringNumeric(splitted[1])) {
+                FastReadFullInterval = std::stoi(splitted[1]);
+                if (FastReadFullInterval < 1) {
+                    FastReadFullInterval = 1;
+                }
+            }
         }
     }
 
@@ -640,23 +729,65 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
     string logPath = CreateLogFolder(time);
 
-    CTfLiteClass *tflite = new CTfLiteClass;  
     string zwcnn = "/sdcard" + cnnmodelfile;
     zwcnn = FormatFileName(zwcnn);
     ESP_LOGD(TAG, "%s", zwcnn.c_str());
 
-    if (!tflite->LoadModel(zwcnn)) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
-        LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
-        delete tflite;
-        return false;
+    // Model lifecycle: with FastRead the model is kept resident across cycles (load/allocate
+    // is pure overhead on a 5-10s cadence). Without FastRead it is loaded and freed each cycle
+    // as before, to keep the heap free between rounds.
+    CTfLiteClass *tflite;
+    if (FastReadEnabled) {
+        if (residentTflite == NULL) {
+            residentTflite = new CTfLiteClass;
+            if (!residentTflite->LoadModel(zwcnn)) {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
+                LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
+                delete residentTflite;
+                residentTflite = NULL;
+                return false;
+            }
+            if (!residentTflite->MakeAllocate()) {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
+                LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
+                delete residentTflite;
+                residentTflite = NULL;
+                return false;
+            }
+        }
+        tflite = residentTflite;
+    }
+    else {
+        tflite = new CTfLiteClass;
+        if (!tflite->LoadModel(zwcnn)) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
+            LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
+            delete tflite;
+            return false;
+        }
+        if (!tflite->MakeAllocate()) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
+            LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
+            delete tflite;
+            return false;
+        }
     }
 
-    if (!tflite->MakeAllocate()) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
-        LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
-        delete tflite;
-        return false;
+    // Decide whether this cycle re-reads every digit (full validation) or may reuse the
+    // FastRead cache. A full pass runs when FastRead is off, when externally triggered
+    // (carry / consistency failure via TriggerFullEval()), or every FastReadFullInterval
+    // cycles as a drift backstop.
+    bool forceAllThisCycle = true;
+    if (FastReadEnabled && isDigitalCNN()) {
+        if (FastReadFullInterval < 1) {
+            FastReadFullInterval = 1;
+        }
+        forceAllThisCycle = forceFullEval || ((fastReadCycle % FastReadFullInterval) == 0);
+        fastReadCycle++;
+        forceFullEval = false;
+        if (forceAllThisCycle) {
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: full validation pass this cycle");
+        }
     }
 
     // For each NUMBER
@@ -698,9 +829,24 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                 case Digit:
                     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: Digit");
                     {
+                        // FastRead gate: if this digit's pixels are unchanged vs the last real
+                        // inference, reuse the cached class and skip the tflite Invoke entirely.
+                        if (FastReadEnabled && !forceAllThisCycle &&
+                            GENERAL[n]->ROI[roi]->fastCacheValid &&
+                            (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
+                            GENERAL[n]->ROI[roi]->result_klasse = GENERAL[n]->ROI[roi]->fastCacheClass;
+                            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                                "' unchanged -> reuse class " + std::to_string(GENERAL[n]->ROI[roi]->result_klasse));
+                            break;
+                        }
+
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image);
                         ESP_LOGD(TAG, "General result (Digit)%i: %d", roi, GENERAL[n]->ROI[roi]->result_klasse);
+
+                        if (FastReadEnabled) {
+                            fastReadUpdateCache(GENERAL[n]->ROI[roi], GENERAL[n]->ROI[roi]->result_klasse, 0);
+                        }
 
                         if (isLogImage) {
                             string _imagename = GENERAL[n]->name +  "_" + GENERAL[n]->ROI[roi]->name;
@@ -793,12 +939,23 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CNN Type: Digit100 or Analogue100");
                         int _num;
                         float _result_save_file;
-                        
-                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
+
+                        // FastRead gate: only for the digital variant (Digit100), never for Analogue100.
+                        if ((CNNType == Digit100) && FastReadEnabled && !forceAllThisCycle &&
+                            GENERAL[n]->ROI[roi]->fastCacheValid &&
+                            (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
+                            GENERAL[n]->ROI[roi]->result_float = GENERAL[n]->ROI[roi]->fastCacheFloat;
+                            GENERAL[n]->ROI[roi]->isReject = false;
+                            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                                "' unchanged -> reuse value " + std::to_string(GENERAL[n]->ROI[roi]->result_float));
+                            break;
+                        }
+
+                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         tflite->Invoke();
-    
+
                         _num = tflite->GetOutClassification();
-                        
+
                         if(GENERAL[n]->ROI[roi]->CCW) {
                             GENERAL[n]->ROI[roi]->result_float = 10 - ((float)_num / 10.0);
                         }
@@ -807,8 +964,12 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         }
 
                         _result_save_file = GENERAL[n]->ROI[roi]->result_float;
-                        
+
                         GENERAL[n]->ROI[roi]->isReject = false;
+
+                        if ((CNNType == Digit100) && FastReadEnabled) {
+                            fastReadUpdateCache(GENERAL[n]->ROI[roi], 0, GENERAL[n]->ROI[roi]->result_float);
+                        }
                         
                         ESP_LOGD(TAG, "Result General(Analog)%i - CCW: %d -  %f", roi, GENERAL[n]->ROI[roi]->CCW, GENERAL[n]->ROI[roi]->result_float);
 
@@ -832,7 +993,10 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         }
     }
 
-    delete tflite;
+    // Resident model (FastRead) is kept for the next cycle; otherwise free it now.
+    if (!FastReadEnabled) {
+        delete tflite;
+    }
 
     return true;
 }
