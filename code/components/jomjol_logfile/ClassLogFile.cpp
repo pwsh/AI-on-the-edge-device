@@ -9,6 +9,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <esp_timer.h>
+#include <vector>
+#include <utility>
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,10 +159,78 @@ static const size_t LOGBUF_FLUSH_BYTES = 4096;              // flush when the bu
 static const int64_t LOGBUF_FLUSH_US = 10LL * 1000 * 1000;  // ...or when it is older than 10 s
 static const size_t LOGBUF_MAX_RETAIN = 16384;             // cap retained bytes if writes keep failing
 
+// Size-based rotation for the message log: cap each file and keep only the most recent few, so a
+// verbose day (e.g. DEBUG at a short interval) can't grow a single file without bound.
+static const size_t LOGFILE_MAX_SIZE  = 10 * 1024 * 1024;  // rotate the active message log at 10 MB
+static const int    LOGFILE_MAX_COUNT = 5;                 // keep this many most-recent message-log files
+
 static inline void ensureLogMutex()
 {
     if (s_logMutex == NULL) {
         s_logMutex = xSemaphoreCreateMutex();
+    }
+}
+
+// If the active message-log file has reached LOGFILE_MAX_SIZE, archive it under a unique name (so a
+// fresh file starts) and prune the log directory to the LOGFILE_MAX_COUNT most-recently-modified
+// files. Caller must hold s_logMutex.
+static void rotateAndPruneMessageLog(const std::string& logroot, const std::string& activePath)
+{
+    struct stat st;
+    if (stat(activePath.c_str(), &st) != 0 || (size_t)st.st_size < LOGFILE_MAX_SIZE) {
+        return;   // file missing or still under the cap
+    }
+
+    // Archive the full file under "<name>_HHMMSS.txt" so the date-named file restarts empty.
+    time_t rawtime;
+    time(&rawtime);
+    struct tm* ti = localtime(&rawtime);
+    char ts[16];
+    strftime(ts, sizeof(ts), "%H%M%S", ti);
+
+    std::string archive = activePath;
+    size_t dot = archive.rfind(".txt");
+    if (dot != std::string::npos) {
+        archive = archive.substr(0, dot) + "_" + std::string(ts) + ".txt";
+    }
+    else {
+        archive = activePath + "_" + std::string(ts);
+    }
+    rename(activePath.c_str(), archive.c_str());
+    ESP_LOGI(TAG, "Rotated message log (>= %u bytes) to %s", (unsigned)LOGFILE_MAX_SIZE, archive.c_str());
+
+    // Keep only the LOGFILE_MAX_COUNT most recent files (by mtime) in the message-log directory.
+    DIR* dir = opendir(logroot.c_str());
+    if (!dir) {
+        return;
+    }
+    std::vector<std::pair<time_t, std::string>> files;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_type != DT_REG) {
+            continue;
+        }
+        std::string fp = logroot + "/" + entry->d_name;
+        struct stat fst;
+        if (stat(fp.c_str(), &fst) == 0) {
+            files.push_back(std::make_pair(fst.st_mtime, fp));
+        }
+    }
+    closedir(dir);
+
+    if ((int)files.size() <= LOGFILE_MAX_COUNT) {
+        return;
+    }
+    std::sort(files.begin(), files.end(),
+              [](const std::pair<time_t, std::string>& a, const std::pair<time_t, std::string>& b) {
+                  return a.first > b.first;   // newest first
+              });
+    for (size_t i = LOGFILE_MAX_COUNT; i < files.size(); ++i) {
+        // Preserve the pre-NTP boot log if the clock was never set (it holds early boot messages).
+        if (getTimeWasNotSetAtBoot() && (files[i].second.rfind("log_1970-01-01.txt") != std::string::npos)) {
+            continue;
+        }
+        unlink(files[i].second.c_str());
     }
 }
 
@@ -172,6 +242,7 @@ static void flushLogBufferLocked(const std::string& logroot)
     }
 
     std::string path = logroot + "/" + s_logBufferFileName;
+    rotateAndPruneMessageLog(logroot, path);   // size-cap the active file + keep N most recent
     FILE* f = fopen(path.c_str(), "a+");
     if (f != NULL) {
         fputs(s_logBuffer.c_str(), f);

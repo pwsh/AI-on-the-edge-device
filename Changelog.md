@@ -1,10 +1,10 @@
-# [17.0.0-alpha.7] - 2026-05-30
+# [17.0.0-alpha.8] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.7)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.8)
 
 ### :bug: Fixes since alpha.2
 
@@ -122,6 +122,11 @@ No software is perfect. We know that our software has some quirks. If you have a
   round; a hard power loss may drop the current buffer window.
 - Added per-step flow **diagnostics** at DEBUG level (duration, internal/PSRAM heap free + delta,
   total round time) so performance can be monitored from the normal log without a special build.
+- **Size-based log rotation.** The message log is date-named with only age-based retention, so a
+  verbose day (e.g. DEBUG at a short interval) could grow a single file without bound. The active
+  file is now rotated when it reaches **10 MB** (archived as `log_<date>_<HHMMSS>.txt`) and the log
+  directory is pruned to the **5 most-recent** files — a ~50 MB cap. The pre-NTP `log_1970-01-01.txt`
+  boot log is preserved if the clock was never set.
 
 ### :broom: Code Quality / Cleanup
 
