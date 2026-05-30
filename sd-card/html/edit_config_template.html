@@ -2162,8 +2162,8 @@
                 <p></p><p></p>
             </td>
             <td>
-                <input type="text" id="System_TimeZone_value1">
-                <p>Use <a href="timezones.html" target="_blank">timezones</a> to find your settings</p>
+                <select id="System_TimeZone_value1" style="max-width: 100%;"></select>
+                <p style="font-size: small; margin: 4px 0 0 0;">Pick your region/city; the matching POSIX time zone string is applied automatically.</p>
             </td>
             <td>$TOOLTIP_System_TimeZone</td>
         </tr>
@@ -2236,8 +2236,9 @@
 </div>
 
 <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
-<script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script> 
- 
+<script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
+<script type="text/javascript" src="timezones.js?v=$COMMIT_HASH"></script>
+
 <script type="text/javascript">
 var canvas = document.getElementById('canvas'),
     domainname = getDomainname(),
@@ -2400,6 +2401,8 @@ function UpdateInputIndividual(sel) {
 }
 
 function UpdateInput() {
+    populateTimezoneSelect();   // ensure the Time Zone dropdown is filled before values are applied
+
     document.getElementById("Category_Digits_enabled").checked = category["Digits"]["enabled"];
     setVisible("DigitItem", category["Digits"]["enabled"]);
 
@@ -2538,6 +2541,7 @@ function UpdateInput() {
 
     WriteParameter(param, category, "System", "Tooltip", false);
     WriteParameter(param, category, "System", "TimeZone", true);
+    ensureTimezoneValuePresent();   // keep a custom/unknown POSIX TZ string selectable
     WriteParameter(param, category, "System", "Hostname", true);
     WriteParameter(param, category, "System", "TimeServer", true);
     WriteParameter(param, category, "System", "RSSIThreshold", true);
@@ -2617,6 +2621,50 @@ function syncStatusColorsFromValues() {
         }
         picker.value = '#' + rgb.map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
     }
+}
+
+// --- Time Zone dropdown ------------------------------------------------------
+// Populate the Time Zone <select> from TIMEZONE_LIST (timezones.js): option text
+// is the IANA zone name, option value is the POSIX TZ string stored in config.
+function populateTimezoneSelect() {
+    var sel = document.getElementById("System_TimeZone_value1");
+    if (!sel || sel.options.length > 0) return;   // already populated
+    if (typeof TIMEZONE_LIST === "undefined") return;
+
+    var currentGroup = null;
+    var optgroup = null;
+    for (var i = 0; i < TIMEZONE_LIST.length; i++) {
+        var name = TIMEZONE_LIST[i][0];
+        var posix = TIMEZONE_LIST[i][1];
+        var region = name.indexOf("/") > -1 ? name.substring(0, name.indexOf("/")) : "Other";
+        if (region !== currentGroup) {
+            optgroup = document.createElement("optgroup");
+            optgroup.label = region;
+            sel.add(optgroup);
+            currentGroup = region;
+        }
+        var opt = document.createElement("option");
+        opt.text = name;
+        opt.value = posix;
+        opt.title = posix;
+        optgroup.appendChild(opt);
+    }
+}
+
+// If the stored POSIX TZ string isn't one of the listed zones (custom/legacy
+// value), keep it usable by injecting it as a selectable "(custom)" option.
+function ensureTimezoneValuePresent() {
+    var sel = document.getElementById("System_TimeZone_value1");
+    if (!sel || sel.selectedIndex > -1) return;
+    var current = (param["System"] && param["System"]["TimeZone"]) ? param["System"]["TimeZone"]["value1"] : "";
+    if (!current) return;
+
+    var opt = document.createElement("option");
+    opt.text = "(custom) " + current;
+    opt.value = current;
+    opt.title = current;
+    sel.insertBefore(opt, sel.firstChild);
+    sel.value = current;
 }
 
 function ReadParameterAll() {
