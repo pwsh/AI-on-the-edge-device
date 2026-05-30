@@ -285,7 +285,11 @@ extern "C" void app_main(void)
 
     // Init external PSRAM
     // ********************************************
-    esp_err_t PSRAMStatus = esp_psram_init();
+    // NOTE: PSRAM is already initialized during boot (CONFIG_SPIRAM_BOOT_INIT=y). Calling
+    // esp_psram_init() again on ESP-IDF 6.0 re-maps PSRAM and corrupts the already-mounted
+    // SD card's FATFS state (config/files become unreadable while raw block reads still
+    // work). Only init if not already initialized.
+    esp_err_t PSRAMStatus = esp_psram_is_initialized() ? ESP_OK : esp_psram_init();
     if (PSRAMStatus == ESP_FAIL) {  // ESP_FAIL -> Failed to init PSRAM
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "PSRAM init failed (" + std::to_string(PSRAMStatus) + ")! PSRAM not found or defective");
         setSystemStatusFlag(SYSTEM_STATUS_PSRAM_BAD);
@@ -344,7 +348,7 @@ extern "C" void app_main(void)
 
                         xDelay = 2000 / portTICK_PERIOD_MS;
                         ESP_LOGD(TAG, "After camera initialization: sleep for: %ldms", (long) xDelay * CONFIG_FREERTOS_HZ/portTICK_PERIOD_MS);
-                        vTaskDelay( xDelay ); 
+                        vTaskDelay( xDelay );
 
                         if (camStatus != ESP_OK) { // Camera init failed again
                             sprintf(camStatusHex,"0x%02x", camStatus);
