@@ -1,10 +1,24 @@
-# [17.0.0-alpha.8] - 2026-05-30
+# [17.0.0-alpha.10] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet. On-device testing
 > (camera capture, CNN inference, MQTT/InfluxDB, mDNS, SD-card) is still pending.
 
-For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.8)
+For a full list of changes see [Full list of changes](https://github.com/jomjol/AI-on-the-edge-device/compare/v16.1.0...v17.0.0-alpha.10)
+
+### Since alpha.8 (IDF-6 adoption roadmap)
+
+- **Toolchain perf:** the CNN-inference + image components build at `-O2` (vs global `-Os`).
+  Measured **CNN digitize ~5520 ms → ~5330 ms (~3.4% faster/round)**, +11 KB flash, numerics
+  unchanged.
+- **Wi-Fi reconnect: exponential backoff.** Replaced "immediate reconnect ×10 then 5 s" with
+  first-few-immediate then 1/2/4/8/16 s capped at 15 s (resets on connect) — gentler on a down AP,
+  far less log spam and power during an outage.
+- **Power management: Dynamic Frequency Scaling as an opt-in** (`ENABLE_DYNAMIC_FREQ_SCALING` in
+  `defines.h`, **off by default**) — CPU down-clocks to 80 MHz when idle (no light sleep). Needs
+  hardware validation (DFS scales APB → camera XCLK can drift).
+- **ESP32-S3 target scaffolding** (config / partitions / board pin map; one codebase, per-target
+  binary). ESP32-CAM build unchanged. P4/C6/C3 ruled out (no PSRAM/camera/USB host).
 
 ### :bug: Fixes since alpha.2
 
