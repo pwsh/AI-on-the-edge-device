@@ -139,38 +139,34 @@ bool ClassLogFile::GetDataLogToSD(){
 static FILE* logFileAppendHandle = NULL;
 std::string fileNameDate;
 
-void ClassLogFile::WriteToFile(esp_log_level_t level, std::string tag, std::string message, bool _time)
+void ClassLogFile::WriteToFile(esp_log_level_t level, const std::string& tag, const std::string& message, bool _time)
 {
-    time_t rawtime;
-    struct tm* timeinfo;
-    std::string fileNameDateNew;
+    // Flatten newlines once (local copy; params are const refs to avoid per-call copies).
+    std::string msg = message;
+    std::replace(msg.begin(), msg.end(), '\n', ' ');
 
-    std::string zwtime;
-    std::string ntpTime = "";
-
-
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-    char buf[30];
-    strftime(buf, sizeof(buf), logfile.c_str(), timeinfo);
-    fileNameDateNew = std::string(buf);
-
-    std::replace(message.begin(), message.end(), '\n', ' '); // Replace all newline characters
-
+    // Console output (the ESP_LOG_LEVEL macro filters by its own level).
     if (tag != "") {
-        ESP_LOG_LEVEL(level, tag.c_str(), "%s", message.c_str());
-        message = "[" + tag + "] " + message;
+        ESP_LOG_LEVEL(level, tag.c_str(), "%s", msg.c_str());
+        msg = "[" + tag + "] " + msg;
     }
     else {
-        ESP_LOG_LEVEL(level, "", "%s", message.c_str());
+        ESP_LOG_LEVEL(level, "", "%s", msg.c_str());
     }
-    
 
     if (level > loglevel) {// Only write to file if loglevel is below threshold
-        return;
+        return;            // Skip the time/format/filename work below for filtered messages.
     }
 
+    // Everything below only runs for messages that are actually written to the log file.
+    time_t rawtime;
+    time(&rawtime);
+    struct tm* timeinfo = localtime(&rawtime);
+    char buf[30];
+    strftime(buf, sizeof(buf), logfile.c_str(), timeinfo);
+    std::string fileNameDateNew(buf);
 
+    std::string ntpTime = "";
     if (_time)
     {
         char logLineDate[30];
@@ -203,7 +199,7 @@ void ClassLogFile::WriteToFile(esp_log_level_t level, std::string tag, std::stri
 
     std::string formatedUptime = getFormatedUptime(true);
 
-    std::string fullmessage = "[" + formatedUptime + "] "  + ntpTime + "\t<" + loglevelString + ">\t" + message + "\n";
+    std::string fullmessage = "[" + formatedUptime + "] "  + ntpTime + "\t<" + loglevelString + ">\t" + msg + "\n";
 
 
 #ifdef KEEP_LOGFILE_OPEN_FOR_APPENDING
@@ -250,7 +246,7 @@ void ClassLogFile::CloseLogFileAppendHandle() {
 }
 
 
-void ClassLogFile::WriteToFile(esp_log_level_t level, std::string tag, std::string message) {
+void ClassLogFile::WriteToFile(esp_log_level_t level, const std::string& tag, const std::string& message) {
     LogFile.WriteToFile(level, tag, message, true);
 }
 

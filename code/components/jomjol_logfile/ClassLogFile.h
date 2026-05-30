@@ -30,8 +30,9 @@ public:
     void SetDataLogToSD(bool _doDataLogToSD);
     bool GetDataLogToSD();
 
-    void WriteToFile(esp_log_level_t level, std::string tag, std::string message, bool _time);
-    void WriteToFile(esp_log_level_t level, std::string tag, std::string message);
+    void WriteToFile(esp_log_level_t level, const std::string& tag, const std::string& message, bool _time);
+    void WriteToFile(esp_log_level_t level, const std::string& tag, const std::string& message);
+    esp_log_level_t getLogLevel() { return loglevel; };
 
     void CloseLogFileAppendHandle();
 

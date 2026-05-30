@@ -334,24 +334,7 @@ bool ClassFlowMQTT::doFlow(string zwtime)
             success |= MQTTPublish(namenumber + "json", json, qos, SetRetainFlag);
         }
     }
-    
-    /* Disabled because this is no longer a use case */
-    // else
-    // {
-    //     for (int i = 0; i < ListFlowControll->size(); ++i)
-    //     {
-    //         zw = (*ListFlowControll)[i]->getReadout();
-    //         if (zw.length() > 0)
-    //         {
-    //             if (result.length() == 0)
-    //                 result = zw;
-    //             else
-    //                 result = result + "\t" + zw;
-    //         }
-    //     }
-    //     success |= MQTTPublish(topic, result, qos, SetRetainFlag);
-    // }
-    
+
     OldValue = result;
 
     if (!success) {
