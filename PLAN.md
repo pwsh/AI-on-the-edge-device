@@ -570,3 +570,23 @@ Opportunities the 5.3→6.0 jump opens up for this project (each TBD / measure b
 - **Secure Boot v2 / flash encryption** maturity: optional hardening for production deployments.
 - **Larger-flash / ESP32-S3 targets**: 6.0's better S3 support pairs with the "web UI in flash"
   idea (§8) and more PSRAM/where a bigger CNN or higher-res capture becomes feasible.
+
+### 9.3 🟡 Adoption roadmap — agreed priority order (2026-05-30)
+Work the IDF-6 opportunities in this order, keeping the device stable at each step:
+1. **Newer toolchain** (GCC 15 / C++23-26). 🟡 In progress. The toolchain is already active via
+   IDF 6.0 (xtensa-esp-elf 15.2.0, `-std=gnu++26`). Leverage it: build the perf-critical components
+   (CNN inference + image processing) at `-O2` instead of the global `-Os`, and adopt modern-C++
+   hot-path idioms (`std::string_view`/`const&`, `constexpr`) — ties into §5.
+2. **Power management** (`esp_pm` DFS + tickless idle / light sleep) — idle-power savings between
+   rounds for battery/solar installs; pairs with the flexible interval (§7).
+3. **Wi-Fi** (802.11 k/v/r roaming + connection stability / lower memory) — builds on the existing
+   `WLAN_USE_ROAMING_BY_SCANNING` scaffolding.
+4. **Heap allocation** (TLSF allocator + PSRAM tuning) — reduce fragmentation/peaks on the
+   memory-tight CNN workload; measure with the per-step heap diagnostics.
+5. **Multi-platform via the split `esp_driver_*` drivers — once the above are stable.** Targets, in
+   priority: **ESP32-S3 (highest — adds USB camera support)** → **ESP32-P4** → **ESP32-C3**.
+   - Per-target `sdkconfig.defaults.<target>`, partition tables, and board pin maps (`defines.h`).
+   - Abstract camera behind an interface: DVP (esp32-camera) vs **USB UVC** on the S3 (USB host).
+   - C3 is single-core / no PSRAM / no USB-host — likely a reduced/headless build (smaller models,
+     no camera or DVP-only); validate feasibility. P4 has more headroom (MIPI-CSI, larger PSRAM).
+   - CI matrix per target; keep the 4 MB ESP32-CAM (current default) building throughout.

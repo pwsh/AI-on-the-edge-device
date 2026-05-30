@@ -49,3 +49,15 @@ if(NOT DEFINED ENV{PLATFORMIO})
 endif()
 
 project(AI-on-the-edge)
+
+# Performance: build the perf-critical components (CNN inference + image processing) at -O2 while
+# the rest of the firmware stays at the global -Os (CONFIG_COMPILER_OPTIMIZATION_SIZE). GCC 15
+# (ESP-IDF 6.0) optimizes these hot paths well; this speeds up digitization / FastRead at a small,
+# bounded size cost. Applied post-project() against the component lib targets so the vendored
+# submodules need no local edits. -O2 comes after the base -Os on the command line, so it wins.
+foreach(perf_component esp-tflite-micro esp-nn jomjol_image_proc jomjol_tfliteclass)
+    if(TARGET __idf_${perf_component})
+        target_compile_options(__idf_${perf_component} PRIVATE -O2)
+        message(STATUS "Perf: building component '${perf_component}' at -O2")
+    endif()
+endforeach()
