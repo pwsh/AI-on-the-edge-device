@@ -84,6 +84,12 @@ int getCountFlowRounds(void);
 bool getFlowPaused(void);
 void setFlowPaused(bool _paused);
 
+// True once init has finished and the flow is ready to run (camera up, models
+// loaded, past the boot/recovery delays). The web server serves the startup
+// status page instead of the full UI until this is true.
+bool getSystemReady(void);
+void setSystemReady(bool _ready);
+
 #ifdef ENABLE_MQTT
 esp_err_t MQTTCtrlFlowStart(std::string _topic);
 #endif // ENABLE_MQTT

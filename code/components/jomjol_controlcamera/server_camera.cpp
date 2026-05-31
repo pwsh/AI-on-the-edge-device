@@ -16,12 +16,13 @@
 
 static const char *TAG = "server_cam";
 
-void PowerResetCamera()
+void PowerResetCamera(int downMs)
 {
 #if CAM_PIN_PWDN == GPIO_NUM_NC // Use reset only if pin is available
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "No power down pin availbale to reset camera");
 #else
-    ESP_LOGD(TAG, "Resetting camera by power down line");
+    if (downMs < 200) downMs = 200;   // keep it long enough to actually drain the sensor rail
+    ESP_LOGD(TAG, "Resetting camera by power down line (%dms down)", downMs);
     gpio_config_t conf;
     conf.intr_type = GPIO_INTR_DISABLE;
     conf.pin_bit_mask = 1LL << CAM_PIN_PWDN;
@@ -32,7 +33,7 @@ void PowerResetCamera()
 
     // carefull, logic is inverted compared to reset pin
     gpio_set_level(CAM_PIN_PWDN, 1);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    vTaskDelay(downMs / portTICK_PERIOD_MS);
     gpio_set_level(CAM_PIN_PWDN, 0);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 #endif

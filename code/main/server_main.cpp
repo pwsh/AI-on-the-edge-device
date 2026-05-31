@@ -124,10 +124,22 @@ esp_err_t info_get_handler(httpd_req_t *req)
     }
     else if (_task.compare("Round") == 0)
     {
-        char formated[10] = "";    
+        char formated[10] = "";
         snprintf(formated, sizeof(formated), "%d", getCountFlowRounds());
         httpd_resp_sendstr(req, formated);
-        return ESP_OK;        
+        return ESP_OK;
+    }
+    else if (_task.compare("Ready") == 0)   // 1 once init is done and the flow is ready to run
+    {
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_sendstr(req, getSystemReady() ? "1" : "0");
+        return ESP_OK;
+    }
+    else if (_task.compare("SystemStatus") == 0)   // bitmask of SystemStatusFlag_t (0 = healthy)
+    {
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_sendstr(req, to_string(getSystemStatus()).c_str());
+        return ESP_OK;
     }
     else if (_task.compare("SDCardPartitionSize") == 0)
     {
@@ -323,29 +335,70 @@ esp_err_t hello_main_handler(httpd_req_t *req)
     }
 
     if (filetosend == "/sdcard/html/index.html") {
-        if (isSetSystemStatusFlag(SYSTEM_STATUS_PSRAM_BAD) || // Initialization failed with crritical errors!
-            isSetSystemStatusFlag(SYSTEM_STATUS_CAM_BAD) ||
-            isSetSystemStatusFlag(SYSTEM_STATUS_SDCARD_CHECK_BAD) ||
-            isSetSystemStatusFlag(SYSTEM_STATUS_FOLDER_CHECK_BAD)) 
-        {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "We have a critical error, not serving main page!");
+        bool criticalError = isSetSystemStatusFlag(SYSTEM_STATUS_PSRAM_BAD) ||
+                             isSetSystemStatusFlag(SYSTEM_STATUS_HEAP_TOO_SMALL) ||
+                             isSetSystemStatusFlag(SYSTEM_STATUS_CAM_BAD) ||
+                             isSetSystemStatusFlag(SYSTEM_STATUS_SDCARD_CHECK_BAD) ||
+                             isSetSystemStatusFlag(SYSTEM_STATUS_FOLDER_CHECK_BAD);
 
-            char buf[20];
-            std::string message = "<h1>AI on the Edge Device</h1><b>We have one or more critical errors:</b><br>";
+        // Don't hand out the full UI until the device is actually ready to run (camera up,
+        // models loaded, boot/recovery delays done) - or to explain a critical error. The
+        // startup page below polls the status endpoints and auto-switches to the full UI.
+        if (criticalError || !getSystemReady()) {
+            if (criticalError)
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Serving startup page: a critical error is present");
 
-            for (int i = 0; i < 32; i++) {
-                if (isSetSystemStatusFlag((SystemStatusFlag_t)(1<<i))) {
-                    snprintf(buf, sizeof(buf), "0x%08X", 1<<i);
-                    message += std::string(buf) + "<br>";
-                }
-            }
+            static const char STARTUP_PAGE[] = R"STARTUP(<!DOCTYPE html><html lang='en'><head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<title>AI on the Edge - starting up</title><style>
+:root{--bg:#fafbfc;--fg:#1c2024;--muted:#5a636b;--card:#fff;--bd:#d8dee4;--accent:#2c7be5;--err:#c0392b;--ok:#1f9d55;}
+html[data-theme=dark]{--bg:#1e1e1e;--fg:#dcdcdc;--muted:#9a9a9a;--card:#252526;--bd:#3e3e42;}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--fg);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;max-width:580px;width:92%;padding:22px 24px;box-shadow:0 2px 10px rgba(0,0,0,.12);box-sizing:border-box;}
+h1{font-size:1.25em;margin:0 0 4px;display:flex;align-items:center;gap:10px;}
+.spin{width:22px;height:22px;border:3px solid rgba(127,127,127,.3);border-top-color:var(--accent);border-radius:50%;animation:s .9s linear infinite;flex:0 0 auto;}
+@keyframes s{to{transform:rotate(360deg)}}
+.sub{color:var(--muted);margin:0 0 14px;font-size:.92em;}
+.row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:.95em;}
+.k{color:var(--muted);}.v{font-weight:600;text-align:right;}
+.errbox{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:rgba(192,57,43,.12);border:1px solid rgba(192,57,43,.4);color:var(--err);font-size:.9em;display:none;}
+.why{margin:12px 0 0;font-size:.88em;color:var(--muted);}
+.btns{margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;}
+button{padding:7px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--card);color:var(--fg);cursor:pointer;font-size:.9em;}
+button:hover{filter:brightness(.97);}
+</style><script>
+try{var s=localStorage.getItem('aiotedge-theme');var d=s?(s==='dark'):(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}
+var FLAGS=[[0x1,'PSRAM not usable - needs at least 4MB'],[0x2,'Internal heap too small'],[0x4,'Camera not detected / init failed - check the ribbon cable is fully seated'],[0x8,'SD card read/write check failed'],[0x10,'Required folders/files missing on the SD card'],[0x100,'Camera framebuffer issue (non-critical)'],[0x200,'Time sync (NTP) failed (non-critical)']];
+function el(i){return document.getElementById(i);}
+function g(u,cb){var x=new XMLHttpRequest();x.onreadystatechange=function(){if(x.readyState==4){cb(x.status==200?x.responseText:null);}};try{x.open('GET',u+(u.indexOf('?')>-1?'&':'?')+'_='+Date.now(),true);x.send();}catch(e){cb(null);}}
+function friendly(s){if(!s)return 'Starting...';if(/delayed/i.test(s))return 'Recovering from a previous crash - waiting up to 5 min before retrying (you can reboot or update now)';if(/not yet created/i.test(s))return 'Initialising - loading recognition models...';return s;}
+function showErrors(mask){var box=el('errbox');var out=[];for(var i=0;i<FLAGS.length;i++){if(mask&FLAGS[i][0])out.push(FLAGS[i][1]);}if(out.length){box.style.display='block';box.innerHTML='<b>Problem(s) detected:</b><br>'+out.join('<br>');}else{box.style.display='none';}el('why').innerHTML=mask?'The full interface stays hidden until these are resolved, so you do not get a half-working UI. Fix the issue, then reboot.':'The full interface loads automatically once the camera is initialised, the models are loaded, and the first processing cycle is ready - this avoids showing a UI that cannot actually run.';}
+function poll(){
+ g('/info?type=Ready',function(r){if(r!=null&&r.trim()==='1'){el('status').textContent='Ready - loading the interface...';location.href='index.html?ready=1&_='+Date.now();}});
+ g('/statusflow',function(r){if(r!=null)el('status').textContent=friendly(r.trim());});
+ g('/info?type=SystemStatus',function(r){showErrors(r==null?0:(parseInt(r,10)||0));});
+ g('/sysinfo',function(r){if(r){try{var j=JSON.parse(r)[0];el('camera').textContent=j.cameraModel||'-';el('uptime').textContent=j.uptime||'-';}catch(e){}}});
+ setTimeout(poll,2000);
+}
+window.addEventListener('load',function(){poll();});
+</script></head><body><div class='card'>
+<h1><span class='spin'></span> AI on the Edge - starting up</h1>
+<p class='sub'>Getting the device ready. This page switches to the full interface automatically when everything is up.</p>
+<div class='row'><span class='k'>Current step</span><span class='v' id='status'>Starting...</span></div>
+<div class='row'><span class='k'>Camera</span><span class='v' id='camera'>-</span></div>
+<div class='row'><span class='k'>Uptime</span><span class='v' id='uptime'>-</span></div>
+<div class='errbox' id='errbox'></div>
+<p class='why' id='why'></p>
+<div class='btns'>
+<button onclick="window.open('/log.html')">Log viewer</button>
+<button onclick="window.open('/info.html')">System info</button>
+<button onclick="window.open('/ota_page.html')">OTA update</button>
+<button onclick="location.href='/reboot'">Reboot</button>
+</div></div></body></html>)STARTUP";
 
-            message += "<br>Please check logs with log viewer and/or <a href=\"https://jomjol.github.io/AI-on-the-edge-device-docs/Error-Codes\" target=_blank>jomjol.github.io/AI-on-the-edge-device-docs/Error-Codes</a> for more information!";
-            message += "<br><br><button onclick=\"window.location.href='/reboot';\">Reboot</button>";
-            message += "&nbsp;<button onclick=\"window.open('/ota_page.html');\">OTA Update</button>";
-            message += "&nbsp;<button onclick=\"window.open('/log.html');\">Log Viewer</button>";
-            message += "&nbsp;<button onclick=\"window.open('/info.html');\">Show System Info</button>";
-            httpd_resp_send(req, message.c_str(), message.length());
+            httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+            httpd_resp_set_type(req, "text/html");
+            httpd_resp_send(req, STARTUP_PAGE, HTTPD_RESP_USE_STRLEN);
             return ESP_OK;
         }
         else if (isSetupModusActive()) {

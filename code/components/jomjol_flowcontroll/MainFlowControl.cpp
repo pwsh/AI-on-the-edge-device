@@ -51,6 +51,12 @@ bool autostartIsEnabled = false;
 // status untouched so reference/ROI setup stays available while paused.
 bool flowPaused = false;
 
+// Becomes true once the device has finished initialising and the flow is ready
+// to run (camera up, models loaded, past the panic-recovery + stabilisation
+// delays). Until then the web server serves the startup status page, not the
+// full UI, so the user never sees a half-working interface.
+volatile bool systemReady = false;
+
 int countRounds = 0;
 bool isPlannedReboot = false;
 
@@ -88,6 +94,16 @@ int getCountFlowRounds(void)
 bool getFlowPaused(void)
 {
     return flowPaused;
+}
+
+bool getSystemReady(void)
+{
+    return systemReady;
+}
+
+void setSystemReady(bool _ready)
+{
+    systemReady = _ready;
 }
 
 void setFlowPaused(bool _paused)
@@ -1801,6 +1817,7 @@ void task_autodoFlow(void *pvParameter)
         // Hold off the first round for 30s after boot so the system can stabilise
         // (Wi-Fi association, camera warm-up, power settling). A manual flow start or
         // resume aborts this delay early via xTaskAbortDelay.
+        flowctrl.setActStatus("Stabilising after boot (30s)");
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting 30s after boot to let the system stabilise before the first round...");
         vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
@@ -1808,6 +1825,10 @@ void task_autodoFlow(void *pvParameter)
     {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Autostart is not enabled -> Not starting Flow");
     }
+
+    // Everything is initialised and the boot/stabilisation delays are done: the
+    // device is ready to run, so let the web server serve the full UI now.
+    setSystemReady(true);
 
     while (autostartIsEnabled)
     {

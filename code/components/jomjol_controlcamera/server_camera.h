@@ -10,6 +10,8 @@
 //#include "ClassControllCamera.h"
 
 void register_server_camera_uri(httpd_handle_t server);
-void PowerResetCamera();
+// Pulse the camera power-down line to power-cycle a (possibly stuck) sensor.
+// downMs = how long to hold it powered down before powering back up.
+void PowerResetCamera(int downMs = 1000);
 
 #endif

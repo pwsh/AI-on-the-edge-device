@@ -330,10 +330,12 @@ extern "C" void app_main(void)
                     // Retry a few times with a power-down reset between attempts. A sensor left in
                     // a stuck state (e.g. after a software-exception reset, which does NOT power-
                     // cycle the camera) can need several PWDN cycles before it probes correctly.
-                    const int CAM_INIT_MAX_ATTEMPTS = 3;
+                    const int CAM_INIT_MAX_ATTEMPTS = 6;
                     esp_err_t camStatus = ESP_FAIL;
                     for (int attempt = 1; attempt <= CAM_INIT_MAX_ATTEMPTS; ++attempt) {
-                        PowerResetCamera();
+                        // Escalate the power-down hold each retry (1.0s, 1.5s, ... 3.5s); a
+                        // marginally-stuck sensor often needs a longer drain before it probes.
+                        PowerResetCamera(1000 + (attempt - 1) * 500);
                         camStatus = Camera.InitCam();
                         Camera.LightOnOff(false);
 
