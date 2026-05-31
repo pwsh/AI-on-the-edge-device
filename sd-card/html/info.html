@@ -108,6 +108,24 @@ table {
 				<output id="chip-features"></output>
 			</td>
 		</tr>
+		<tr>
+			<td>Chip Model:</td>
+			<td>
+				<output id="chip-model"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>CPU Frequency:</td>
+			<td>
+				<output id="cpu-frequency"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>CPU Temperature:</td>
+			<td>
+				<output id="cpu-temperature"></output>
+			</td>
+		</tr>
 	</table>
 
 
@@ -116,7 +134,30 @@ table {
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>			
+		<tr>
+			<h3>Camera Info</h3>
+		</tr>
+		<tr>
+			<td>Camera Model:</td>
+			<td>
+				<output id="camera-model"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>Camera Resolution:</td>
+			<td>
+				<output id="camera-resolution"></output>
+			</td>
+		</tr>
+	</table>
+
+
+	<table>
+		<colgroup>
+			<col span="1" style="width: 35%;">
+			<col span="1" style="width: 65%;">
+		</colgroup>
+		<tr>
 			<h3>Host Info</h3>
 		</tr>
 		<tr>
@@ -132,9 +173,21 @@ table {
 			</td>
 		</tr>
 		<tr>
-			<td>WLAN SSID:</td>	
+			<td>WLAN SSID:</td>
 			<td>
 				<output id="wlan-ssid"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>WLAN Signal (RSSI):</td>
+			<td>
+				<output id="wlan-rssi"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>WLAN Channel:</td>
+			<td>
+				<output id="wlan-channel"></output>
 			</td>
 		</tr>
 	</table>
@@ -519,6 +572,19 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 		xhttp.send();
 	}
 
+	// Generic loader for a single /info?type= field (optional display suffix).
+	function loadInfoField(type, elemId, suffix)
+	{
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				document.getElementById(elemId).value = xhttp.response + (suffix || "");
+			}
+		}
+		xhttp.open("GET", getDomainname() + '/info?type=' + type, true);
+		xhttp.send();
+	}
+
 	function init()
 	{
 		loadMemoryInfo();
@@ -540,6 +606,13 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 		loadChipCores();
 		loadChipRevision();
 		loadChipFeatures();
+		loadInfoField('ChipModel', 'chip-model');
+		loadInfoField('CPUFrequency', 'cpu-frequency');
+		loadInfoField('CPUTemperature', 'cpu-temperature', ' °C');
+		loadInfoField('CameraModel', 'camera-model');
+		loadInfoField('CameraResolution', 'camera-resolution');
+		loadInfoField('WifiRSSI', 'wlan-rssi');
+		loadInfoField('WifiChannel', 'wlan-channel');
 	}
 
 	init();

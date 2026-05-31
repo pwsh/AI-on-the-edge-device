@@ -19,6 +19,9 @@
 #include "esp_log.h"
 #include "basic_auth.h"
 #include "esp_chip_info.h"
+#include "esp_timer.h"
+#include "esp_private/esp_clk.h"
+#include "ClassControllCamera.h"
 
 #include <stdio.h>
 
@@ -191,7 +194,59 @@ esp_err_t info_get_handler(httpd_req_t *req)
         esp_chip_info_t chipInfo;
         esp_chip_info(&chipInfo);
         httpd_resp_sendstr(req, to_string(chipInfo.features).c_str());
-        return ESP_OK;      
+        return ESP_OK;
+    }
+    else if (_task.compare("ChipModel") == 0)
+    {
+        esp_chip_info_t chipInfo;
+        esp_chip_info(&chipInfo);
+        std::string m = (chipInfo.model == CHIP_ESP32) ? "ESP32" :
+                        (chipInfo.model == CHIP_ESP32S3) ? "ESP32-S3" :
+                        (chipInfo.model == CHIP_ESP32S2) ? "ESP32-S2" : "unknown";
+        httpd_resp_sendstr(req, m.c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("CPUFrequency") == 0)
+    {
+        httpd_resp_sendstr(req, (to_string(esp_clk_cpu_freq() / 1000000) + " MHz").c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("CPUTemperature") == 0)
+    {
+        httpd_resp_sendstr(req, to_string((int)temperatureRead()).c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("CameraModel") == 0)
+    {
+        std::string camModel;
+        switch (CCstatus.CamSensor_id)
+        {
+            case OV2640_PID: camModel = "OV2640"; break;
+            case OV3660_PID: camModel = "OV3660"; break;
+            case OV5640_PID: camModel = "OV5640"; break;
+            default:         camModel = "unknown"; break;
+        }
+        httpd_resp_sendstr(req, camModel.c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("CameraResolution") == 0)
+    {
+        httpd_resp_sendstr(req, (to_string(CCstatus.ImageWidth) + "x" + to_string(CCstatus.ImageHeight)).c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("WifiRSSI") == 0)
+    {
+        wifi_ap_record_t ap;
+        std::string r = (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) ? (to_string(ap.rssi) + " dBm") : "-";
+        httpd_resp_sendstr(req, r.c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("WifiChannel") == 0)
+    {
+        wifi_ap_record_t ap;
+        std::string c = (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) ? to_string(ap.primary) : "-";
+        httpd_resp_sendstr(req, c.c_str());
+        return ESP_OK;
     }
     else
     {
@@ -383,8 +438,48 @@ esp_err_t sysinfo_handler(httpd_req_t *req)
     std::string htmlversion = getHTMLversion();
     char freeheapmem[11];
     sprintf(freeheapmem, "%lu", (long) getESPHeapSize());
-    
-    zw = string("[{") + 
+
+    // CPU / chip
+    esp_chip_info_t chip;
+    esp_chip_info(&chip);
+    std::string cpuFreq = std::to_string(esp_clk_cpu_freq() / 1000000);     // MHz
+    std::string cpuCores = std::to_string(chip.cores);
+    std::string chipModel = (chip.model == CHIP_ESP32) ? "ESP32" :
+                            (chip.model == CHIP_ESP32S3) ? "ESP32-S3" :
+                            (chip.model == CHIP_ESP32S2) ? "ESP32-S2" : "unknown";
+
+    // Uptime (since boot)
+    int64_t up = esp_timer_get_time() / 1000000;       // seconds
+    char upbuf[48];
+    snprintf(upbuf, sizeof(upbuf), "%dd %02dh %02dm %02ds",
+             (int)(up / 86400), (int)((up % 86400) / 3600), (int)((up % 3600) / 60), (int)(up % 60));
+
+    // Wi-Fi (station)
+    std::string wifiSsid = "", wifiRssi = "-", wifiChannel = "-";
+    wifi_ap_record_t ap;
+    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK)
+    {
+        wifiSsid = std::string(reinterpret_cast<char *>(ap.ssid));
+        wifiRssi = std::to_string(ap.rssi);
+        wifiChannel = std::to_string(ap.primary);
+    }
+
+    // Camera
+    std::string camModel;
+    switch (CCstatus.CamSensor_id)
+    {
+        case OV2640_PID: camModel = "OV2640"; break;
+        case OV3660_PID: camModel = "OV3660"; break;
+        case OV5640_PID: camModel = "OV5640"; break;
+        default:         camModel = "unknown"; break;
+    }
+    std::string camResolution = std::to_string(CCstatus.ImageWidth) + "x" + std::to_string(CCstatus.ImageHeight);
+
+    // SD card / filesystem (MB)
+    std::string sdTotalMB = getSDCardPartitionSize();
+    std::string sdFreeMB = getSDCardFreePartitionSpace();
+
+    zw = string("[{") +
         "\"firmware\": \"" + gitversion + "\"," +
         "\"buildtime\": \"" + buildtime + "\"," +
         "\"gitbranch\": \"" + gitbranch + "\"," +
@@ -392,6 +487,18 @@ esp_err_t sysinfo_handler(httpd_req_t *req)
         "\"gitrevision\": \"" + gitrevision + "\"," +
         "\"html\": \"" + htmlversion + "\"," +
         "\"cputemp\": \"" + cputemp + "\"," +
+        "\"cpuFrequencyMHz\": \"" + cpuFreq + "\"," +
+        "\"chipModel\": \"" + chipModel + "\"," +
+        "\"cpuCores\": \"" + cpuCores + "\"," +
+        "\"uptime\": \"" + std::string(upbuf) + "\"," +
+        "\"uptimeSeconds\": \"" + std::to_string(up) + "\"," +
+        "\"wifiSSID\": \"" + wifiSsid + "\"," +
+        "\"wifiRSSI\": \"" + wifiRssi + "\"," +
+        "\"wifiChannel\": \"" + wifiChannel + "\"," +
+        "\"cameraModel\": \"" + camModel + "\"," +
+        "\"cameraResolution\": \"" + camResolution + "\"," +
+        "\"sdCardTotalMB\": \"" + sdTotalMB + "\"," +
+        "\"sdCardFreeMB\": \"" + sdFreeMB + "\"," +
         "\"hostname\": \"" + *getHostname() + "\"," +
         "\"IPv4\": \"" + *getIPAddress() + "\"," +
         "\"freeHeapMem\": \"" + freeheapmem + "\"" +

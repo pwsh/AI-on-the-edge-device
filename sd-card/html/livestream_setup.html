@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Stream + Camera Setup</title>
+    <link rel="stylesheet" href="style.css?v=$COMMIT_HASH" type="text/css">
+    <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
+    <script type="text/javascript" src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="firework.js?v=$COMMIT_HASH"></script>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        .wrap { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; box-sizing: border-box; }
+        .streamcol { flex: 1 1 420px; min-width: 320px; }
+        .ctrlcol { flex: 1 1 340px; min-width: 300px; max-height: 96vh; overflow-y: auto; }
+        #stream { width: 100%; height: auto; display: block; border: 1px solid #888; background: #111; }
+        fieldset { margin: 0 0 10px 0; border: 1px solid #bbb; border-radius: 5px; }
+        legend { font-weight: bold; padding: 0 5px; }
+        .row { display: flex; align-items: center; justify-content: space-between; margin: 5px 0; gap: 8px; }
+        .row label { flex: 0 0 46%; }
+        .row input[type=range] { flex: 1 1 auto; }
+        .row input[type=number], .row select { flex: 0 0 46%; box-sizing: border-box; }
+        .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .hint { font-size: 12px; opacity: 0.8; margin: 4px 0 10px 0; }
+        .val { flex: 0 0 28px; text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body onload="init()">
+    <div class="wrap">
+        <div class="streamcol">
+            <img id="stream" alt="live stream" crossorigin>
+            <div class="row" style="margin-top:6px;">
+                <label style="flex:0 0 auto;"><input type="checkbox" id="flash" onchange="onCtrlChange()"> &#128161; Light (flash LED)</label>
+                <span class="hint" id="status"></span>
+            </div>
+        </div>
+
+        <div class="ctrlcol">
+            <div class="toolbar">
+                <input class="button" type="button" value="Save Camera Settings" onclick="SaveCam()">
+                <input class="button" type="button" value="Close" onclick="window.close()">
+            </div>
+            <div class="hint">Adjustments preview live in the stream. They are only kept when you click <b>Save</b>.</div>
+
+            <fieldset>
+                <legend>Image</legend>
+                <div class="row"><label>Brightness</label><input type="range" id="TakeImage_CamBrightness_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamBrightness')" onchange="onCtrlChange()"><span class="val" id="v_CamBrightness"></span></div>
+                <div class="row"><label>Contrast</label><input type="range" id="TakeImage_CamContrast_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamContrast')" onchange="onCtrlChange()"><span class="val" id="v_CamContrast"></span></div>
+                <div class="row"><label>Saturation</label><input type="range" id="TakeImage_CamSaturation_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamSaturation')" onchange="onCtrlChange()"><span class="val" id="v_CamSaturation"></span></div>
+                <div class="row"><label>Mirror image</label>
+                    <select id="TakeImage_CamHmirror_value1" onchange="onCtrlChange()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
+                <div class="row"><label>Flip image</label>
+                    <select id="TakeImage_CamVflip_value1" onchange="onCtrlChange()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Zoom</legend>
+                <div class="row"><label>Zoom</label>
+                    <select id="TakeImage_CamZoom_value1" onchange="onZoomToggle()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
+                <div class="row"><label>Zoom size</label><input type="number" id="TakeImage_CamZoomSize_value1" min="0" max="59" step="1" value="0" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Zoom offset X</label><input type="number" id="TakeImage_CamZoomOffsetX_value1" min="-960" max="960" step="8" value="0" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Zoom offset Y</label><input type="number" id="TakeImage_CamZoomOffsetY_value1" min="-720" max="720" step="8" value="0" onchange="onCtrlChange()"></div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Exposure, colour &amp; quality</legend>
+                <div class="row"><label>Image quality</label><input type="number" id="TakeImage_CamQuality_value1" min="5" max="63" step="1" value="12" onchange="onCtrlChange()"></div>
+                <div class="row"><label>White balance mode</label>
+                    <select id="TakeImage_CamWbMode_value1" onchange="onCtrlChange()"><option value="auto" selected>auto</option><option value="sunny">sunny</option><option value="cloudy">cloudy</option><option value="office">office</option><option value="home">home</option></select></div>
+                <div class="row"><label>Auto white balance</label>
+                    <select id="TakeImage_CamAwb_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Auto exposure</label>
+                    <select id="TakeImage_CamAec_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Auto exposure level</label><input type="number" id="TakeImage_CamAeLevel_value1" min="-5" max="5" step="1" value="0" onchange="onCtrlChange()"></div>
+                <div class="row"><label>LED intensity (%)</label><input type="number" id="TakeImage_LEDIntensity_value1" min="0" max="100" step="1" value="0" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Lens correction</label>
+                    <select id="TakeImage_CamLenc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+            </fieldset>
+        </div>
+    </div>
+
+    <script>
+        var domainname = getDomainname();
+        var savedDuringSession = false;
+        var streamTimer = null;
+
+        // value1 ids of every camera control on this page, in the order the firmware query expects them
+        var CTRLS = [
+            ["CamBrightness", "bri"], ["CamContrast", "con"], ["CamSaturation", "sat"],
+            ["CamHmirror", "mirror"], ["CamVflip", "flip"],
+            ["CamZoom", "zoom"], ["CamZoomSize", "zooms"], ["CamZoomOffsetX", "zoomx"], ["CamZoomOffsetY", "zoomy"],
+            ["CamQuality", "qual"], ["CamWbMode", "wbm"], ["CamAwb", "awb"],
+            ["CamAec", "aec"], ["CamAeLevel", "ael"], ["LEDIntensity", "ledi"], ["CamLenc", "lenc"]
+        ];
+
+        function el(name) { return document.getElementById("TakeImage_" + name + "_value1"); }
+        function showVal(name) { document.getElementById("v_" + name).textContent = el(name).value; }
+
+        function init() {
+            if (!loadConfig(domainname)) {
+                firework.launch('Configuration could not be loaded! Please reload the page!', 'danger', 30000);
+                return;
+            }
+            param = getCamConfig();
+
+            // Populate the controls from the saved config (keep the markup default if a value is absent)
+            CTRLS.forEach(function (c) {
+                var name = c[0];
+                if (param["TakeImage"] && param["TakeImage"][name] && typeof param["TakeImage"][name]["value1"] !== "undefined") {
+                    el(name).value = param["TakeImage"][name]["value1"];
+                }
+            });
+            ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
+            onZoomToggle();   // also kicks the first stream load
+        }
+
+        function onZoomToggle() {
+            var on = el("CamZoom").value === "true";
+            ["CamZoomSize", "CamZoomOffsetX", "CamZoomOffsetY"].forEach(function (n) { el(n).disabled = !on; });
+            onCtrlChange();
+        }
+
+        // Rebuild the stream URL with the current control values so the live view reflects them.
+        // Changing img.src drops the old MJPEG connection and opens a fresh one with the new settings
+        // applied (camset=1). Debounced so dragging a slider doesn't thrash reconnects.
+        function onCtrlChange() {
+            document.getElementById("status").textContent = "applying…";
+            if (streamTimer) clearTimeout(streamTimer);
+            streamTimer = setTimeout(updateStream, 120);
+        }
+
+        function updateStream() {
+            var p = ["camset=1"];
+            if (document.getElementById("flash").checked) p.push("flashlight=true");
+            CTRLS.forEach(function (c) {
+                p.push(c[1] + "=" + encodeURIComponent(el(c[0]).value));
+            });
+            p.push("t=" + Date.now());   // cache-bust -> force a fresh stream connection
+            document.getElementById("stream").src = domainname + "/stream?" + p.join("&");
+            document.getElementById("status").textContent = "live";
+        }
+
+        function SaveCam() {
+            // Write the current control values back into the config model, then persist the whole config.
+            CTRLS.forEach(function (c) {
+                var name = c[0];
+                if (param["TakeImage"] && param["TakeImage"][name]) {
+                    param["TakeImage"][name]["value1"] = el(name).value;
+                    param["TakeImage"][name]["enabled"] = true;
+                }
+            });
+            WriteConfigININew();
+            SaveConfigToServer(domainname);
+
+            // Defer the "create a new reference image" prompt until the stream window is closed.
+            savedDuringSession = true;
+            try { localStorage.setItem("aiotedge_cam_warn", "1"); } catch (e) {}
+
+            firework.launch('Camera settings saved. A new reference image / alignment will be needed (you will be reminded after you close this window).', 'success', 6000);
+        }
+    </script>
+</body>
+</html>

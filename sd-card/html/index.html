@@ -147,6 +147,7 @@
                 <ul>
                     <li><a href="#" onclick="start_livestream(false);">Live Stream (Light off)</a></li>
                     <li><a href="#" onclick="start_livestream(true);">Live Stream (Light on)</a></li>
+                    <li><a href="#" onclick="start_livestream_setup();">Live Stream + Camera Setup</a></li>
                 </ul>
             </li>
             <li><a href="#" onclick="loadPage('graph.html?v=$COMMIT_HASH');">Data Graph</a></li>
@@ -303,6 +304,30 @@
 		}
 		xhttp.open("GET", url, true);
 		xhttp.send();
+    }
+
+    // Live stream with camera-setup controls. Camera changes preview live and are only saved on the
+    // page's Save button; the "create a new reference image" reminder is deferred until this window is
+    // closed (and only if camera settings were actually saved during the session).
+    function start_livestream_setup() {
+        try { localStorage.removeItem("aiotedge_cam_warn"); } catch (e) {}
+        if (streamPopup) { streamPopup.close(); }
+
+        streamPopup = window.open(getDomainname() + '/livestream_setup.html', 'LivestreamSetup',
+            'left=10,top=120,width=1000,height=760,scrollbars=yes,resizable=yes');
+        streamPopup.focus();
+
+        var iv = setInterval(function () {
+            if (!streamPopup || streamPopup.closed) {
+                clearInterval(iv);
+                try {
+                    if (localStorage.getItem("aiotedge_cam_warn") === "1") {
+                        localStorage.removeItem("aiotedge_cam_warn");
+                        firework.launch('You changed and saved camera settings. Creating a new reference image and updating the alignment marks is now required!', 'success', 8000);
+                    }
+                } catch (e) {}
+            }
+        }, 1000);
     }
 
     function start_livestream(streamFlashlight) {
