@@ -229,6 +229,8 @@
     }
     tbody.cfg-section.collapsed .cfg-chevron { transform: rotate(-90deg); }
     tbody.cfg-section.collapsed > tr:not(.cfg-head) { display: none !important; }
+    /* Camera settings the connected sensor doesn't support are hidden, not greyed out */
+    tr.cam-na { display: none !important; }
     /* Tighter rows now that the per-row help icon is gone (tips moved onto the name) */
     tbody.cfg-section > tr:not(.cfg-head) > td {
         border-bottom: 1px solid #f1f3f5;
@@ -732,7 +734,7 @@
             </td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomSize_value1" value="0" min="0" max="59" step="1" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=59)) && (!validity.rangeUnderflow||(value=0)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
             <td>$TOOLTIP_TakeImage_CamZoomSize</td>			
         </tr>
@@ -743,7 +745,7 @@
             </td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomOffsetX_value1" value="0" min="-960" max="960" step="8" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=960)) && (!validity.rangeUnderflow||(value=-960)) && (!validity.stepMismatch||(value=parseInt(this.value)));">Pixel
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">Pixel
             </td>
             <td>$TOOLTIP_TakeImage_CamZoomOffsetX</td>
         </tr>
@@ -754,7 +756,7 @@
             </td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomOffsetY_value1" value="0" min="-720" max="720" step="8" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=720)) && (!validity.rangeUnderflow||(value=-720)) && (!validity.stepMismatch||(value=parseInt(this.value)));">Pixel
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">Pixel
             </td>
             <td>$TOOLTIP_TakeImage_CamZoomOffsetY</td>
         </tr>
@@ -2633,7 +2635,7 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "StatusLEDTransmit", false);
     WriteParameter(param, category, "GPIO", "StatusLEDError", false);
     syncStatusColorsFromValues();   // load path: set the colour pickers from the just-populated RGB values
-    disableUnsupportedCamSettings();   // grey out controls the detected sensor doesn't support
+    gateCamSettingsForSensor();   // show only the controls the detected sensor supports
 
     //WriteParameter(param, category, "AutoTimer", "AutoStart", false);
     WriteParameter(param, category, "AutoTimer", "Interval", false);
@@ -2728,30 +2730,28 @@ function syncStatusColorsFromValues() {
     }
 }
 
-// Grey out camera-settings controls the detected sensor doesn't actually support, with a tooltip
-// explaining why. Per the esp32-camera drivers: the OV2640 has no Denoise (firmware forces 0);
-// OV3660/OV5640 have no Auto-sharpness (firmware forces 0). Everything else applies on all sensors.
-function disableUnsupportedCamSettings() {
-    var x = new XMLHttpRequest();
-    x.onreadystatechange = function () {
-        if (this.readyState != 4 || this.status != 200) return;
-        var model = (this.responseText || "").trim();
-        function lock(id, txtId, reason) {
-            var e = document.getElementById(id);
-            if (e) { e.disabled = true; e.title = reason; e.style.opacity = "0.5"; }
-            var t = document.getElementById(txtId);
-            if (t) { t.title = reason; t.style.color = "#999"; }
-        }
-        if (model === "OV2640") {
-            lock("TakeImage_CamDenoise_value1", "TakeImage_CamDenoise_text",
-                 "Denoise is not supported on the OV2640 sensor - the firmware ignores it (forces 0).");
-        } else if (model === "OV3660" || model === "OV5640") {
-            lock("TakeImage_CamAutoSharpness_value1", "TakeImage_CamAutoSharpness_text",
-                 "Auto-sharpness is not supported on the " + model + " sensor (manual Sharpness works).");
-        }
-    };
-    x.open("GET", getDomainname() + "/info?type=CameraModel", true);
-    x.send();
+// Expose only the camera controls the connected sensor actually supports: hide the rows for
+// settings that are a no-op on this sensor (rather than greying them out) and clamp the zoom
+// fields to the sensor's real range. Sensor capabilities live in CAM_SENSOR_CAPS (common.js),
+// derived from the esp32-camera drivers + ClassControllCamera.cpp:
+//   OV2640 -> no Denoise;  OV3660/OV5640 -> Auto-sharpness is a no-op (manual Sharpness works).
+function gateCamSettingsForSensor() {
+    withCamSensorCaps(function (model, caps) {
+        if (!caps) return;   // unknown sensor: leave every control visible
+        caps.unsupported.forEach(function (name) {
+            var el = document.getElementById("TakeImage_" + name + "_value1");
+            var row = el ? el.closest('tr') : null;
+            if (row) row.classList.add('cam-na');   // CSS hides it (survives expert/collapse toggles)
+            // Normalise the hidden (no-op) control so it can't affect related controls or the saved config
+            if (el) {
+                if (name === "CamAutoSharpness") el.value = "false";
+                else if (name === "CamDenoise") el.value = "0";
+            }
+        });
+        camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
+        camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
+        camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+    });
 }
 
 // --- Time Zone dropdown ------------------------------------------------------

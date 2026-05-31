@@ -188,7 +188,7 @@
 			</td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomOffsetX_value1" value="0" min="-960" max="960" step="8" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=960)) && (!validity.rangeUnderflow||(value=-960)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
 			<td>$TOOLTIP_TakeImage_CamZoomOffsetX</td>				
         </tr>
@@ -199,7 +199,7 @@
 			</td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomSize_value1" value="0" min="0" max="59" step="1" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=59)) && (!validity.rangeUnderflow||(value=0)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
 			<td>$TOOLTIP_TakeImage_CamZoomSize</td>			
 		
@@ -208,7 +208,7 @@
 			</td>
             <td>
                 <input required type="number" id="TakeImage_CamZoomOffsetY_value1" value="0" min="-720" max="720" step="8" onchange="cameraParameterChanged()"
-                    oninput="(!validity.rangeOverflow||(value=720)) && (!validity.rangeUnderflow||(value=-720)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                    oninput="(!validity.rangeOverflow||(value=this.max)) && (!validity.rangeUnderflow||(value=this.min)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
 			<td>$TOOLTIP_TakeImage_CamZoomOffsetY</td>		
         </tr>
@@ -887,33 +887,34 @@
             UpdateExpertModus();
 			UpdateTooltipModus();
             showReference();
-            disableUnsupportedCamSettings();   // grey out controls the detected sensor doesn't support
+            gateCamSettingsForSensor();   // show only the controls the detected sensor supports
         }
 
-        // Grey out camera-settings controls the detected sensor doesn't support, with a tooltip.
-        // Per the esp32-camera drivers: OV3660/OV5640 have no Auto-sharpness (firmware forces 0).
-        // (Denoise is OV2640-only and isn't on this page.)
-        function disableUnsupportedCamSettings() {
-            var x = new XMLHttpRequest();
-            x.onreadystatechange = function () {
-                if (this.readyState != 4 || this.status != 200) return;
-                var model = (this.responseText || "").trim();
-                function lock(id, txtId, reason) {
-                    var e = document.getElementById(id);
-                    if (e) { e.disabled = true; e.title = reason; e.style.opacity = "0.5"; }
-                    var t = document.getElementById(txtId);
-                    if (t) { t.title = reason; t.style.color = "#999"; }
+        // Expose only the camera controls the connected sensor supports (CAM_SENSOR_CAPS, common.js):
+        // OV3660/OV5640 -> Auto-sharpness is a no-op (manual Sharpness works), so hide just the
+        // AutoSharpness cells (Sharpness shares the row and shifts left to fill). Always clamp the
+        // zoom fields to the sensor's real range.
+        function gateCamSettingsForSensor() {
+            withCamSensorCaps(function (model, caps) {
+                if (!caps) return;   // unknown sensor: leave every control visible
+                if (caps.unsupported.indexOf("CamAutoSharpness") > -1) {
+                    var sel = document.getElementById("TakeImage_CamAutoSharpness_value1");
+                    var lbl = document.getElementById("TakeImage_CamAutoSharpness_text");
+                    if (sel) {
+                        sel.value = "false";   // treat auto-sharpness as off -> manual Sharpness stays enabled
+                        var selTd = sel.closest('td');
+                        var tipTd = selTd ? selTd.nextElementSibling : null;   // the help cell after the select
+                        [lbl ? lbl.closest('td') : null, selTd, tipTd].forEach(function (td) {
+                            if (td) td.style.display = 'none';
+                        });
+                    }
+                    var shp = document.getElementById("TakeImage_CamSharpness_value1");
+                    if (shp) shp.disabled = false;
                 }
-                if (model === "OV2640") {
-                    lock("TakeImage_CamDenoise_value1", "TakeImage_CamDenoise_text",
-                         "Denoise is not supported on the OV2640 sensor - the firmware ignores it (forces 0).");
-                } else if (model === "OV3660" || model === "OV5640") {
-                    lock("TakeImage_CamAutoSharpness_value1", "TakeImage_CamAutoSharpness_text",
-                         "Auto-sharpness is not supported on the " + model + " sensor (manual Sharpness works).");
-                }
-            };
-            x.open("GET", getDomainname() + "/info?type=CameraModel", true);
-            x.send();
+                camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
+                camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
+                camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+            });
         }
 
         function loadCanvas(dataURL, grid = false) {

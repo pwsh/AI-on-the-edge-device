@@ -144,3 +144,37 @@ function compareVersions() {
             fWGitHash + ")! It is suggested to keep them on the same version!", 'warning', 30000);
     }
 }
+
+// --- Per-sensor camera capabilities ------------------------------------------
+// Derived from the esp32-camera drivers (sensors/ov*.c) and the firmware's
+// ClassControllCamera.cpp. Used by the config + livestream-setup pages to expose
+// only the controls a connected sensor actually supports, and to clamp the zoom
+// fields to that sensor's real range (instead of greying things out).
+//   unsupported : Cam* settings that are a no-op on this sensor (hide them).
+//   zoom        : max |offsetX|, max |offsetY|, max zoom-size (SetZoomSize()).
+var CAM_SENSOR_CAPS = {
+    "OV2640": { unsupported: ["CamDenoise"],       zoom: { offX: 480, offY: 360, size: 29 } },
+    "OV3660": { unsupported: ["CamAutoSharpness"], zoom: { offX: 704, offY: 528, size: 43 } },
+    "OV5640": { unsupported: ["CamAutoSharpness"], zoom: { offX: 960, offY: 720, size: 59 } }
+};
+
+// Fetch the connected camera model, then call cb(model, caps) where caps is the
+// CAM_SENSOR_CAPS entry (or null for an unknown sensor -> caller should show all).
+function withCamSensorCaps(cb) {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function () {
+        if (this.readyState != 4 || this.status != 200) return;
+        var model = (this.responseText || "").trim().toUpperCase();
+        cb(model, CAM_SENSOR_CAPS[model] || null);
+    };
+    try { x.open("GET", getDomainname() + "/info?type=CameraModel", true); x.send(); } catch (e) {}
+}
+
+// Set an input's min/max and pull any out-of-range current value back into range.
+function camSetRange(id, min, max) {
+    var e = document.getElementById(id);
+    if (!e) return;
+    e.min = min; e.max = max;
+    var v = parseInt(e.value, 10);
+    if (!isNaN(v)) e.value = Math.max(min, Math.min(max, v));
+}

@@ -152,6 +152,13 @@
             document.getElementById("flash").checked = (waitb > 0);
 
             ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
+            // Clamp the zoom fields to the connected sensor's actual range (CAM_SENSOR_CAPS, common.js)
+            withCamSensorCaps(function (model, caps) {
+                if (!caps) return;
+                camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
+                camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
+                camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+            });
             onZoomToggle();    // enable/disable the zoom sub-fields for the current zoom state
             startPreview();    // begin polling preview frames (with the light state set above)
         }
