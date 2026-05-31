@@ -92,7 +92,7 @@
     <script>
         var domainname = getDomainname();
         var savedDuringSession = false;
-        var streamTimer = null;
+        var polling = false;
 
         // value1 ids of every camera control on this page, in the order the firmware query expects them
         var CTRLS = [
@@ -152,11 +152,12 @@
             document.getElementById("flash").checked = (waitb > 0);
 
             ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
-            onZoomToggle();   // also kicks the first stream load (with the light state set above)
+            onZoomToggle();    // enable/disable the zoom sub-fields for the current zoom state
+            startPreview();    // begin polling preview frames (with the light state set above)
         }
 
         // Resume processing when the window is closed (best-effort; index.html also resumes on close).
-        window.addEventListener("pagehide", function () { setFlowPaused(false); });
+        window.addEventListener("pagehide", function () { polling = false; setFlowPaused(false); });
 
         function onZoomToggle() {
             var on = el("CamZoom").value === "true";
@@ -164,26 +165,40 @@
             onCtrlChange();
         }
 
-        // Rebuild the stream URL with the current control values so the live view reflects them.
-        // Changing img.src drops the old MJPEG connection and opens a fresh one with the new settings
-        // applied (camset=1). Debounced so dragging a slider doesn't thrash reconnects.
-        function onCtrlChange() {
-            document.getElementById("status").textContent = "applying…";
-            if (streamTimer) clearTimeout(streamTimer);
-            streamTimer = setTimeout(updateStream, 120);
-        }
-
-        function updateStream() {
-            var p = ["camset=1"];
+        // Build the query for a single preview frame from the current control values.
+        function buildParams() {
+            var p = ["camset=1", "single=1"];
             if (document.getElementById("flash").checked) p.push("flashlight=true");
             CTRLS.forEach(function (c) {
                 p.push(c[1] + "=" + encodeURIComponent(el(c[0]).value));
             });
             var rgb = ledRGB();
             p.push("ledr=" + rgb[0], "ledg=" + rgb[1], "ledb=" + rgb[2]);   // external WS281x flash colour
-            p.push("t=" + Date.now());   // cache-bust -> force a fresh stream connection
-            document.getElementById("stream").src = domainname + "/stream?" + p.join("&");
-            document.getElementById("status").textContent = "live";
+            return p.join("&");
+        }
+
+        // Poll one frame at a time. A persistent MJPEG stream blocks the single HTTP server, so a
+        // setting change could never reach a new request (the reconnect deadlocks and nothing
+        // updates). Instead each request applies the current settings and returns ONE frame;
+        // chaining on img.onload gives a continuous preview that reflects every change on the next
+        // frame - including the flash toggle and LED colour.
+        function pollFrame() {
+            if (!polling) return;
+            document.getElementById("stream").src = domainname + "/stream?" + buildParams() + "&t=" + Date.now();
+        }
+
+        function startPreview() {
+            var img = document.getElementById("stream");
+            img.onload = function () { if (polling) { document.getElementById("status").textContent = "live"; setTimeout(pollFrame, 0); } };
+            img.onerror = function () { if (polling) setTimeout(pollFrame, 600); };
+            polling = true;
+            pollFrame();
+        }
+
+        // A control changed: the next polled frame automatically uses the new values - nothing to do
+        // here beyond reflecting it in the status line.
+        function onCtrlChange() {
+            document.getElementById("status").textContent = "applying…";
         }
 
         function SaveCam() {

@@ -856,6 +856,18 @@ esp_err_t handler_stream(httpd_req_t *req)
                 }
             }
         }
+
+        // Single-frame mode (single=1): the camera-setup page polls one frame at a time instead of
+        // holding an MJPEG stream open. A persistent stream blocks the single HTTP server, so a
+        // setting change can never reach a new request (the reconnect deadlocks) - polling applies
+        // each change on the very next frame. Apply the flash state (colour set above), grab one
+        // frame and return without entering the streaming loop.
+        if (httpd_query_key_value(_query, "single", _value, 10) == ESP_OK)
+        {
+            Camera.LightOnOff(flashlightOn);
+            Camera.CaptureToHTTP(req, 0);   // delay 0: flash already handled, no warm-up wait
+            return ESP_OK;
+        }
     }
 
     Camera.CaptureToStream(req, flashlightOn);

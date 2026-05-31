@@ -320,8 +320,10 @@
         var iv = setInterval(function () {
             if (!streamPopup || streamPopup.closed) {
                 clearInterval(iv);
-                // The setup page pauses processing while open; make sure it resumes once closed.
+                // The setup page pauses processing while open; make sure it resumes once closed,
+                // and turn the flash off (the preview may have left it lit).
                 try { var x = new XMLHttpRequest(); x.open("GET", getDomainname() + "/pause?status=resume", true); x.send(); } catch (e) {}
+                try { var lo = new XMLHttpRequest(); lo.open("GET", getDomainname() + "/lightoff", true); lo.send(); } catch (e) {}
                 try {
                     if (localStorage.getItem("aiotedge_cam_warn") === "1") {
                         localStorage.removeItem("aiotedge_cam_warn");
