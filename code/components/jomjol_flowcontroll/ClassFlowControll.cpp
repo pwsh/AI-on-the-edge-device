@@ -461,6 +461,17 @@ bool ClassFlowControll::doFlow(string time)
         size_t psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 
         if (!FlowControll[i]->doFlow(time)) {
+            // An alignment failure (reference markers not found) is a legitimate, recoverable
+            // condition - e.g. the camera is not positioned at the meter - not a stuck device.
+            // Don't retry it into the 5x-failure reboot below: end the round gracefully and let the
+            // next round try again. All other steps keep the retry/reboot watchdog behaviour.
+            if (FlowControll[i]->name() == "ClassFlowAlignment") {
+                setProcessingStage(PROC_STAGE_ERROR);
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - skipping the rest of "
+                    "this round without rebooting; will retry on the next round.");
+                result = false;
+                break;
+            }
             repeat++;
             setProcessingStage(PROC_STAGE_ERROR);   // status LED: step failed / retrying
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Fehler im vorheriger Schritt - wird zum " + to_string(repeat) + ". Mal wiederholt");
