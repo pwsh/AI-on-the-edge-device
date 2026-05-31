@@ -12,6 +12,9 @@
 
 #include <algorithm>    // std::min / std::max
 #include <cstring>      // memmove
+#include <cstdlib>      // strtol / strtof
+#include <cerrno>       // errno / ERANGE
+#include <cstdio>       // remove
 
 static const char *TAG = "ALIGN";
 
@@ -445,6 +448,33 @@ void ClassFlowAlignment::SaveReferenceAlignmentValues()
     fclose(pFile);
 }
 
+// Non-throwing numeric parsers for the untrusted align.txt cache. Return false on an
+// empty, non-numeric or out-of-range token (trailing whitespace/newline is tolerated),
+// so a corrupt cache can never reach stof/stoi and abort() (exceptions are disabled).
+static bool alignParseInt(const std::string &s, int &out)
+{
+    if (s.empty()) return false;
+    errno = 0;
+    char *end = nullptr;
+    long v = strtol(s.c_str(), &end, 10);
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+    if (end == s.c_str() || *end != '\0' || errno == ERANGE) return false;
+    out = (int) v;
+    return true;
+}
+
+static bool alignParseFloat(const std::string &s, float &out)
+{
+    if (s.empty()) return false;
+    errno = 0;
+    char *end = nullptr;
+    float v = strtof(s.c_str(), &end);
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+    if (end == s.c_str() || *end != '\0' || errno == ERANGE) return false;
+    out = v;
+    return true;
+}
+
 bool ClassFlowAlignment::LoadReferenceAlignmentValues(void)
 {
     FILE *pFile;
@@ -458,40 +488,48 @@ bool ClassFlowAlignment::LoadReferenceAlignmentValues(void)
         return false;
     }
 
-    fgets(zw, 1024, pFile);
+    // align.txt is a regenerable cache and may be stale, partially written or from an
+    // older format. Parse it defensively: any missing / non-numeric / out-of-range field
+    // discards the whole cache (delete + recompute) instead of letting stof/stoi throw,
+    // which would abort() - C++ exceptions are disabled in this build (that was the cause
+    // of a boot panic loop on a corrupt align.txt).
+    bool ok = (fgets(zw, sizeof(zw), pFile) != NULL);   // 1st line: informational, skipped
     ESP_LOGD(TAG, "%s", zw);
 
-    fgets(zw, 1024, pFile);
-    splitted = ZerlegeZeile(std::string(zw), " \t");
-
-    if (splitted.size() < 6) {
-        fclose(pFile);
-        return false;
+    if (ok && fgets(zw, sizeof(zw), pFile)) {
+        splitted = ZerlegeZeile(std::string(zw), " \t");
+        ok = (splitted.size() >= 6) &&
+             alignParseInt(splitted[0], References[0].fastalg_x) &&
+             alignParseInt(splitted[1], References[0].fastalg_y) &&
+             alignParseFloat(splitted[2], References[0].fastalg_SAD) &&
+             alignParseInt(splitted[3], References[0].fastalg_min) &&
+             alignParseInt(splitted[4], References[0].fastalg_max) &&
+             alignParseFloat(splitted[5], References[0].fastalg_avg);
+    } else {
+        ok = false;
     }
 
-    References[0].fastalg_x = stoi(splitted[0]);
-    References[0].fastalg_y = stoi(splitted[1]);
-    References[0].fastalg_SAD = stof(splitted[2]);
-    References[0].fastalg_min = stoi(splitted[3]);
-    References[0].fastalg_max = stoi(splitted[4]);
-    References[0].fastalg_avg = stof(splitted[5]);
-
-    fgets(zw, 1024, pFile);
-    splitted = ZerlegeZeile(std::string(zw));
-
-    if (splitted.size() < 6) {
-        fclose(pFile);
-        return false;
+    if (ok && fgets(zw, sizeof(zw), pFile)) {
+        splitted = ZerlegeZeile(std::string(zw), " \t");
+        ok = (splitted.size() >= 6) &&
+             alignParseInt(splitted[0], References[1].fastalg_x) &&
+             alignParseInt(splitted[1], References[1].fastalg_y) &&
+             alignParseFloat(splitted[2], References[1].fastalg_SAD) &&
+             alignParseInt(splitted[3], References[1].fastalg_min) &&
+             alignParseInt(splitted[4], References[1].fastalg_max) &&
+             alignParseFloat(splitted[5], References[1].fastalg_avg);
+    } else {
+        ok = false;
     }
-
-    References[1].fastalg_x = stoi(splitted[0]);
-    References[1].fastalg_y = stoi(splitted[1]);
-    References[1].fastalg_SAD = stof(splitted[2]);
-    References[1].fastalg_min = stoi(splitted[3]);
-    References[1].fastalg_max = stoi(splitted[4]);
-    References[1].fastalg_avg = stof(splitted[5]);
 
     fclose(pFile);
+
+    if (!ok) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment cache (align.txt) is missing fields or malformed - "
+                                               "discarding it; it will be recomputed on the next full alignment.");
+        remove(FileStoreRefAlignment.c_str());
+        return false;
+    }
 
     /*#ifdef DEBUG_DETAIL_ON
         std::string _zw = "\tLoadReferences[0]\tx,y:\t" + std::to_string(References[0].fastalg_x) + "\t" + std::to_string(References[0].fastalg_x);
