@@ -1798,6 +1798,11 @@ void task_autodoFlow(void *pvParameter)
     if (autostartIsEnabled)
     {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Starting Flow...");
+        // Hold off the first round for 30s after boot so the system can stabilise
+        // (Wi-Fi association, camera warm-up, power settling). A manual flow start or
+        // resume aborts this delay early via xTaskAbortDelay.
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Waiting 30s after boot to let the system stabilise before the first round...");
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
     }
     else
     {
