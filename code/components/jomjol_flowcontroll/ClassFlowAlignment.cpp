@@ -456,17 +456,19 @@ void ClassFlowAlignment::SaveReferenceAlignmentValues()
     fclose(pFile);
 }
 
-// Non-throwing numeric parsers for the untrusted align.txt cache. Return false on an
-// empty, non-numeric or out-of-range token (trailing whitespace/newline is tolerated),
-// so a corrupt cache can never reach stof/stoi and abort() (exceptions are disabled).
+// Non-throwing replacements for stoi/stof on the align.txt cache. They mirror stoi/stof
+// semantics exactly - parse a leading number and IGNORE any trailing characters - but never
+// throw, so a corrupt token can't reach abort() (C++ exceptions are disabled). Only a token
+// with no numeric prefix at all, or an out-of-range value, is treated as invalid. (An earlier
+// version also rejected any trailing character, which was stricter than stoi/stof and wrongly
+// flagged valid caches - including the firmware's own Save output - as "malformed".)
 static bool alignParseInt(const std::string &s, int &out)
 {
     if (s.empty()) return false;
     errno = 0;
     char *end = nullptr;
     long v = strtol(s.c_str(), &end, 10);
-    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
-    if (end == s.c_str() || *end != '\0' || errno == ERANGE) return false;
+    if (end == s.c_str() || errno == ERANGE) return false;   // no digits / overflow
     out = (int) v;
     return true;
 }
@@ -477,8 +479,7 @@ static bool alignParseFloat(const std::string &s, float &out)
     errno = 0;
     char *end = nullptr;
     float v = strtof(s.c_str(), &end);
-    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
-    if (end == s.c_str() || *end != '\0' || errno == ERANGE) return false;
+    if (end == s.c_str() || errno == ERANGE) return false;   // no number / overflow
     out = v;
     return true;
 }
