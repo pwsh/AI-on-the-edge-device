@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
 <title>AI on the edge</title>
 <meta charset="UTF-8" />
@@ -68,6 +70,7 @@ body, html {
 </head>
 
 <body style="font-family: arial">
+<div class="app-container">
 
     <table style="border: none">
         <tr>
@@ -343,5 +346,6 @@ body, html {
 
 </script>
 
+</div>
 </body>
 </html>

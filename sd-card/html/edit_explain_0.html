@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
 <title>AI on the edge</title>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
 h1 {font-size: 2em; margin-block-end: 0.3em;}
@@ -19,6 +22,7 @@ p {font-size: 1em;}
 </head>
 
 <body style="font-family: arial">
+<div class="app-container">
 
     <h2>Welcome to the setup of the AI-on-the-edge-device</h2>
 
@@ -71,5 +75,6 @@ p {font-size: 1em;}
 
 <p><b>Have fun with your AI-on-the-edge-device!</b></p>
 
+</div>
 </body>
 </html>
