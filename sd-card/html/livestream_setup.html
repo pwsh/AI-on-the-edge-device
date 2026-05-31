@@ -76,9 +76,15 @@
                 <div class="row"><label>Auto exposure</label>
                     <select id="TakeImage_CamAec_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
                 <div class="row"><label>Auto exposure level</label><input type="number" id="TakeImage_CamAeLevel_value1" min="-5" max="5" step="1" value="0" onchange="onCtrlChange()"></div>
-                <div class="row"><label>LED intensity (%)</label><input type="number" id="TakeImage_LEDIntensity_value1" min="0" max="100" step="1" value="0" onchange="onCtrlChange()"></div>
                 <div class="row"><label>Lens correction</label>
                     <select id="TakeImage_CamLenc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Flash light</legend>
+                <div class="hint">Used for the live view when the &#128161; Light box is on, and saved as the flash for captured images.</div>
+                <div class="row"><label>LED colour (external RGB flash)</label><input type="color" id="led_color" value="#ffffff" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Onboard flash intensity (%)</label><input type="number" id="TakeImage_LEDIntensity_value1" min="0" max="100" step="1" value="0" onchange="onCtrlChange()"></div>
             </fieldset>
         </div>
     </div>
@@ -99,8 +105,24 @@
 
         function el(name) { return document.getElementById("TakeImage_" + name + "_value1"); }
         function showVal(name) { document.getElementById("v_" + name).textContent = el(name).value; }
+        function clamp8(v) { v = parseInt(v, 10); return isNaN(v) ? 0 : Math.min(255, Math.max(0, v)); }
+        function hx(v) { return ("0" + clamp8(v).toString(16)).slice(-2); }
+        function rgbToHex(r, g, b) { return "#" + hx(r) + hx(g) + hx(b); }
+        function ledRGB() {
+            var h = document.getElementById("led_color").value;   // #rrggbb
+            return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)];
+        }
+
+        // Tell the device to pause / resume the processing loop. While the camera-setup stream is
+        // open the flow is paused, so it does not fight the stream for the camera, does not overwrite
+        // the flash LED with the status-LED colour, and reverts any unsaved preview on resume.
+        function setFlowPaused(pause) {
+            var x = new XMLHttpRequest();
+            try { x.open("GET", domainname + "/pause?status=" + (pause ? "pause" : "resume"), true); x.send(); } catch (e) {}
+        }
 
         function init() {
+            setFlowPaused(true);
             if (!loadConfig(domainname)) {
                 firework.launch('Configuration could not be loaded! Please reload the page!', 'danger', 30000);
                 return;
@@ -114,9 +136,19 @@
                     el(name).value = param["TakeImage"][name]["value1"];
                 }
             });
+            // Seed the flash LED colour from the [GPIO] LEDColor config (defaults to white).
+            if (param["GPIO"] && param["GPIO"]["LEDColor"]) {
+                var c = param["GPIO"]["LEDColor"];
+                if (typeof c["value1"] !== "undefined") {
+                    document.getElementById("led_color").value = rgbToHex(c["value1"], c["value2"], c["value3"]);
+                }
+            }
             ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
             onZoomToggle();   // also kicks the first stream load
         }
+
+        // Resume processing when the window is closed (best-effort; index.html also resumes on close).
+        window.addEventListener("pagehide", function () { setFlowPaused(false); });
 
         function onZoomToggle() {
             var on = el("CamZoom").value === "true";
@@ -139,6 +171,8 @@
             CTRLS.forEach(function (c) {
                 p.push(c[1] + "=" + encodeURIComponent(el(c[0]).value));
             });
+            var rgb = ledRGB();
+            p.push("ledr=" + rgb[0], "ledg=" + rgb[1], "ledb=" + rgb[2]);   // external WS281x flash colour
             p.push("t=" + Date.now());   // cache-bust -> force a fresh stream connection
             document.getElementById("stream").src = domainname + "/stream?" + p.join("&");
             document.getElementById("status").textContent = "live";
@@ -153,6 +187,14 @@
                     param["TakeImage"][name]["enabled"] = true;
                 }
             });
+            // Persist the flash LED colour into [GPIO] LEDColor.
+            if (param["GPIO"] && param["GPIO"]["LEDColor"]) {
+                var rgb = ledRGB();
+                param["GPIO"]["LEDColor"]["value1"] = "" + rgb[0];
+                param["GPIO"]["LEDColor"]["value2"] = "" + rgb[1];
+                param["GPIO"]["LEDColor"]["value3"] = "" + rgb[2];
+                param["GPIO"]["LEDColor"]["enabled"] = true;
+            }
             WriteConfigININew();
             SaveConfigToServer(domainname);
 

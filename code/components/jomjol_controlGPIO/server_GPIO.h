@@ -76,6 +76,7 @@ public:
     void gpioInterrupt(GpioResult* gpioResult);  
     void flashLightEnable(bool value);
     void setStatusStageLED(int stage);   // drive the WS281x status LED for a ProcessingStage
+    void setFlashLEDColor(uint8_t r, uint8_t g, uint8_t b) { LEDColor = Rgb{r, g, b}; }   // runtime flash colour (e.g. live camera-setup stream)
     bool isEnabled() { return _isEnabled; }
 #ifdef ENABLE_MQTT
     void handleMQTTconnect();

@@ -827,9 +827,11 @@ esp_err_t handler_stream(httpd_req_t *req)
 
         // Live camera setup: when the stream URL carries camera parameters (camset=1), apply them to
         // the sensor before streaming so the live view reflects the change. This only touches the
-        // sensor + CFstatus staging copy (NOT the saved config / CCstatus); persisting still happens
-        // via the page's Save button. changedCameraSettings is deliberately left untouched so the
-        // running flow does not revert the preview between frames.
+        // sensor + CFstatus staging copy, NOT the saved config (CCstatus) - persisting still happens
+        // via the page's Save button. The camera-setup page pauses the flow while it is open, so
+        // setting changedCameraSettings is safe: nothing reverts the preview between frames, and once
+        // the page closes and the flow resumes, the next round resets the sensor from CCstatus -
+        // discarding any unsaved preview changes (saved ones are already in CCstatus).
         if (httpd_query_key_value(_query, "camset", _value, 10) == ESP_OK)
         {
             parseCamQueryToCFstatus(_query);
@@ -837,6 +839,22 @@ esp_err_t handler_stream(httpd_req_t *req)
             Camera.SetQualityZoomSize(CFstatus.ImageQuality, CFstatus.ImageFrameSize, CFstatus.ImageZoomEnabled,
                                       CFstatus.ImageZoomOffsetX, CFstatus.ImageZoomOffsetY, CFstatus.ImageZoomSize, CFstatus.ImageVflip);
             Camera.LedIntensity = CFstatus.ImageLedIntensity;
+            CFstatus.changedCameraSettings = true;
+
+            // Live flash colour for an external WS281x flash LED (ledr/ledg/ledb, 0-255).
+            char _ledv[8];
+            std::string _leds;
+            if (httpd_query_key_value(_query, "ledr", _ledv, sizeof(_ledv)) == ESP_OK && (_leds = _ledv, isStringNumeric(_leds)))
+            {
+                int r = std::stoi(_leds), g = 0, b = 0;
+                if (httpd_query_key_value(_query, "ledg", _ledv, sizeof(_ledv)) == ESP_OK) { _leds = _ledv; if (isStringNumeric(_leds)) g = std::stoi(_leds); }
+                if (httpd_query_key_value(_query, "ledb", _ledv, sizeof(_ledv)) == ESP_OK) { _leds = _ledv; if (isStringNumeric(_leds)) b = std::stoi(_leds); }
+                GpioHandler *gpioHandler = gpio_handler_get();
+                if (gpioHandler != NULL)
+                {
+                    gpioHandler->setFlashLEDColor((uint8_t)r, (uint8_t)g, (uint8_t)b);
+                }
+            }
         }
     }
 

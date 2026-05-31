@@ -320,6 +320,8 @@
         var iv = setInterval(function () {
             if (!streamPopup || streamPopup.closed) {
                 clearInterval(iv);
+                // The setup page pauses processing while open; make sure it resumes once closed.
+                try { var x = new XMLHttpRequest(); x.open("GET", getDomainname() + "/pause?status=resume", true); x.send(); } catch (e) {}
                 try {
                     if (localStorage.getItem("aiotedge_cam_warn") === "1") {
                         localStorage.removeItem("aiotedge_cam_warn");
