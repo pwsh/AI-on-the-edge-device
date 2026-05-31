@@ -325,8 +325,9 @@ function ParseConfig() {
     ParamAddValue(param, catname, "Hostname");   
     ParamAddValue(param, catname, "RSSIThreshold");   
     ParamAddValue(param, catname, "CPUFrequency");
-    ParamAddValue(param, catname, "SetupMode"); 
-     
+    ParamAddValue(param, catname, "SetupMode");
+    ParamAddValue(param, catname, "BackupInterval");
+
     while (aktline < config_split.length){
         for (var cat in category) {
             zw = cat.toUpperCase();

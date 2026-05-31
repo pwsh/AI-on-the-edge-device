@@ -23,6 +23,7 @@
 #include "server_GPIO.h"
 
 #include "server_file.h"
+#include "server_backup.h"
 
 #include "read_wlanini.h"
 #include "connect_wlan.h"
@@ -1883,6 +1884,9 @@ void task_autodoFlow(void *pvParameter)
 
         // WIFI Signal Strength (RSSI) -> Logfile
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "WIFI Signal (RSSI): " + std::to_string(get_WIFI_RSSI()) + "dBm");
+
+        // Scheduled backup to the SD card (no-op unless [System] BackupInterval > 0)
+        CheckScheduledBackup();
 
         // Check if time is synchronized (if NTP is configured)
         if (getUseNtp() && !getTimeIsSet())

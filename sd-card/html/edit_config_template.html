@@ -2303,6 +2303,17 @@
             <td>$TOOLTIP_System_CPUFrequency</td>
         </tr>
 
+        <tr class="expert" unused_id="System_BackupInterval">
+            <td class="indent1">
+                <input type="checkbox" id="System_BackupInterval_enabled" value="1"  onclick = 'InvertEnableItem("System", "BackupInterval")' unchecked >
+                <label for=System_BackupInterval_enabled><class id="System_BackupInterval_text" style="color:black;">Backup Interval (days)</class></label>
+            </td>
+            <td>
+                <input required type="number" id="System_BackupInterval_value1" size="13" min="0" step="1" value="0">
+            </td>
+            <td>$TOOLTIP_System_BackupInterval</td>
+        </tr>
+
         <tr>
             <td class="indent1">
                 <class id="System_Tooltip_text" style="color:black;">Tooltip</class>

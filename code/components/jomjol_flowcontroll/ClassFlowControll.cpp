@@ -21,6 +21,7 @@ extern "C" {
 #include "time_sntp.h"
 #include "Helper.h"
 #include "server_ota.h"
+#include "server_backup.h"
 #ifdef ENABLE_MQTT
     #include "interface_mqtt.h"
     #include "server_mqtt.h"
@@ -708,7 +709,14 @@ bool ClassFlowControll::ReadParameter(FILE* pfile, string& aktparamgraph)
         }
 
         if ((toUpper(splitted[0]) == "SETUPMODE") && (splitted.size() > 1)) {
-            SetupModeActive = alphanumericToBoolean(splitted[1]);        
+            SetupModeActive = alphanumericToBoolean(splitted[1]);
+        }
+
+        if ((toUpper(splitted[0]) == "BACKUPINTERVAL") && (splitted.size() > 1)) {
+            // Scheduled backup to /sdcard/backup, in days. 0 (or non-numeric) = disabled.
+            int _days = isStringNumeric(splitted[1]) ? atoi(splitted[1].c_str()) : 0;
+            if (_days < 0) _days = 0;
+            setBackupAutoIntervalDays(_days);
         }
     }
     return true;
