@@ -196,6 +196,19 @@
         <tr>
             <td colspan="4"><canvas id="canvas" crossorigin></canvas></td>
         </tr>
+        <tr>
+            <td colspan="4">
+                <small id="roiLegend" style="cursor:help;" title="Only the solid box is saved and analysed by the neural network. Size it so a single digit fills it (small margin, digit not touching the edges) and is centred on the crosshair. The dashed inner box and the crosshair are on-screen guides only — they are not saved.">
+                    <span style="display:inline-block;width:16px;height:11px;border:2px solid #FF0000;vertical-align:middle;"></span>
+                    Analysed region — fill it with one digit &nbsp;&middot;&nbsp;
+                    <span style="display:inline-block;width:16px;height:11px;border:1px dashed rgba(255,0,0,0.6);vertical-align:middle;"></span>
+                    inner 60% guide &nbsp;&middot;&nbsp;
+                    <span style="color:rgba(255,0,0,0.85);font-weight:bold;">&#10010;</span>
+                    centre crosshair — centre the digit on it
+                    <span style="cursor:help;" title="Only the solid box is saved and analysed by the neural network. Size it so a single digit fills it (small margin, digit not touching the edges) and is centred on the crosshair. The dashed inner box and the crosshair are visual guides only — they are not saved.">&#9432;</span>
+                </small>
+            </td>
+        </tr>
     </table>
 
 
@@ -780,20 +793,26 @@
                         var y0 = parseInt(ROIInfo[_nb].y) - parseInt(lw/2);
                         var dx = parseInt(ROIInfo[_nb].dx) + parseInt(lw);
                         var dy = parseInt(ROIInfo[_nb].dy) + parseInt(lw);
+                        // Outer box = the analysed region (solid)
+                        context.setLineDash([]);
                         context.strokeRect(x0, y0, dx, dy);
                         drawTextBG(context, ROIInfo[_nb]["name"], x0+dx/2, y0-12, 5);
 
-                        lw = 1
-                        var x0 = parseInt(ROIInfo[_nb].x) - parseInt(lw/2);
-                        var y0 = parseInt(ROIInfo[_nb].y) - parseInt(lw/2);
-                        var dx = parseInt(ROIInfo[_nb].dx) + parseInt(lw);
-                        var dy = parseInt(ROIInfo[_nb].dy) + parseInt(lw);
-                        context.lineWidth = lw;
+                        // Inner 60% box = centering guide (dashed, 50% opacity)
+                        context.lineWidth = 1;
+                        context.strokeStyle = "rgba(153, 0, 0, 0.5)";
+                        context.setLineDash([5, 4]);
+                        context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
+                        context.setLineDash([]);
+
+                        // Centre crosshair: horizontal + vertical mid-lines (70% opacity)
+                        context.strokeStyle = "rgba(153, 0, 0, 0.7)";
                         context.beginPath();
                         context.moveTo(x0, y0+dy/2);
                         context.lineTo(x0+dx, y0+dy/2);
-                        context.stroke();   
-                        context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
+                        context.moveTo(x0+dx/2, y0);
+                        context.lineTo(x0+dx/2, y0+dy);
+                        context.stroke();
                     }
                 }
             }
@@ -805,16 +824,27 @@
             var y0 = parseInt(rect.startY) - parseInt(lw/2);
             var dx = parseInt(rect.w) + parseInt(lw);
             var dy = parseInt(rect.h) + parseInt(lw);
+            // Outer box = the analysed region (solid, full opacity): fill it with the digit
+            context.setLineDash([]);
             context.strokeRect(x0, y0, dx, dy);
             drawTextBG(context, ROIInfo[aktindex]["name"], x0+dx/2, y0-11, 5);
-            context.lineWidth = 1;
-            context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
 
+            // Inner 60% box = centering guide only (dashed, 50% opacity); not saved/analysed
+            context.lineWidth = 1;
+            context.strokeStyle = "rgba(255, 0, 0, 0.5)";
+            context.setLineDash([5, 4]);
+            context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
+            context.setLineDash([]);
+
+            // Centre crosshair: horizontal + vertical mid-lines (70% opacity) - centre the digit on it
             context.lineWidth = 2;
+            context.strokeStyle = "rgba(255, 0, 0, 0.7)";
             context.beginPath();
             context.moveTo(x0, y0+dy/2);
             context.lineTo(x0+dx, y0+dy/2);
-            context.stroke();   
+            context.moveTo(x0+dx/2, y0);
+            context.lineTo(x0+dx/2, y0+dy);
+            context.stroke();
 
             ROIInfo[aktindex]["x"] = rect.startX;       
             ROIInfo[aktindex]["y"] = rect.startY;       

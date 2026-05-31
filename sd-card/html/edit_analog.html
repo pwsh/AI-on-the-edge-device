@@ -180,6 +180,19 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         <tr>
             <td colspan="4"><canvas id="canvas" crossorigin></canvas></td>
         </tr>
+        <tr>
+            <td colspan="4">
+                <small id="roiLegend" style="cursor:help;" title="Only the solid box is saved and analysed by the neural network. Size it so the analog dial fills it and the dial centre sits on the crosshair. The dashed circle and the crosshair are on-screen guides only — they are not saved.">
+                    <span style="display:inline-block;width:16px;height:11px;border:2px solid #FF0000;vertical-align:middle;"></span>
+                    Analysed region — fit the dial in it &nbsp;&middot;&nbsp;
+                    <span style="display:inline-block;width:13px;height:13px;border:1px dashed rgba(255,0,0,0.6);border-radius:50%;vertical-align:middle;"></span>
+                    dial guide circle &nbsp;&middot;&nbsp;
+                    <span style="color:rgba(255,0,0,0.85);font-weight:bold;">&#10010;</span>
+                    centre crosshair — centre the dial on it
+                    <span style="cursor:help;" title="Only the solid box is saved and analysed by the neural network. Size it so the analog dial fills it and the dial centre sits on the crosshair. The dashed circle and the crosshair are visual guides only — they are not saved.">&#9432;</span>
+                </small>
+            </td>
+        </tr>
     </table>
 
 
@@ -745,30 +758,34 @@ The following settings are only used for easier setup, they are <b>not</b> persi
                         var y0 = parseInt(ROIInfo[_nb].y) - parseInt(lw/2);
                         var dx = parseInt(ROIInfo[_nb].dx) + parseInt(lw);
                         var dy = parseInt(ROIInfo[_nb].dy) + parseInt(lw);
+                        // Outer box = the analysed region (solid)
+                        context.setLineDash([]);
                         context.strokeRect(x0, y0, dx, dy);
-                    
+
                         if (ROIInfo[_nb]["CCW"] != "true") {
                            drawTextBG(context, ROIInfo[_nb]["name"], x0+dx/2-0.5, y0-13, 5);
                         }
                         else {
                            drawTextBG(context, ROIInfo[_nb]["name"]+" (CCW)", x0+dx/2-0.5, y0-13, 5);
                         }
-                    
-                        lw = 1;
-                        var x0 = parseInt(ROIInfo[_nb].x) - parseInt(lw/2);
-                        var y0 = parseInt(ROIInfo[_nb].y) - parseInt(lw/2);
-                        var dx = parseInt(ROIInfo[_nb].dx) + parseInt(lw);
-                        var dy = parseInt(ROIInfo[_nb].dy) + parseInt(lw);
-                        context.strokeRect(x0, y0, dx, dy); 
-                        context.lineWidth = lw;
+
+                        // Dial guide = dashed circle filling the box (50% opacity)
+                        context.lineWidth = 1;
+                        context.strokeStyle = "rgba(153, 0, 0, 0.5)";
+                        context.setLineDash([5, 4]);
                         context.beginPath();
-                        // context.arc (x0+dx/2, y0+dy/2, dx/2, 0, 2 * Math.PI);
                         context.ellipse(x0+dx/2, y0+dy/2, dx/2, dy/2, 0, 0, 2 * Math.PI);
+                        context.stroke();
+                        context.setLineDash([]);
+
+                        // Centre crosshair: horizontal + vertical mid-lines (70% opacity)
+                        context.strokeStyle = "rgba(153, 0, 0, 0.7)";
+                        context.beginPath();
                         context.moveTo(x0+dx/2, y0);
                         context.lineTo(x0+dx/2, y0+dy);
                         context.moveTo(x0, y0+dy/2);
                         context.lineTo(x0+dx, y0+dy/2);
-                        context.stroke();  
+                        context.stroke();
                     }
                 }
             }
@@ -780,6 +797,8 @@ The following settings are only used for easier setup, they are <b>not</b> persi
             var y0 = parseInt(rect.startY) - parseInt(lw/2);
             var dx = parseInt(rect.w) + parseInt(lw);
             var dy = parseInt(rect.h) + parseInt(lw);
+            // Outer box = the analysed region (solid, full opacity): fit the dial inside it
+            context.setLineDash([]);
             context.strokeRect(x0, y0, dx, dy);
 
             if (ROIInfo[aktindex]["CCW"] != "true") {
@@ -789,16 +808,25 @@ The following settings are only used for easier setup, they are <b>not</b> persi
                 drawTextBG(context, ROIInfo[aktindex]["name"] + " (CCW)", x0+dx/2, y0-11, 5);
             }
 
+            // Dial guide = dashed circle filling the box (50% opacity); not saved/analysed
             context.lineWidth = 1;
+            context.strokeStyle = "rgba(255, 0, 0, 0.5)";
+            context.setLineDash([5, 4]);
             context.beginPath();
-            // context.arc(x0+dx/2, y0+dy/2, dx/2, 0, 2 * Math.PI);
             context.ellipse(x0+dx/2, y0+dy/2, dx/2, dy/2, 0, 0, 2 * Math.PI);
+            context.stroke();
+            context.setLineDash([]);
+
+            // Centre crosshair: horizontal + vertical mid-lines (70% opacity) - centre the dial on it
+            context.lineWidth = 2;
+            context.strokeStyle = "rgba(255, 0, 0, 0.7)";
+            context.beginPath();
             context.moveTo(x0+dx/2, y0);
             context.lineTo(x0+dx/2, y0+dy);
             context.moveTo(x0, y0+dy/2);
             context.lineTo(x0+dx, y0+dy/2);
-            context.stroke();   
-            ROIInfo[aktindex]["x"] = rect.startX;       
+            context.stroke();
+            ROIInfo[aktindex]["x"] = rect.startX;
             ROIInfo[aktindex]["y"] = rect.startY;       
             ROIInfo[aktindex]["dx"] = rect.w;       
             ROIInfo[aktindex]["dy"] = rect.h;       
