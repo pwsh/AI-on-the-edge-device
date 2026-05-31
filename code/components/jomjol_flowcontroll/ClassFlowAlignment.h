@@ -9,8 +9,18 @@
 #include "CFindTemplate.h"
 
 #include <string>
+#include <vector>
 
 using namespace std;
+
+// A rectangle (full-frame capture coordinates) to blank out before analysis, reducing image
+// complexity and spurious alignment matches in areas that are not part of the meter.
+struct MaskRect {
+    int x;
+    int y;
+    int w;
+    int h;
+};
 
 class ClassFlowAlignment : public ClassFlow
 {
@@ -26,6 +36,25 @@ protected:
     std::string FileStoreRefAlignment;
     float SAD_criteria;
 
+    // Periodic alignment: re-run the (expensive) reference-marker search only every Nth round and
+    // reuse the cached transform in between. 1 = align every round (default, = legacy behaviour).
+    int alignmentInterval;
+    int alignmentCounter;
+    bool haveCachedTransform;
+    int cached_dx, cached_dy;
+    float cached_winkel;
+
+    // Crop: restrict analysis to a sub-rectangle of the capture. The raw frame is repacked to the
+    // crop rectangle before alignment; all downstream coordinates (reference markers, ROIs) are
+    // shifted by (-cropX, -cropY). Disabled when cropW/cropH are 0 (default = full frame).
+    bool cropEnabled;
+    int cropX, cropY, cropW, cropH;
+    bool cropOffsetApplied;     // references are shifted into crop space exactly once
+    // Mask: rectangles blanked (set to white) before alignment, in full-frame capture coordinates.
+    std::vector<MaskRect> masks;
+
+    void ApplyMaskAndCrop(void);
+
     void SetInitialParameter(void);
     bool LoadReferenceAlignmentValues(void);
     void SaveReferenceAlignmentValues();
@@ -39,6 +68,11 @@ public:
     ClassFlowAlignment(std::vector<ClassFlow *> *lfc);
 
     CAlignAndCutImage *GetAlignAndCutImage() { return AlignAndCutImage; };
+
+    // Crop offset, consumed by the CNN flow to shift its ROI coordinates into crop space.
+    bool IsCropEnabled() { return cropEnabled; };
+    int GetCropOffsetX() { return cropEnabled ? cropX : 0; };
+    int GetCropOffsetY() { return cropEnabled ? cropY : 0; };
 
     void DrawRef(CImageBasis *_zw);
 

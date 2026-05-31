@@ -83,12 +83,40 @@ bool CAlignAndCutImage::Align(RefInfo *_temp1, RefInfo *_temp2)
     LogFile.WriteToDedicatedFile("/sdcard/alignment.txt", zw);
 #endif*/
 
+    // Remember the computed transform so periodic alignment can re-apply it on rounds where the
+    // marker search is skipped (see ClassFlowAlignment / AlignByTransform).
+    out_dx = dx;
+    out_dy = dy;
+    out_winkel = d_winkel;
+
     CRotateImage rt("Align", this, ImageTMP);
     rt.Translate(dx, dy);
-    rt.Rotate(d_winkel, _temp1->target_x, _temp1->target_y);
+    // Skip the full-frame rotate when there is effectively no rotation (rigidly mounted camera):
+    // it is a no-op that still touches every pixel. Translation alone then aligns the frame.
+    if (fabs(d_winkel) >= ALIGNMENT_ROTATION_DEADBAND_DEG) {
+        rt.Rotate(d_winkel, _temp1->target_x, _temp1->target_y);
+    }
     ESP_LOGD(TAG, "Alignment: dx %d - dy %d - rot %f", dx, dy, d_winkel);
 
     return (isSimilar1 && isSimilar2);
+}
+
+
+void CAlignAndCutImage::AlignByTransform(RefInfo *_temp1, int dx, int dy, float winkel)
+{
+    // Re-apply a cached transform WITHOUT searching the reference markers (CFindTemplate). Used by
+    // periodic alignment: the camera framing is stable between captures, so the offset/angle found
+    // on the last full alignment still holds for the fresh raw frame.
+    out_dx = dx;
+    out_dy = dy;
+    out_winkel = winkel;
+
+    CRotateImage rt("Align", this, ImageTMP);
+    rt.Translate(dx, dy);
+    if (fabs(winkel) >= ALIGNMENT_ROTATION_DEADBAND_DEG) {
+        rt.Rotate(winkel, _temp1->target_x, _temp1->target_y);
+    }
+    ESP_LOGD(TAG, "Alignment (cached): dx %d - dy %d - rot %f", dx, dy, winkel);
 }
 
 

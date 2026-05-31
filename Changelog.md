@@ -1,7 +1,32 @@
-# [17.0.0-alpha.13] - 2026-05-30
+# [17.0.0-alpha.14] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
 > still-experimental features. Not recommended for production meters yet.
+
+### Since alpha.13 — image-pipeline efficiency (alignment)
+
+Three opt-in optimisations to cut the per-round image-processing footprint. Recognition (the CNN)
+already only ever analyses small per-ROI crops; the whole-frame cost lives entirely in the
+alignment step (a full-frame copy + reference-marker search + rotate, run every round). These target
+exactly that.
+
+- **Periodic alignment (`[Alignment] AlignmentInterval = N`).** Runs the expensive reference-marker
+  search only every Nth round and re-applies the cached transform (offset + angle) in between — the
+  camera framing is stable between captures. Default `1` = legacy behaviour (search every round).
+  Cuts the marker-search cost on `(N-1)/N` of rounds. GUI: Expert → Alignment.
+- **No-rotation fast path.** When the computed alignment angle is below a small dead-band
+  (`ALIGNMENT_ROTATION_DEADBAND_DEG`, 0.05°) — the norm for a rigidly mounted camera — the full-frame
+  rotate pass is skipped (translation alone aligns the frame), saving a whole-image transform.
+- **Single-channel marker search** is the default search mode (`AlignmentAlgo = Default`, R-channel
+  only); the CNN models remain 3-channel RGB (changing them would require retraining).
+- **Crop (`[Alignment] Crop = x y w h`).** Restricts analysis to a sub-rectangle of the capture; the
+  frame is repacked to the crop and all marker/ROI coordinates are shifted automatically. Shrinks the
+  alignment working buffers + per-round CPU + logged-overview size. (The JPEG-decode peak that sets
+  the PSRAM region floor is unchanged — that needs sensor windowing — but the floor tracks the
+  analysed size, so a crop reduces it.) Not compatible with *Flip image*. GUI: Expert → Alignment.
+- **Mask (`[Alignment] Mask = x y w h`, repeatable).** Blanks rectangles (to white) before analysis
+  to cut image complexity and spurious marker matches in non-meter areas. Config-file + round-trips
+  through the Web config editor (a visual box editor is a planned follow-up).
 
 ### Since alpha.12
 

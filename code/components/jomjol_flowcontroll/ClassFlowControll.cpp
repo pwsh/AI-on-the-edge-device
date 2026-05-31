@@ -354,6 +354,19 @@ void ClassFlowControll::InitFlow(std::string config)
     }
 
     fclose(pFile);
+
+    // Once all sections are read: if the alignment crop is enabled, shift the CNN ROI coordinates
+    // into crop space so cut + draw line up with the repacked (cropped) frame.
+    if (flowalignment && flowalignment->IsCropEnabled()) {
+        int dx = flowalignment->GetCropOffsetX();
+        int dy = flowalignment->GetCropOffsetY();
+        if (flowanalog) {
+            flowanalog->ShiftROIs(dx, dy);
+        }
+        if (flowdigit) {
+            flowdigit->ShiftROIs(dx, dy);
+        }
+    }
 }
 
 std::string* ClassFlowControll::getActStatusWithTime()

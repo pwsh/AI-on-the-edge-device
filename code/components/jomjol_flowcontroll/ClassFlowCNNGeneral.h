@@ -74,7 +74,11 @@ public:
 
     string getReadoutRawString(int _analog);  
 
-    void DrawROI(CImageBasis *_zw); 
+    void DrawROI(CImageBasis *_zw);
+
+    // Shift every ROI position into crop space. Called once after config load when the alignment
+    // crop is enabled, so cut + draw coordinates match the repacked (cropped) frame.
+    void ShiftROIs(int dx, int dy);
 
    	std::vector<HTMLInfo*> GetHTMLInfo();   
 

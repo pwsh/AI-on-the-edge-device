@@ -5,6 +5,7 @@ var category;
 var ref = new Array(2);
 var NUMBERS = new Array(0);
 var REFERENCES = new Array(0);
+var MASKS = new Array(0);   // [Alignment] Mask <x> <y> <w> <h> rectangles (repeatable)
 
 function getNUMBERSList() {
     _domainname = getDomainname(); 
@@ -143,6 +144,8 @@ function ParseConfig() {
     ParamAddValue(param, catname, "SearchFieldX");
     ParamAddValue(param, catname, "SearchFieldY");
     ParamAddValue(param, catname, "AlignmentAlgo");
+    ParamAddValue(param, catname, "AlignmentInterval", 1);
+    ParamAddValue(param, catname, "Crop", 4);
 
     var catname = "Digits";
     category[catname] = new Object();
@@ -417,6 +420,16 @@ function ParseConfigParamAll(_aktline, _catname) {
             _newref["x"] = linesplit[1];
             _newref["y"] = linesplit[2];
             REFERENCES.push(_newref);
+        }
+
+        if (!isCom && (linesplit.length >= 5) && (_catname == 'Alignment') &&
+            (linesplit[0].toUpperCase() == 'MASK')) {
+            var _newmask = new Object();
+            _newmask["x"] = linesplit[1];
+            _newmask["y"] = linesplit[2];
+            _newmask["w"] = linesplit[3];
+            _newmask["h"] = linesplit[4];
+            MASKS.push(_newmask);
         }
 
         ++_aktline;
@@ -804,6 +817,11 @@ function WriteConfigININew() {
                 text = REFERENCES[_roi]["name"];
                 text = text + " " + REFERENCES[_roi]["x"];
                 text = text + " " + REFERENCES[_roi]["y"];
+                config_split.push(text);
+            }
+            for (var _m in MASKS) {
+                text = "Mask " + MASKS[_m]["x"] + " " + MASKS[_m]["y"] +
+                       " " + MASKS[_m]["w"] + " " + MASKS[_m]["h"];
                 config_split.push(text);
             }
         }

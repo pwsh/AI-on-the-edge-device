@@ -10,6 +10,9 @@
 #include "psram.h"
 #include "../../include/defines.h"
 
+#include <algorithm>    // std::min / std::max
+#include <cstring>      // memmove
+
 static const char *TAG = "ALIGN";
 
 // #define DEBUG_DETAIL_ON
@@ -33,6 +36,19 @@ void ClassFlowAlignment::SetInitialParameter(void)
     previousElement = NULL;
     disabled = false;
     SAD_criteria = 0.05;
+    alignmentInterval = 1;
+    alignmentCounter = 0;
+    haveCachedTransform = false;
+    cached_dx = 0;
+    cached_dy = 0;
+    cached_winkel = 0.0f;
+    cropEnabled = false;
+    cropX = 0;
+    cropY = 0;
+    cropW = 0;
+    cropH = 0;
+    cropOffsetApplied = false;
+    masks.clear();
 }
 
 ClassFlowAlignment::ClassFlowAlignment(std::vector<ClassFlow *> *lfc)
@@ -120,6 +136,41 @@ bool ClassFlowAlignment::ReadParameter(FILE *pfile, string &aktparamgraph)
         else if ((toUpper(splitted[0]) == "SAVEALLFILES") && (splitted.size() > 1)) {
             SaveAllFiles = alphanumericToBoolean(splitted[1]);
         }
+        else if ((toUpper(splitted[0]) == "ALIGNMENTINTERVAL") && (splitted.size() > 1)) {
+            // How many rounds between full reference-marker searches (>=1). Intermediate rounds
+            // reuse the cached transform. 1 = align every round.
+            if (isStringNumeric(splitted[1])) {
+                alignmentInterval = std::stoi(splitted[1]);
+                if (alignmentInterval < 1) {
+                    alignmentInterval = 1;
+                }
+            }
+        }
+        else if ((toUpper(splitted[0]) == "CROP") && (splitted.size() > 4)) {
+            // Crop <x> <y> <width> <height> (full-frame capture coordinates).
+            if (isStringNumeric(splitted[1]) && isStringNumeric(splitted[2]) &&
+                isStringNumeric(splitted[3]) && isStringNumeric(splitted[4])) {
+                cropX = std::stoi(splitted[1]);
+                cropY = std::stoi(splitted[2]);
+                cropW = std::stoi(splitted[3]);
+                cropH = std::stoi(splitted[4]);
+                cropEnabled = (cropW > 0) && (cropH > 0);
+            }
+        }
+        else if ((toUpper(splitted[0]) == "MASK") && (splitted.size() > 4)) {
+            // Mask <x> <y> <width> <height> (full-frame capture coordinates); repeatable.
+            if (isStringNumeric(splitted[1]) && isStringNumeric(splitted[2]) &&
+                isStringNumeric(splitted[3]) && isStringNumeric(splitted[4])) {
+                MaskRect m;
+                m.x = std::stoi(splitted[1]);
+                m.y = std::stoi(splitted[2]);
+                m.w = std::stoi(splitted[3]);
+                m.h = std::stoi(splitted[4]);
+                if ((m.w > 0) && (m.h > 0)) {
+                    masks.push_back(m);
+                }
+            }
+        }
         else if ((toUpper(splitted[0]) == "ALIGNMENTALGO") && (splitted.size() > 1)) {
 #ifdef DEBUG_DETAIL_ON
             std::string zw2 = "Alignment mode selected: " + splitted[1];
@@ -167,8 +218,83 @@ string ClassFlowAlignment::getHTMLSingleStep(string host)
     return result;
 }
 
+void ClassFlowAlignment::ApplyMaskAndCrop(void)
+{
+    if (!ImageBasis || !ImageBasis->ImageOkay()) {
+        return;
+    }
+
+    const int w = ImageBasis->width;
+    const int h = ImageBasis->height;
+    const int ch = ImageBasis->channels;
+    uint8_t *img = ImageBasis->RGBImageLock();
+    if (!img) {
+        return;
+    }
+
+    // 1) Mask: blank configured rectangles (white, matching the alignment fill colour). Coordinates
+    //    are full-frame, so this is applied before the crop repack.
+    for (const MaskRect &m : masks) {
+        int x0 = std::max(0, m.x);
+        int y0 = std::max(0, m.y);
+        int x1 = std::min(w, m.x + m.w);
+        int y1 = std::min(h, m.y + m.h);
+        for (int y = y0; y < y1; ++y) {
+            uint8_t *row = img + (size_t)(y * w + x0) * ch;
+            for (int x = x0; x < x1; ++x) {
+                for (int c = 0; c < ch; ++c) {
+                    *row++ = 255;
+                }
+            }
+        }
+    }
+
+    // 2) Crop: repack the crop rectangle to the buffer origin and shrink the logical dimensions.
+    //    The backing buffer stays full-size (re-filled by the next capture), so no realloc. Forward
+    //    copy is safe: every destination offset is <= its source offset.
+    if (cropEnabled) {
+        int cx = std::max(0, cropX);
+        int cy = std::max(0, cropY);
+        int cw = std::min(cropW, w - cx);
+        int chgt = std::min(cropH, h - cy);
+        if ((cw > 0) && (chgt > 0)) {
+            for (int y = 0; y < chgt; ++y) {
+                uint8_t *dst = img + (size_t)(y * cw) * ch;
+                uint8_t *src = img + (size_t)((y + cy) * w + cx) * ch;
+                memmove(dst, src, (size_t)cw * ch);
+            }
+            ImageBasis->width = cw;
+            ImageBasis->height = chgt;
+        }
+    }
+
+    ImageBasis->RGBImageRelease();
+}
+
 bool ClassFlowAlignment::doFlow(string time)
 {
+    // Crop is incompatible with the initial flip (coordinate spaces differ); fall back to full frame.
+    if (cropEnabled && initialflip) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Crop is not supported together with FlipImageSize - crop disabled");
+        cropEnabled = false;
+    }
+
+    // Blank masked regions and repack the crop rectangle before any analysis of this frame.
+    if (cropEnabled || !masks.empty()) {
+        ApplyMaskAndCrop();
+    }
+
+    // Shift the reference-marker targets into crop space exactly once (downstream ROI coordinates
+    // are shifted by the CNN flow via GetCropOffset*()).
+    if (cropEnabled && !cropOffsetApplied) {
+        for (int i = 0; i < anz_ref; ++i) {
+            References[i].target_x -= cropX;
+            References[i].target_y -= cropY;
+        }
+        cropOffsetApplied = true;
+    }
+
+
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
     // AlgROI needs to be allocated before ImageTMP to avoid heap fragmentation
     if (!AlgROI)  {
@@ -231,9 +357,25 @@ bool ClassFlowAlignment::doFlow(string time)
 
     // no align algo if set to 3 = off //add disable aligment algo |01.2023
     if (References[0].alignment_algo != 3) {
-        if (!AlignAndCutImage->Align(&References[0], &References[1])) {
-            SaveReferenceAlignmentValues();
+        // Periodic alignment: run the full reference-marker search only every Nth round; on the
+        // rounds in between, re-apply the cached transform (camera framing is stable between
+        // captures). alignmentInterval == 1 keeps the legacy behaviour (search every round).
+        bool doFullSearch = (!haveCachedTransform) || (alignmentInterval <= 1) ||
+                            ((alignmentCounter % alignmentInterval) == 0);
+
+        if (doFullSearch) {
+            if (!AlignAndCutImage->Align(&References[0], &References[1])) {
+                SaveReferenceAlignmentValues();
+            }
+            cached_dx = AlignAndCutImage->out_dx;
+            cached_dy = AlignAndCutImage->out_dy;
+            cached_winkel = AlignAndCutImage->out_winkel;
+            haveCachedTransform = true;
         }
+        else {
+            AlignAndCutImage->AlignByTransform(&References[0], cached_dx, cached_dy, cached_winkel);
+        }
+        alignmentCounter++;
     } // no align
 
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG

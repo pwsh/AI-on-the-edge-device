@@ -745,6 +745,32 @@
             <td>$TOOLTIP_Alignment_AlignmentAlgo</td>
         </tr>
 
+        <tr class="expert" unused_id="Alignment_AlignmentInterval_ex8">
+            <td class="indent1">
+                <input type="checkbox" id="Alignment_AlignmentInterval_enabled" value="1" onclick = 'InvertEnableItem("Alignment", "AlignmentInterval")' unchecked >
+                <label for=Alignment_AlignmentInterval_enabled><class id="Alignment_AlignmentInterval_text" style="color:black;">Alignment Interval</class></label>
+            </td>
+            <td>
+                <input type="number" id="Alignment_AlignmentInterval_value1" size="13" min="1" step="1"
+                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.stepMismatch||(value=parseInt(this.value)));">round(s)
+            </td>
+            <td>Run the full reference-marker search only every Nth round and reuse the cached transform in between (1 = every round). Reduces per-round CPU on a stable camera.</td>
+        </tr>
+
+        <tr class="expert" unused_id="Alignment_Crop_ex8">
+            <td class="indent1">
+                <input type="checkbox" id="Alignment_Crop_enabled" value="1" onclick = 'InvertEnableItem("Alignment", "Crop")' unchecked >
+                <label for=Alignment_Crop_enabled><class id="Alignment_Crop_text" style="color:black;">Crop (x, y, w, h)</class></label>
+            </td>
+            <td>
+                <input type="number" id="Alignment_Crop_value1" size="6" min="0" step="1" placeholder="x">
+                <input type="number" id="Alignment_Crop_value2" size="6" min="0" step="1" placeholder="y">
+                <input type="number" id="Alignment_Crop_value3" size="6" min="1" step="1" placeholder="w">
+                <input type="number" id="Alignment_Crop_value4" size="6" min="1" step="1" placeholder="h">Pixel
+            </td>
+            <td>Restrict analysis to this sub-rectangle of the capture (full-frame pixel coordinates). The frame is repacked to the crop and all marker/ROI coordinates are shifted accordingly. Not compatible with Flip image.</td>
+        </tr>
+
         <tr unused_id="Alignment_InitialRotate_ex8">
             <td class="indent1">
                 <class id="Alignment_InitialRotate_text" style="color:black;">Rotation angle</class>
@@ -2466,9 +2492,11 @@ function UpdateInput() {
     WriteParameter(param, category, "TakeImage", "LEDIntensity", false);
     WriteParameter(param, category, "TakeImage", "Demo", false);
 	
-    WriteParameter(param, category, "Alignment", "SearchFieldX", false);		
-    WriteParameter(param, category, "Alignment", "SearchFieldY", false);		
-    WriteParameter(param, category, "Alignment", "AlignmentAlgo", true);			
+    WriteParameter(param, category, "Alignment", "SearchFieldX", false);
+    WriteParameter(param, category, "Alignment", "SearchFieldY", false);
+    WriteParameter(param, category, "Alignment", "AlignmentAlgo", true);
+    WriteParameter(param, category, "Alignment", "AlignmentInterval", true);
+    WriteParameter(param, category, "Alignment", "Crop", true);
     WriteParameter(param, category, "Alignment", "InitialRotate", false);
 
     WriteParameter(param, category, "Digits", "CNNGoodThreshold", true);
@@ -2718,9 +2746,11 @@ function ReadParameterAll() {
     ReadParameter(param, "TakeImage", "LEDIntensity", false);	
     ReadParameter(param, "TakeImage", "Demo", false);	
 
-    ReadParameter(param, "Alignment", "SearchFieldX", false);	
+    ReadParameter(param, "Alignment", "SearchFieldX", false);
     ReadParameter(param, "Alignment", "SearchFieldY", false);
     ReadParameter(param, "Alignment", "AlignmentAlgo", true);
+    ReadParameter(param, "Alignment", "AlignmentInterval", true);
+    ReadParameter(param, "Alignment", "Crop", true);
     ReadParameter(param, "Alignment", "InitialRotate", false);
 
     ReadParameter(param, "Digits", "Model", false);

@@ -588,6 +588,18 @@ bool ClassFlowCNNGeneral::doFlow(string time) {
     return true;
 }
 
+void ClassFlowCNNGeneral::ShiftROIs(int dx, int dy) {
+    if ((dx == 0) && (dy == 0)) {
+        return;
+    }
+    for (int _ana = 0; _ana < GENERAL.size(); ++_ana) {
+        for (int i = 0; i < GENERAL[_ana]->ROI.size(); ++i) {
+            GENERAL[_ana]->ROI[i]->posx -= dx;
+            GENERAL[_ana]->ROI[i]->posy -= dy;
+        }
+    }
+}
+
 bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
     if (disabled) {
         return true;

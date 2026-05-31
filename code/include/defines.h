@@ -218,6 +218,10 @@
 #define MAX_MODEL_SIZE            (unsigned int)(512 * 1024) // 524288 bytes (largest shipped model ~356 KB + margin)
 #define TENSOR_ARENA_SIZE         800 * 1024 // Space for the Tensor Arena, (819200 Bytes)
 #define IMAGE_SIZE                640 * 480 * 3 // Space for a extracted image (921600 Bytes)
+
+// Alignment: angles below this (degrees) are treated as "no rotation" so the full-frame rotate
+// pass (and its scratch buffer) is skipped - translation alone aligns a rigidly mounted camera.
+#define ALIGNMENT_ROTATION_DEADBAND_DEG  0.05f
 /////////////////////////////////////////////
 ////      Conditionnal definitions       ////
 /////////////////////////////////////////////

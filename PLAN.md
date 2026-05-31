@@ -402,6 +402,67 @@ between v16 and v17:
      threshold and the name-based PSRAM allocation note in `ClassFlowAlignment.cpp`.
    - Measure first (`WriteHeapInfo` / timing logs) before optimizing; quantify per-stage cost.
 
+### 6.1 Pipeline scope findings (2026-05-30) — grounds tasks 2/3 + alignment questions
+
+**Where the full frame is actually touched (VGA 640×480×3 = `IMAGE_SIZE` 921,600 B):**
+
+| Stage | Scope | Per-cycle cost | File |
+|---|---|---|---|
+| TakeImage (STBI decode) | full frame | ~1.54 MB peak shared-region (decode + crop planes) | `ClassFlowTakeImage.cpp` |
+| **Alignment** | **full frame** | full `ImageTMP` copy (~921 KB) + 2-marker search + **full-frame rotate/shift** + overview draw | `ClassFlowAlignment.cpp` `doFlow` |
+| CNN / Digitization | **ROI crops only** | per-ROI `CutAndSave` → `Resize` to model input (~32×20×3) → inference (arena_used ~28 KB) | `ClassFlowCNNGeneral.cpp` |
+
+**Answer — "does analysis ever check the full image, or only individual regions?"**
+The *recognition* (CNN) only ever looks at small per-ROI crops resized to the model input
+([ClassFlowCNNGeneral.cpp:602-612](code/components/jomjol_flowcontroll/ClassFlowCNNGeneral.cpp#L602-L612)).
+The only stage that touches the whole frame is **Alignment**: it copies the entire frame to
+`ImageTMP`, finds 2 reference markers in their search windows, then rotates/shifts the *whole*
+image so the ROIs land at fixed coordinates. Functionally it only needs (a) the two marker
+search windows and (b) the ROI boxes — the full-frame copy+rotate is overhead.
+
+**Q "alignment only needs a buffer around the reference image" — CONFIRMED feasible.**
+Two independent reductions:
+  - *Periodic alignment:* the marker offset drifts slowly. Cache the transform (dx,dy,angle),
+    re-run the marker search only every N cycles (or on drift/on demand), reuse the cached
+    transform on intermediate cycles. Skips the ~921 KB copy + full rotate + search on most
+    rounds. This is the same idea as §2 "reuse cached transform; only re-align on the full
+    validation pass," and pairs with FastRead. Alignment can already be turned fully OFF via
+    `alignment_algo == 3`, so a "re-align every N rounds" interval is a natural extension.
+  - *Localized alignment:* never materialize a full rotated frame — cut each ROI directly from
+    the raw decoded image at the transform-adjusted position (cut-with-rotation per ROI). Drops
+    the full-frame `ImageTMP`. The full rotated frame is only needed for the optional AlgROI
+    overview JPEG (debug/SaveAllFiles), which can be gated behind that flag.
+
+**Task 2 — crop + mask before analysis — feasible, biggest structural win:**
+  - The meter occupies a fraction of the frame (confirmed on the downloaded `alg_roi.jpg`).
+  - A configured crop (bounding box of markers + all ROIs) shrinks the *analyzed* footprint.
+    Because the PSRAM region floor is `IMAGE_SIZE * 2` and `IMAGE_SIZE` would track the cropped
+    dimensions, **cropping shrinks the shared region automatically** (see psram.cpp note) — on
+    top of the CPU saving from copying/rotating fewer pixels.
+  - Camera-level digital zoom already exists (sensor window). The new piece is a *software*
+    post-capture crop driven by a GUI-set box in the reference/alignment phase.
+  - Masking (zeroing non-ROI areas) does **not** shrink buffers (same dimensions) — its only
+    value is alignment robustness against moving backgrounds. Lower priority than cropping.
+
+**Task 3 — grayscale / single channel — NOT a drop-in for the CNN:**
+  - The shipped models are **hardcoded 3-channel RGB**: input dim 3 = `im_channel`
+    ([CTfLiteClass.cpp:107-109](code/components/jomjol_tfliteclass/CTfLiteClass.cpp#L107-L109))
+    and the loader writes 3 floats/pixel R,G,B
+    ([CTfLiteClass.cpp:176-188](code/components/jomjol_tfliteclass/CTfLiteClass.cpp#L176-L188)).
+    Grayscale/single-channel CNN input requires **retraining** every dig/analog model *and*
+    changing the loader. Out of scope for a firmware-only change.
+  - However the *alignment* marker search does not need color — it could run on a 1-channel
+    (luma) buffer, cutting the big alignment buffer to ~1/3. The CNN ROIs stay RGB (cut from
+    the raw image), so model compatibility is preserved. This is the realistic grayscale win.
+
+**Recommended priority (lowest risk → highest structural payoff):**
+  1. **Periodic alignment** (cache transform, re-align every N rounds) — biggest CPU + transient
+     memory win, reuses existing FastRead/`alignment_algo` infrastructure, no model/GUI change.
+  2. **GUI crop box** (task 2) — shrinks both the PSRAM region (auto, via the IMAGE_SIZE floor)
+     and per-cycle CPU; needs reference-phase UI + capture-time crop.
+  3. **Localized / grayscale alignment** — drop the full-frame `ImageTMP`, run the search on luma.
+  4. Masking and CNN-grayscale — deprioritized (masking: no buffer win; CNN-grayscale: retraining).
+
 ---
 
 ## 7. UI / front-end
