@@ -84,6 +84,14 @@ html[data-theme="dark"] .tooltiptext [style*="color:black"],
 html[data-theme="dark"] .tooltiptext [style*="color: black"] { color: var(--fg) !important; }
 html[data-theme="dark"] .cfg-help { border-bottom-color: var(--muted); }
 
+/* Config page bespoke classes (predate app.css): keep the collapsible section
+   headers and expert rows readable in dark mode. Higher specificity than the
+   page's inline .cfg-head/.expert rules, so it wins without !important. */
+html[data-theme="dark"] .cfg-head td { background: var(--panel-alt); border-color: var(--border) !important; }
+html[data-theme="dark"] .cfg-head:hover td { background: var(--border); }
+html[data-theme="dark"] tr.expert td { background-color: #332a2a; }   /* warm tint instead of #ffefef */
+html[data-theme="dark"] .cfg-head h4, html[data-theme="dark"] .cfg-head label { color: var(--fg); }
+
 /* style.css top menu is already dark (#333); recolor the LIGHT submenu parts */
 html[data-theme="dark"] .menu li ul { background: var(--panel); }
 html[data-theme="dark"] .menu li:hover li a { background: var(--panel); color: var(--fg); }
