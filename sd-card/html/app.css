@@ -215,3 +215,20 @@
     .frow .frow-ctrl select { width: 100%; }
     .actionbar .btn { width: 100%; }
 }
+
+/* ---- Mobile width safety net ------------------------------------------------
+   Several pages declare fixed pixel widths (tables at 660px, setup iframes at
+   995px, file inputs, progress bars, ...) that overflow a phone screen and force
+   the whole page to render zoomed-out with horizontal scrolling. Cap content to
+   the viewport - max-width:100% beats a larger fixed width, so the desktop sizes
+   are untouched while phones get a properly fitted layout. */
+@media (max-width: 768px) {
+    html, body { min-width: 0 !important; max-width: 100% !important; overflow-x: hidden; }
+    .app-container, .app-card { max-width: 100% !important; box-sizing: border-box; }
+    table, img, iframe, pre, canvas, svg, video,
+    input, select, textarea, progress, fieldset {
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+    table { width: 100% !important; }
+}
