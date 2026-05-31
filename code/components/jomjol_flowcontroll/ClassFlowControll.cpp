@@ -465,12 +465,26 @@ bool ClassFlowControll::doFlow(string time)
             // condition - e.g. the camera is not positioned at the meter - not a stuck device.
             // Don't retry it into the 5x-failure reboot below: end the round gracefully and let the
             // next round try again. All other steps keep the retry/reboot watchdog behaviour.
+            //
+            // The downstream steps that normally report to MQTT / InfluxDB / the REST API are
+            // skipped on this round, so surface the failure here instead of silently ending as
+            // "Flow finished": set the round status (REST /statusflow + MQTT <topic>/status) and
+            // raise the MQTT error topic (drives the Home Assistant "problem" binary sensor). The
+            // next successful round republishes "no error" and clears it. InfluxDB only stores the
+            // numeric reading, so a skipped round is simply a gap in the series (no datapoint).
             if (FlowControll[i]->name() == "ClassFlowAlignment") {
                 setProcessingStage(PROC_STAGE_ERROR);
-                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - skipping the rest of "
-                    "this round without rebooting; will retry on the next round.");
-                result = false;
-                break;
+                aktstatus = "Alignment error - reference markers not found (camera not at meter?)";
+                aktstatusWithTime = aktstatus + " (" + getCurrentTimeString("%H:%M:%S") + ")";
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - reporting status/error "
+                    "to REST + MQTT and skipping the rest of this round without rebooting; will retry "
+                    "on the next round.");
+                #ifdef ENABLE_MQTT
+                    MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);
+                    MQTTPublish(mqttServer_getMainTopic() + "/" + "error",
+                                "Alignment: reference markers not found", qos, false);
+                #endif //ENABLE_MQTT
+                return false;   // skip the post-loop "Flow finished" so the failure status persists
             }
             repeat++;
             setProcessingStage(PROC_STAGE_ERROR);   // status LED: step failed / retrying
