@@ -143,8 +143,16 @@
                     document.getElementById("led_color").value = rgbToHex(c["value1"], c["value2"], c["value3"]);
                 }
             }
+            // Match the capture setup: the camera flashes whenever WaitBeforeTakingPicture > 0, so
+            // start the live preview with the light ON (and thus the flash LED active, showing its
+            // colour). The flash only lights up when this box is ticked.
+            var waitb = (param["TakeImage"] && param["TakeImage"]["WaitBeforeTakingPicture"] &&
+                         typeof param["TakeImage"]["WaitBeforeTakingPicture"]["value1"] !== "undefined")
+                        ? parseInt(param["TakeImage"]["WaitBeforeTakingPicture"]["value1"], 10) : 0;
+            document.getElementById("flash").checked = (waitb > 0);
+
             ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
-            onZoomToggle();   // also kicks the first stream load
+            onZoomToggle();   // also kicks the first stream load (with the light state set above)
         }
 
         // Resume processing when the window is closed (best-effort; index.html also resumes on close).
