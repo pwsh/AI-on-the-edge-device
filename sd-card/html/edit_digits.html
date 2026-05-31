@@ -798,9 +798,9 @@
                         context.strokeRect(x0, y0, dx, dy);
                         drawTextBG(context, ROIInfo[_nb]["name"], x0+dx/2, y0-12, 5);
 
-                        // Inner 60% box = centering guide (dashed, 50% opacity)
+                        // Inner 60% box = centering guide (dashed, 60% opacity)
                         context.lineWidth = 1;
-                        context.strokeStyle = "rgba(153, 0, 0, 0.5)";
+                        context.strokeStyle = "rgba(153, 0, 0, 0.6)";
                         context.setLineDash([5, 4]);
                         context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
                         context.setLineDash([]);
@@ -829,9 +829,9 @@
             context.strokeRect(x0, y0, dx, dy);
             drawTextBG(context, ROIInfo[aktindex]["name"], x0+dx/2, y0-11, 5);
 
-            // Inner 60% box = centering guide only (dashed, 50% opacity); not saved/analysed
+            // Inner 60% box = centering guide only (dashed, 60% opacity); not saved/analysed
             context.lineWidth = 1;
-            context.strokeStyle = "rgba(255, 0, 0, 0.5)";
+            context.strokeStyle = "rgba(255, 0, 0, 0.6)";
             context.setLineDash([5, 4]);
             context.strokeRect(x0+dx*0.2, y0+dy*0.2, dx*0.6, dy*0.6);
             context.setLineDash([]);

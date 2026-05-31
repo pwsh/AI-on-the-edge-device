@@ -769,9 +769,9 @@ The following settings are only used for easier setup, they are <b>not</b> persi
                            drawTextBG(context, ROIInfo[_nb]["name"]+" (CCW)", x0+dx/2-0.5, y0-13, 5);
                         }
 
-                        // Dial guide = dashed circle filling the box (50% opacity)
+                        // Dial guide = dashed circle filling the box (60% opacity)
                         context.lineWidth = 1;
-                        context.strokeStyle = "rgba(153, 0, 0, 0.5)";
+                        context.strokeStyle = "rgba(153, 0, 0, 0.6)";
                         context.setLineDash([5, 4]);
                         context.beginPath();
                         context.ellipse(x0+dx/2, y0+dy/2, dx/2, dy/2, 0, 0, 2 * Math.PI);
@@ -808,9 +808,9 @@ The following settings are only used for easier setup, they are <b>not</b> persi
                 drawTextBG(context, ROIInfo[aktindex]["name"] + " (CCW)", x0+dx/2, y0-11, 5);
             }
 
-            // Dial guide = dashed circle filling the box (50% opacity); not saved/analysed
+            // Dial guide = dashed circle filling the box (60% opacity); not saved/analysed
             context.lineWidth = 1;
-            context.strokeStyle = "rgba(255, 0, 0, 0.5)";
+            context.strokeStyle = "rgba(255, 0, 0, 0.6)";
             context.setLineDash([5, 4]);
             context.beginPath();
             context.ellipse(x0+dx/2, y0+dy/2, dx/2, dy/2, 0, 0, 2 * Math.PI);
