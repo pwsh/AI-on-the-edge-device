@@ -400,26 +400,41 @@ between v16 and v17:
 
 ## 6. Image processing efficiency (investigate)
 
-⬜ **Audit the image pipeline for performance / memory wins.** The image path is the largest
-   RAM consumer and a big chunk of per-cycle CPU. Areas to check:
-   - **Per-cycle allocations:** `CImageBasis` temp images are `new`/`delete`d every round
-     (rawImage, alignment `ImageTMP`/`AlignAndCutImage`, `SendRawImage`, per-ROI cut/resize
-     buffers). Look for buffers that can be pooled/reused across cycles instead of
-     reallocated (PSRAM fragmentation + alloc cost). See `ClassFlowTakeImage.cpp`,
-     `ClassFlowAlignment.cpp`, `ClassFlowCNNGeneral.cpp`, `CImageBasis.cpp`.
+✅ **Audited the image pipeline (alpha.14) — measured first, then fixed the real waste.**
+   Per-stage Diag timing on device (stable across rounds): **TakeImage ~9.5 s** (of which ~5 s is the
+   intentional `WaitBeforePicture` flash/exposure warm-up + camera capture + one JPEG decode),
+   **CNN ~5.3 s** (dominated by tflite inference across the ROIs), **Alignment ~1.4 s**,
+   PostProcessing/MQTT ~0.1 s each → **round ~16.5 s**. So the round time is dominated by *intentional*
+   camera warm-up and *inherent* neural inference, not by image-processing waste.
+   - **Per-cycle allocations — already pooled (measured: per-stage heap/PSRAM delta ≈ 0; heap steady
+     ~93 KB, PSRAM ~508 KB free).** `rawImage` is allocated once in `ClassFlowTakeImage::ReadParameter`;
+     each ROI's `image`/`image_org` once at config load (`ClassFlowCNNGeneral` getNetworkParameter) and
+     reused via `CutAndSave`/`Resize`; the STBI decode and alignment `ImageTMP` use the shared PSRAM
+     region. The only per-round `new`/`delete` are the small `ImageTMP`/`AlignAndCutImage` *objects*
+     (pixels are the shared region) — negligible. The hypothesised pooling win was already done.
+   - ✅ **Fixed the genuine waste: two per-byte copy loops → `memcpy`.** `CCamera::CaptureToBasisImage`
+     copied the decoded ~921 KB frame `_zwImage`→`_Image` one byte at a time (index multiply per
+     pixel); and `CAlignAndCutImage::CutAndSave(...,_target)` (run once per ROI, ~16×/round, ~820 KB
+     total) did the same per byte. Both are identical-layout copies → replaced with a contiguous
+     `memcpy` (full-frame) / per-row `memcpy` (ROI). Zero behaviour change.
    - ✅ **Alignment cost — DONE (alpha.14).** The full-frame rotate/shift + marker search is no
      longer paid every round: `AlignmentInterval=N` reuses the cached transform between full
      searches; a no-rotation dead-band skips the full-frame rotate when the angle is ~0; and
      `Crop`/`Mask` shrink the analysed frame. Validated on device (see §6.1). Remaining tie-in
      with FastRead §2 (re-align only on the full-validation pass) is now trivial via the interval.
-   - **Resize/cut:** `Resize()`/`CutAndSave()` run per ROI every cycle; check the
-     interpolation cost and whether output buffers can be reused.
-   - **JPEG decode/encode:** confirm decode happens once per capture (not repeatedly) and
-     that the new `espressif/esp_jpeg` managed component is used efficiently.
-   - **PSRAM vs internal:** verify large buffers land in PSRAM (`MALLOC_CAP_SPIRAM`) and only
-     latency-sensitive ones use internal RAM; review the `SPIRAM_MALLOC_ALWAYSINTERNAL`
-     threshold and the name-based PSRAM allocation note in `ClassFlowAlignment.cpp`.
-   - Measure first (`WriteHeapInfo` / timing logs) before optimizing; quantify per-stage cost.
+   - **Resize/cut:** output buffers are reused (ROI `image`/`image_org` are persistent). `CutAndSave`
+     now row-`memcpy`s; `Resize()` is bilinear into the persistent ROI buffer. Cost is small vs.
+     inference. The remaining two `CutAndSave` overloads (file-save / `SendImage`) still loop per byte
+     but are **cold paths** (SaveAllFiles / live view), not per-round — left as-is.
+   - ✅ **JPEG decode happens once per capture.** `CaptureToBasisImage` does one
+     `_zwImage->LoadFromMemory(fb->buf, fb->len)` (STBI software decode); no re-decode downstream
+     (alignment/CNN read the decoded RGB `rawImage`). The per-round raw-image JPEG **log** is gated off
+     unless `RawImagesLocation` is set, so no per-round re-encode. Note: on the **ESP32** (no hardware
+     JPEG) any decoder is software; a faster software decoder (esp_jpeg/tjpgd vs STBI) is a possible
+     future lever but unproven and risky — not pursued.
+   - ✅ **Large buffers are in PSRAM.** rawImage, the shared region, STBI buffers and ROI buffers all
+     allocate with `MALLOC_CAP_SPIRAM`; PSRAM free held steady at ~508 KB across rounds.
+   - ✅ Measured first (per-stage Diag + `MEM-PROFILE`), then changed only the byte-loop copies.
 
 ### 6.1 Pipeline scope findings (2026-05-30) — grounds tasks 2/3 + alignment questions
 

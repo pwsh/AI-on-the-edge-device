@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <algorithm>
+#include <cstring>
 #include <esp_log.h>
 #include "psram.h"
 #include "../../include/defines.h"
@@ -186,17 +187,15 @@ void CAlignAndCutImage::CutAndSave(int x1, int y1, int dx, int dy, CImageBasis *
     uint8_t* odata = _target->RGBImageLock();
     RGBImageLock();
 
-    stbi_uc* p_target;
-    stbi_uc* p_source;
-
-    for (int x = x1; x < x2; ++x)
-        for (int y = y1; y < y2; ++y)
-        {
-            p_target = odata + (channels * ((y - y1) * dx + (x - x1)));
-            p_source = rgb_image + (channels * (y * width + x));
-            for (int _channels = 0; _channels < channels; ++_channels)
-                p_target[_channels] = p_source[_channels];
-        }
+    // Each source row segment [x1..x2) is contiguous, as is the matching destination row, so copy
+    // the ROI a row at a time instead of per byte.
+    const size_t rowbytes = (size_t)dx * channels;
+    for (int y = y1; y < y2; ++y)
+    {
+        memcpy(odata + (size_t)channels * ((y - y1) * dx),
+               rgb_image + (size_t)channels * ((size_t)y * width + x1),
+               rowbytes);
+    }
 
     RGBImageRelease();
     _target->RGBImageRelease();
