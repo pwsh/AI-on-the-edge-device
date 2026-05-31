@@ -1464,7 +1464,12 @@ esp_err_t handler_editflow(httpd_req_t *req)
 
         std::string out2 = out.substr(0, out.length() - 4) + "_org.jpg";
 
-        if ((flowctrl.SetupModeActive || (*flowctrl.getActStatus() == std::string("Flow finished"))) && psram_init_shared_memory_for_take_image_step())
+        // Allow the capture whenever a round is not actively executing (flowisrunning), rather than
+        // string-matching the "Flow finished" status. A round that ended early - e.g. alignment
+        // skipped because markers weren't found - leaves a descriptive status, but the camera/PSRAM
+        // are free, so setting up the alignment markers must still work (otherwise the user can't fix
+        // the very condition that caused the skip). PSRAM init below is the real mutex against a round.
+        if ((flowctrl.SetupModeActive || !flowisrunning) && psram_init_shared_memory_for_take_image_step())
         {
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Taking image for Alignment Mark Update...");
 
