@@ -73,6 +73,17 @@ html[data-theme="dark"] textarea::placeholder { color: var(--muted); }
 /* Links */
 html[data-theme="dark"] a { color: var(--link); }
 
+/* Config-page hover help popups (.tooltiptext): dark panel so the light text stays readable */
+html[data-theme="dark"] .tooltiptext {
+    background-color: var(--panel) !important;
+    border-color: var(--border) !important;
+    color: var(--fg);
+}
+html[data-theme="dark"] .tooltiptext a { color: var(--link); }
+html[data-theme="dark"] .tooltiptext [style*="color:black"],
+html[data-theme="dark"] .tooltiptext [style*="color: black"] { color: var(--fg) !important; }
+html[data-theme="dark"] .cfg-help { border-bottom-color: var(--muted); }
+
 /* style.css top menu is already dark (#333); recolor the LIGHT submenu parts */
 html[data-theme="dark"] .menu li ul { background: var(--panel); }
 html[data-theme="dark"] .menu li:hover li a { background: var(--panel); color: var(--fg); }

@@ -133,27 +133,38 @@
         display: inline-block;
     }
 
-    .tooltip .tooltiptext {
+    /* The hover help popup. Styled by its own class so it works whether it sits inside the
+       legacy .tooltip icon wrapper or the new .cfg-nt name wrapper. */
+    .tooltiptext {
         visibility: hidden;
         width: 600px;
+        max-width: 92vw;
+        box-sizing: border-box;
         background-color: #fcfcfc;
 
         padding: 5px;
         padding-bottom: 0;
 
-        border: solid black 2px; 
+        border: solid black 2px;
 
-        /* Position the tooltip */
+        /* Position the popup below its anchor (the setting name), extending to the right */
         position: absolute;
-        z-index: 1;
+        z-index: 5;
         top: 100%;
-        left: 100%;
-        margin-left: -600px;
+        left: 0;
     }
 
-    .tooltip:hover .tooltiptext {
+    .tooltip:hover .tooltiptext,
+    .cfg-nt:hover .tooltiptext {
         visibility: visible;
     }
+
+    /* Name-anchored tooltip: the setting name becomes the hover target (no per-row help icon) */
+    .cfg-nt { position: relative; display: inline-block; }
+    .cfg-help { border-bottom: 1px dotted #888; cursor: help; }
+    /* When the System -> Tooltip setting is off, suppress the name-hover help entirely */
+    body.cfg-tips-off .cfg-nt .tooltiptext { display: none; }
+    body.cfg-tips-off .cfg-help { border-bottom: none; cursor: default; }
 
     .tooltip-content {
         width: calc(100% - 2px);
@@ -218,7 +229,15 @@
     }
     tbody.cfg-section.collapsed .cfg-chevron { transform: rotate(-90deg); }
     tbody.cfg-section.collapsed > tr:not(.cfg-head) { display: none !important; }
-    tbody.cfg-section > tr:not(.cfg-head) > td { border-bottom: 1px solid #f1f3f5; }
+    /* Tighter rows now that the per-row help icon is gone (tips moved onto the name) */
+    tbody.cfg-section > tr:not(.cfg-head) > td {
+        border-bottom: 1px solid #f1f3f5;
+        padding-top: 5px; padding-bottom: 5px;
+    }
+    /* The 3rd column used to hold the help icon; collapse it and give the width to the value column */
+    .table colgroup col:nth-child(2) { width: auto; }
+    .table colgroup col:nth-child(3) { width: 0; }
+    tbody.cfg-section > tr > td:last-child:empty { padding: 0; }
 
     /* ---- Sticky save bar pinned to the bottom of the viewport -------------------------------- */
     #cfg_savebar {
@@ -257,7 +276,7 @@
         .cfg-head td { padding: 10px 8px !important; font-weight: 400; }
         .cfg-head h4 { font-size: 1.1em; }
         /* the wide 600px tooltip popup would overflow a phone - make it fit the screen */
-        .tooltip .tooltiptext { width: calc(100vw - 24px); left: 0; margin-left: 0; box-sizing: border-box; }
+        .tooltiptext { width: calc(100vw - 24px); left: 0; margin-left: 0; box-sizing: border-box; }
         #cfg_savebar .button { width: 100%; }
     }
 </style>
@@ -287,8 +306,8 @@
         </summary>
         <p>
             Every device setting lives here, grouped into collapsible sections &mdash; click a section header
-            to fold or unfold it. Hover a setting name (or click its <img src="help.png" width="16px"> icon) to
-            see what it does.
+            to fold or unfold it. Hover a setting's <b>underlined name</b> to see what it does (toggle this off
+            under <i>System &rarr; Tooltip</i>).
         </p>
         <p>
             The default view covers everyday configuration. Tick <b>"Show Expert Parameters"</b> to reveal
@@ -2986,19 +3005,20 @@ function UpdateExpertModus() {
 }
 
 function UpdateTooltipModus() {
-    var _style_pur = 'none';
-    var _hidden = true;
-	
+    var hidden = true;
+
     if (!document.getElementById("System_Tooltip_value1").selectedIndex) {
-        _style_pur = '';
-        _hidden = false;
+        hidden = false;
         //firework.launch("Tooltip view activated.", 'warning', 5000);
     }
 
+    // New model: tips live on the setting name (.cfg-nt); a body class toggles them via CSS.
+    document.body.classList.toggle('cfg-tips-off', hidden);
+
+    // Legacy: any not-yet-rehomed .tooltip help icons (e.g. if buildConfigUI hasn't run).
     const tooltip = document.querySelectorAll(".tooltip");
-	
     for (var i = 0; i < tooltip.length; i++) {
-        tooltip[i].style.display = _style_pur;
+        tooltip[i].style.display = hidden ? 'none' : '';
     }
 }
 
@@ -3673,6 +3693,38 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
     EnDisableItem(_category[_cat]["enabled"], _param, _category, _cat, _name, _optional, _number);
 }
 	
+/* Move a row's help popup off its own help-icon column and onto the setting name, so hovering
+   the name shows the tip and the icon column can be removed (tighter rows). Works for both the
+   generated .tooltip/.tooltiptext markup and the few rows that carry plain inline description text. */
+function rehomeTooltipToName(row) {
+    if (row.cells.length < 3) return;                       // skip full-width / 2-cell rows
+    var firstCell = row.querySelector('td.indent1, td.indent2');
+    if (!firstCell) return;
+    var nameEl = firstCell.querySelector('label, [id$="_text"]');
+    if (!nameEl || nameEl.closest('.cfg-nt')) return;       // no name, or already rehomed
+
+    var lastCell = row.cells[row.cells.length - 1];
+    if (lastCell === firstCell) return;
+    if (lastCell.querySelector('input, select, textarea, button')) return; // that's a value cell
+
+    var tiptext = lastCell.querySelector('.tooltiptext');
+    if (!tiptext) {
+        var inner = lastCell.innerHTML.trim();
+        if (!inner) return;                                 // nothing to move
+        tiptext = document.createElement('span');
+        tiptext.className = 'tooltiptext';
+        tiptext.innerHTML = inner;
+    }
+
+    var wrap = document.createElement('span');
+    wrap.className = 'cfg-nt';
+    nameEl.parentNode.insertBefore(wrap, nameEl);
+    wrap.appendChild(nameEl);
+    wrap.appendChild(tiptext);
+    nameEl.classList.add('cfg-help');
+    lastCell.innerHTML = '';                                // drop the old help-icon column content
+}
+
 /* Turn the flat parameter table into collapsible, icon-labelled accordion sections.
    Runs once after the config is loaded; regroups the existing rows into one <tbody> per
    section heading so a section can be folded without disturbing the per-row show/hide logic
@@ -3729,7 +3781,10 @@ function buildConfigUI() {
         sec.h.appendChild(chev);
 
         tb.appendChild(sec.head);
-        sec.rows.forEach(function (r) { tb.appendChild(r); });
+        sec.rows.forEach(function (r) {
+            try { rehomeTooltipToName(r); } catch (e) { /* leave row as-is on any hiccup */ }
+            tb.appendChild(r);
+        });
         table.appendChild(tb);
 
         sec.head.addEventListener('click', function (e) {
