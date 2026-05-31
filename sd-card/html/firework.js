@@ -17,8 +17,14 @@
         return false
       }
 
+      // Start the notification BELOW the sticky top navigation bar (.appnav) so it is never
+      // hidden behind it. Pages without the shared nav fall back to a small top margin.
+      var navOffset = 0;
+      var $nav = $('.appnav');
+      if ($nav.length) { navOffset = $nav.outerHeight() || 0; }
+
       var c = 'firework' // css class(es)
-        , p = 10 // pixels from top or page to display
+        , p = navOffset + 12 // pixels from top of page to display (clears the top nav bar)
         , d = new Date()
         , s = d.getTime() // used to create unique element ids
         , fid = "firework-"+ s; // firework id

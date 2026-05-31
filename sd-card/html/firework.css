@@ -2,10 +2,10 @@
 .firework {
   background-color: #888;
   border-color: #888;
-  border-radius: 6px;
+  border-radius: 8px;
   color: #fff;
   left: 10%;
-  padding: 5px;
+  padding: 10px 14px;
   position: fixed;
   opacity: 0;
   text-align: center;
@@ -13,8 +13,11 @@
   width: 80%;
   min-width:30%;
   max-width:580px;
-  z-index: 99;
-  font-size:120%;
+  /* Above the sticky top nav (.appnav is z-index:100) so messages are never hidden behind it.
+     firework.js positions the toast just below the nav; this keeps it on top of everything. */
+  z-index: 1000;
+  font-size:115%;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.28);
 }
 .firework a {
   color: rgba(255, 255, 255, 0.9);
@@ -38,3 +41,16 @@
   background-color: #dbd567f0;
   border-color: #DBD667;
 }
+
+/* Dark mode: keep notifications legible and integrated with the dark theme. The coloured
+   variants are re-asserted here so they still win over the dark default (the attribute
+   selector would otherwise out-specify the plain .firework.success/.danger/.warning rules). */
+html[data-theme="dark"] .firework {
+  background-color: #2d2d2d;
+  border-color: #4a4a4a;
+  color: #e8e8e8;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+}
+html[data-theme="dark"] .firework.success { background-color: #2f7d2e; border-color: #276625; color: #fff; }
+html[data-theme="dark"] .firework.danger  { background-color: #b34526; border-color: #8f3017; color: #fff; }
+html[data-theme="dark"] .firework.warning { background-color: #8a7d22; border-color: #6e6018; color: #fff; }
