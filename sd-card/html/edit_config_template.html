@@ -2540,6 +2540,7 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "StatusLEDTransmit", false);
     WriteParameter(param, category, "GPIO", "StatusLEDError", false);
     syncStatusColorsFromValues();   // load path: set the colour pickers from the just-populated RGB values
+    disableUnsupportedCamSettings();   // grey out controls the detected sensor doesn't support
 
     //WriteParameter(param, category, "AutoTimer", "AutoStart", false);
     WriteParameter(param, category, "AutoTimer", "Interval", false);
@@ -2632,6 +2633,32 @@ function syncStatusColorsFromValues() {
         }
         picker.value = '#' + rgb.map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
     }
+}
+
+// Grey out camera-settings controls the detected sensor doesn't actually support, with a tooltip
+// explaining why. Per the esp32-camera drivers: the OV2640 has no Denoise (firmware forces 0);
+// OV3660/OV5640 have no Auto-sharpness (firmware forces 0). Everything else applies on all sensors.
+function disableUnsupportedCamSettings() {
+    var x = new XMLHttpRequest();
+    x.onreadystatechange = function () {
+        if (this.readyState != 4 || this.status != 200) return;
+        var model = (this.responseText || "").trim();
+        function lock(id, txtId, reason) {
+            var e = document.getElementById(id);
+            if (e) { e.disabled = true; e.title = reason; e.style.opacity = "0.5"; }
+            var t = document.getElementById(txtId);
+            if (t) { t.title = reason; t.style.color = "#999"; }
+        }
+        if (model === "OV2640") {
+            lock("TakeImage_CamDenoise_value1", "TakeImage_CamDenoise_text",
+                 "Denoise is not supported on the OV2640 sensor - the firmware ignores it (forces 0).");
+        } else if (model === "OV3660" || model === "OV5640") {
+            lock("TakeImage_CamAutoSharpness_value1", "TakeImage_CamAutoSharpness_text",
+                 "Auto-sharpness is not supported on the " + model + " sensor (manual Sharpness works).");
+        }
+    };
+    x.open("GET", getDomainname() + "/info?type=CameraModel", true);
+    x.send();
 }
 
 // --- Time Zone dropdown ------------------------------------------------------

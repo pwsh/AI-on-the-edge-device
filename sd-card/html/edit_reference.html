@@ -887,6 +887,33 @@
             UpdateExpertModus();
 			UpdateTooltipModus();
             showReference();
+            disableUnsupportedCamSettings();   // grey out controls the detected sensor doesn't support
+        }
+
+        // Grey out camera-settings controls the detected sensor doesn't support, with a tooltip.
+        // Per the esp32-camera drivers: OV3660/OV5640 have no Auto-sharpness (firmware forces 0).
+        // (Denoise is OV2640-only and isn't on this page.)
+        function disableUnsupportedCamSettings() {
+            var x = new XMLHttpRequest();
+            x.onreadystatechange = function () {
+                if (this.readyState != 4 || this.status != 200) return;
+                var model = (this.responseText || "").trim();
+                function lock(id, txtId, reason) {
+                    var e = document.getElementById(id);
+                    if (e) { e.disabled = true; e.title = reason; e.style.opacity = "0.5"; }
+                    var t = document.getElementById(txtId);
+                    if (t) { t.title = reason; t.style.color = "#999"; }
+                }
+                if (model === "OV2640") {
+                    lock("TakeImage_CamDenoise_value1", "TakeImage_CamDenoise_text",
+                         "Denoise is not supported on the OV2640 sensor - the firmware ignores it (forces 0).");
+                } else if (model === "OV3660" || model === "OV5640") {
+                    lock("TakeImage_CamAutoSharpness_value1", "TakeImage_CamAutoSharpness_text",
+                         "Auto-sharpness is not supported on the " + model + " sensor (manual Sharpness works).");
+                }
+            };
+            x.open("GET", getDomainname() + "/info?type=CameraModel", true);
+            x.send();
         }
 
         function loadCanvas(dataURL, grid = false) {
