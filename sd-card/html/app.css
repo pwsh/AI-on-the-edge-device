@@ -66,6 +66,18 @@
 .btn-danger:hover { filter: brightness(1.06); }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
+/* Unify the legacy per-page .button class: give it the modern shape/colours while
+   leaving each page's own width/padding/font-size (declared later) untouched.
+   Pages that set an explicit background (e.g. the red reboot button) still win. */
+.button {
+    border: 1px solid var(--border, #c3ccd6);
+    border-radius: 6px;
+    background: var(--panel, #f4f6f8);
+    color: var(--fg, #1c2024);
+    cursor: pointer;
+}
+.button:hover { background: var(--panel-alt, #e9edf1); }
+
 /* ---- Accordion (generic; built by App.buildAccordions or markup) -----------*/
 .acc { border: 1px solid var(--border, #d8dee4); border-radius: var(--app-radius);
        overflow: hidden; margin: 0 0 12px; background: var(--panel, #fff); }

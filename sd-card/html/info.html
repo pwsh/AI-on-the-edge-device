@@ -27,12 +27,14 @@ output {
 	padding-left:5px;
 }
 
+.app-card { max-width: 680px; }
+.app-card h3 { margin: 0 0 8px; font-size: 1.05em; }
 table {
     width: 100%;
-    max-width: 660px;
-	padding: 5px;
-	border-collapse:collapse;
+	border-collapse: collapse;
 }
+.app-card td { border: none; border-bottom: 1px solid var(--border, #eee); }
+.app-card tr:last-child td { border-bottom: none; }
 </style>
 
 <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script> 
@@ -40,14 +42,11 @@ table {
 
 <body style="font-family: arial; padding: 0px 10px;">
 <div class="app-container">
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Runtime Information</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Runtime Information</h3>
-		</tr>
 		<tr>
 			<td>Start time:</td>
 			<td><output id="starttime"></output></td>
@@ -56,16 +55,13 @@ table {
 			<td>Uptime:</td>
 			<td><output id="uptime"></output></td>
 		</tr>
-	</table>
+	</table></div>
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Build Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Build Info</h3>
-		</tr>
 		<tr>
 			<td>Firmware version:</td>
 			<td>
@@ -85,16 +81,13 @@ table {
 				<output id="web-ui"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Device Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Device Info</h3>
-		</tr>
 		<tr>
 			<td>Chip Cores:</td>
 			<td>
@@ -131,17 +124,14 @@ table {
 				<output id="cpu-temperature"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Camera Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Camera Info</h3>
-		</tr>
 		<tr>
 			<td>Camera Model:</td>
 			<td>
@@ -154,17 +144,14 @@ table {
 				<output id="camera-resolution"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Host Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Host Info</h3>
-		</tr>
 		<tr>
 			<td>Hostname:</td>
 			<td>
@@ -195,16 +182,13 @@ table {
 				<output id="wlan-channel"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Storage Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Storage Info</h3>
-		</tr>
 		<tr>
 			<td>On-device flash chip size:</td>
 			<td>
@@ -253,16 +237,13 @@ table {
 				<output id="SDCardPartitionAllocationSize"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
-	<table>
-		<colgroup>
+	<div class="app-card"><h3>Memory Info</h3>
+<table><colgroup>
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>
-			<h3>Memory Info</h3>
-		</tr>
 		<tr>
 			<td>Total Free (Int + Ext):</td>
 			<td>
@@ -311,7 +292,7 @@ table {
 				<output id="IntRAMMinFree"></output>
 			</td>
 		</tr>
-	</table>
+	</table></div>
 
 
 <h3>Copyright</h3>
