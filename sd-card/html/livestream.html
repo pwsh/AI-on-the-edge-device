@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Stream</title>
+    <style>
+        html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+        #wrap { position: relative; width: 100vw; height: 100vh; line-height: 0; }
+        #stream { display: block; width: 100vw; height: 100vh; object-fit: contain; }
+        /* SVG overlay sits exactly on top of the stream box; never eats clicks */
+        #grid { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; }
+        #grid line { stroke: rgba(0, 255, 170, 0.55); stroke-width: 0.15; vector-effect: non-scaling-stroke; }
+        #grid line.cross { stroke: rgba(255, 80, 80, 0.8); stroke-width: 0.25; vector-effect: non-scaling-stroke; }
+        /* Controls panel */
+        #ctrl {
+            position: absolute; top: 6px; left: 6px; z-index: 10;
+            font-family: Arial, sans-serif; font-size: 12px; color: #fff;
+            background: rgba(0, 0, 0, 0.55); padding: 5px 8px; border-radius: 5px;
+            line-height: 1.4; user-select: none;
+        }
+        #ctrl select { font-size: 12px; }
+        #ctrl label { cursor: pointer; }
+        #ctrl .hint { opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div id="wrap">
+        <img id="stream" alt="live stream" crossorigin>
+        <svg id="grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+
+    <div id="ctrl">
+        <label>Grid:
+            <select id="gridSel">
+                <option value="off">Off</option>
+                <option value="3x3">Thirds (3×3)</option>
+                <option value="4x4">4×4</option>
+                <option value="8x6">Fine (8×6)</option>
+            </select>
+        </label>
+        &nbsp;
+        <label><input type="checkbox" id="crossChk"> Centre crosshair</label>
+        <span class="hint">&nbsp;(key <b>g</b> cycles grid)</span>
+    </div>
+
+    <script>
+        // Forward the flashlight choice from this page's own query string to the MJPEG stream.
+        var qs = new URLSearchParams(location.search);
+        var streamUrl = "/stream" + (qs.get("flashlight") === "true" ? "?flashlight=true" : "");
+        document.getElementById("stream").src = streamUrl;
+
+        var SVGNS = "http://www.w3.org/2000/svg";
+        var svg = document.getElementById("grid");
+        var sel = document.getElementById("gridSel");
+        var crossChk = document.getElementById("crossChk");
+        var order = ["off", "3x3", "4x4", "8x6"];
+
+        function line(x1, y1, x2, y2, cls) {
+            var l = document.createElementNS(SVGNS, "line");
+            l.setAttribute("x1", x1); l.setAttribute("y1", y1);
+            l.setAttribute("x2", x2); l.setAttribute("y2", y2);
+            if (cls) l.setAttribute("class", cls);
+            svg.appendChild(l);
+        }
+
+        function drawGrid() {
+            while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+            var v = sel.value;
+            if (v !== "off") {
+                var cols = parseInt(v.split("x")[0], 10);
+                var rows = parseInt(v.split("x")[1], 10);
+                for (var i = 1; i < cols; ++i) { var x = (100 * i) / cols; line(x, 0, x, 100); }
+                for (var j = 1; j < rows; ++j) { var y = (100 * j) / rows; line(0, y, 100, y); }
+            }
+            if (crossChk.checked) {
+                line(50, 0, 50, 100, "cross");
+                line(0, 50, 100, 50, "cross");
+            }
+
+            localStorage.setItem("ls_grid", v);
+            localStorage.setItem("ls_cross", crossChk.checked ? "1" : "0");
+        }
+
+        // Restore last choice (default: thirds + crosshair on)
+        sel.value = localStorage.getItem("ls_grid") || "3x3";
+        crossChk.checked = (localStorage.getItem("ls_cross") || "1") === "1";
+
+        sel.addEventListener("change", drawGrid);
+        crossChk.addEventListener("change", drawGrid);
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "g" || e.key === "G") {
+                sel.value = order[(order.indexOf(sel.value) + 1) % order.length];
+                drawGrid();
+            }
+        });
+
+        drawGrid();
+    </script>
+</body>
+</html>

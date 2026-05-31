@@ -951,9 +951,10 @@ esp_err_t CCamera::CaptureToStream(httpd_req_t *req, bool FlashlightOn)
     while (1)
     {
         fr_start = esp_timer_get_time();
+        // Single grab per frame: with grab_mode=CAMERA_GRAB_LATEST this already returns the most
+        // recent frame, and in a continuous stream each iteration is fresh. (The extra grab+discard
+        // used for one-shot capture would halve the stream frame-rate here.)
         camera_fb_t *fb = esp_camera_fb_get();
-        esp_camera_fb_return(fb);
-        fb = esp_camera_fb_get();
 
         if (!fb)
         {

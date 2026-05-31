@@ -75,7 +75,7 @@
 
 
     //ClassControllCamera
-    #define CAM_LIVESTREAM_REFRESHRATE 500      // Camera livestream feature: Waiting time in milliseconds to refresh image
+    #define CAM_LIVESTREAM_REFRESHRATE 100      // Camera livestream: min ms between frames (frame-rate cap). 100 = up to ~10 fps; actual rate is also bounded by capture time. Lower = smoother live view, more CPU/Wi-Fi while streaming.
     // #define GRAYSCALE_AS_DEFAULT
 
 
