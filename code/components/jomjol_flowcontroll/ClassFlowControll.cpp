@@ -461,10 +461,11 @@ bool ClassFlowControll::doFlow(string time)
         size_t psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 
         if (!FlowControll[i]->doFlow(time)) {
-            // An alignment failure (reference markers not found) is a legitimate, recoverable
-            // condition - e.g. the camera is not positioned at the meter - not a stuck device.
-            // Don't retry it into the 5x-failure reboot below: end the round gracefully and let the
-            // next round try again. All other steps keep the retry/reboot watchdog behaviour.
+            // The alignment step does best-effort marker matching and only reports failure when the
+            // regenerable align.txt cache can't be read back (missing/corrupt) - a rare, recoverable
+            // condition, not a stuck device. Don't retry it into the 5x-failure reboot below: end the
+            // round gracefully and let the next round try again (it self-heals once the cache is
+            // rewritten). All other steps keep the retry/reboot watchdog behaviour.
             //
             // The downstream steps that normally report to MQTT / InfluxDB / the REST API are
             // skipped on this round, so surface the failure here instead of silently ending as
@@ -474,15 +475,15 @@ bool ClassFlowControll::doFlow(string time)
             // numeric reading, so a skipped round is simply a gap in the series (no datapoint).
             if (FlowControll[i]->name() == "ClassFlowAlignment") {
                 setProcessingStage(PROC_STAGE_ERROR);
-                aktstatus = "Alignment error - reference markers not found (camera not at meter?)";
+                aktstatus = "Alignment error - could not read alignment data (check reference image / markers)";
                 aktstatusWithTime = aktstatus + " (" + getCurrentTimeString("%H:%M:%S") + ")";
-                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - reporting status/error "
-                    "to REST + MQTT and skipping the rest of this round without rebooting; will retry "
-                    "on the next round.");
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed (alignment cache unreadable) - "
+                    "reporting status/error to REST + MQTT and skipping the rest of this round without "
+                    "rebooting; will retry on the next round.");
                 #ifdef ENABLE_MQTT
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "error",
-                                "Alignment: reference markers not found", qos, false);
+                                "Alignment: could not read alignment data", qos, false);
                 #endif //ENABLE_MQTT
                 return false;   // skip the post-loop "Flow finished" so the failure status persists
             }

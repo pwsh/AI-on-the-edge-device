@@ -358,10 +358,6 @@ bool ClassFlowAlignment::doFlow(string time)
         }
     }
 
-    // Whether the reference-marker search located both markers this round. Stays true for the
-    // "alignment off" mode and for periodic rounds that re-apply the (already valid) cached transform.
-    bool markersFound = true;
-
     // no align algo if set to 3 = off //add disable aligment algo |01.2023
     if (References[0].alignment_algo != 3) {
         // Periodic alignment: run the full reference-marker search only every Nth round; on the
@@ -371,8 +367,12 @@ bool ClassFlowAlignment::doFlow(string time)
                             ((alignmentCounter % alignmentInterval) == 0);
 
         if (doFullSearch) {
-            markersFound = AlignAndCutImage->Align(&References[0], &References[1]);
-            if (!markersFound) {
+            // Align() returns whether both markers matched ABOVE the similarity threshold. A
+            // sub-threshold match is NOT "markers absent" - FindTemplate still locates a best-fit
+            // position, and the alignment is applied best-effort (this is the upstream behaviour).
+            // So a marginal match (lighting / JPEG noise on a real installed meter) must not fail
+            // the round; only persist the freshly found positions to the cache when it re-searched.
+            if (!AlignAndCutImage->Align(&References[0], &References[1])) {
                 SaveReferenceAlignmentValues();
             }
             cached_dx = AlignAndCutImage->out_dx;
@@ -410,17 +410,9 @@ bool ClassFlowAlignment::doFlow(string time)
 
     // no align algo if set to 3 = off => no draw ref //add disable aligment algo |01.2023
     if (References[0].alignment_algo != 3) {
-        if (!markersFound) {
-            // Reference markers could not be located. The most common cause is that the camera is
-            // not (yet) positioned at the meter, or the reference images no longer match the scene.
-            // Treat this as a recoverable, per-round condition: skip the round gracefully so the
-            // flow controller does NOT retry it into a reboot loop. The device keeps running and
-            // tries again on the next round, so it self-heals once the camera is aimed correctly.
-            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment reference markers not found - is the "
-                "camera positioned at the meter? Skipping this round (device keeps running, will "
-                "retry on the next round).");
-            return false;
-        }
+        // Best-effort alignment: the frame has already been aligned/cut using the found marker
+        // positions. The round only fails if the regenerable align.txt cache can't be read back
+        // (missing/corrupt) - the flow controller treats that as a graceful skip, not a reboot.
         return LoadReferenceAlignmentValues();
     }
 
