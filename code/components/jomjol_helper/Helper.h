@@ -16,23 +16,23 @@ std::size_t file_size(const std::string& file_name);
 void FindReplace(std::string& line, std::string& oldString, std::string& newString);
 
 bool CopyFile(string input, string output);
-bool DeleteFile(string filename);
-bool RenameFile(string from, string to);
-bool RenameFolder(string from, string to);
-bool MakeDir(std::string _what);
-bool FileExists(string filename);
-bool FolderExists(string foldername);
+bool DeleteFile(const string& filename);
+bool RenameFile(const string& from, const string& to);
+bool RenameFolder(const string& from, const string& to);
+bool MakeDir(const std::string& _what);
+bool FileExists(const string& filename);
+bool FolderExists(const string& foldername);
 
 string RundeOutput(double _in, int _anzNachkomma);
 
-size_t findDelimiterPos(string input, string delimiter);
+size_t findDelimiterPos(const string& input, const string& delimiter);
 //string trim(string istring);
 string trim(string istring, string adddelimiter = "");
 bool ctype_space(const char c, string adddelimiter);
 
-string getFileType(string filename);
-string getFileFullFileName(string filename);
-string getDirectory(string filename);
+string getFileType(const string& filename);
+string getFileFullFileName(const string& filename);
+string getDirectory(const string& filename);
 
 int mkdir_r(const char *dir, const mode_t mode);
 int removeFolder(const char* folderPath, const char* logTag);
@@ -109,8 +109,8 @@ bool isStringAlphanumeric(std::string &input);
 bool alphanumericToBoolean(std::string &input);
 
 int clipInt(int input, int high, int low);
-bool numericStrToBool(std::string input);
-bool stringToBoolean(std::string input);
+bool numericStrToBool(const std::string& input);
+bool stringToBoolean(const std::string& input);
 
 // ---------------------------------------------------------------------------
 // Status-LED processing stages.

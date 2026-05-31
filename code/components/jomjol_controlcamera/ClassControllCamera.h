@@ -74,7 +74,7 @@ class CCamera
 protected:
     void ledc_init(void);
     bool loadNextDemoImage(camera_fb_t *fb);
-    long GetFileSize(std::string filename);
+    long GetFileSize(const std::string& filename);
     void SetCamWindow(sensor_t *s, int frameSizeX, int frameSizeY, int xOffset, int yOffset, int xTotal, int yTotal, int xOutput, int yOutput, int imageVflip);
     void SetImageWidthHeightFromResolution(framesize_t resol);
     void SanitizeZoomParams(int imageSize, int frameSizeX, int frameSizeY, int &imageWidth, int &imageHeight, int &zoomOffsetX, int &zoomOffsetY);

@@ -25,7 +25,7 @@ struct HTMLInfo
 class ClassFlow
 {
 protected:
-	bool isNewParagraph(string input);
+	bool isNewParagraph(const string& input);
 	bool GetNextParagraph(FILE* pfile, string& aktparamgraph);
 	bool getNextLine(FILE* pfile, string* rt);
 

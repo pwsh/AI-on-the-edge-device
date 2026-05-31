@@ -21,7 +21,7 @@ ConfigFile::~ConfigFile()
     fclose(pFile);
 }
 
-bool ConfigFile::isNewParagraph(std::string input)
+bool ConfigFile::isNewParagraph(const std::string& input)
 {
 	if ((input[0] == '[') || ((input[0] == ';') && (input[1] == '[')))
 	{

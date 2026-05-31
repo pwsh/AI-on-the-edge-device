@@ -262,7 +262,7 @@ void FindReplace(std::string &line, std::string &oldString, std::string &newStri
 /**
  * Create a folder and its parent folders as needed
  */
-bool MakeDir(std::string path)
+bool MakeDir(const std::string& path)
 {
 	std::string parent;
 
@@ -352,7 +352,7 @@ string trim(string istring, string adddelimiter)
 	}
 }
 
-size_t findDelimiterPos(string input, string delimiter)
+size_t findDelimiterPos(const string& input, const string& delimiter)
 {
 	size_t pos = std::string::npos;
 	// size_t zw;
@@ -379,7 +379,7 @@ size_t findDelimiterPos(string input, string delimiter)
 	return pos;
 }
 
-bool RenameFile(string from, string to)
+bool RenameFile(const string& from, const string& to)
 {
 	// ESP_LOGI(logTag, "Renaming File: %s", from.c_str());
 	FILE *fpSourceFile = fopen(from.c_str(), "rb");
@@ -397,7 +397,7 @@ bool RenameFile(string from, string to)
 	return true;
 }
 
-bool RenameFolder(string from, string to)
+bool RenameFolder(const string& from, const string& to)
 {
 	// ESP_LOGI(logTag, "Renaming Folder: %s", from.c_str());
 	DIR *fpSourceFolder = opendir(from.c_str());
@@ -415,7 +415,7 @@ bool RenameFolder(string from, string to)
 	return true;
 }
 
-bool FileExists(string filename)
+bool FileExists(const string& filename)
 {
 	FILE *fpSourceFile = fopen(filename.c_str(), "rb");
 
@@ -430,7 +430,7 @@ bool FileExists(string filename)
 	return true;
 }
 
-bool FolderExists(string foldername)
+bool FolderExists(const string& foldername)
 {
 	DIR *fpSourceFolder = opendir(foldername.c_str());
 
@@ -445,7 +445,7 @@ bool FolderExists(string foldername)
 	return true;
 }
 
-bool DeleteFile(string filename)
+bool DeleteFile(const string& filename)
 {
 	// ESP_LOGI(logTag, "Deleting file: %s", filename.c_str());
 	/* Delete file */
@@ -504,7 +504,7 @@ bool CopyFile(string input, string output)
 	return true;
 }
 
-string getFileFullFileName(string filename)
+string getFileFullFileName(const string& filename)
 {
 	size_t lastpos = filename.find_last_of('/');
 
@@ -520,7 +520,7 @@ string getFileFullFileName(string filename)
 	return zw;
 }
 
-string getDirectory(string filename)
+string getDirectory(const string& filename)
 {
 	size_t lastpos = filename.find('/');
 
@@ -540,7 +540,7 @@ string getDirectory(string filename)
 	return zw;
 }
 
-string getFileType(string filename)
+string getFileType(const string& filename)
 {
 	size_t lastpos = filename.rfind(".", filename.length());
 	size_t neu_pos;
@@ -1382,12 +1382,12 @@ int clipInt(int input, int high, int low)
 	return input;
 }
 
-bool numericStrToBool(std::string input)
+bool numericStrToBool(const std::string& input)
 {
 	return (std::stoi(input) != 0);
 }
 
-bool stringToBoolean(std::string input)
+bool stringToBoolean(const std::string& input)
 {
 	return (input == "TRUE");
 }

@@ -31,7 +31,7 @@ class CTfLiteClass
         int input_i;
         int im_height, im_width, im_channel;
 
-        long GetFileSize(std::string filename);
+        long GetFileSize(const std::string& filename);
         bool ReadFileToModel(std::string _fn);
         void MakeStaticResolver();
 

@@ -337,14 +337,24 @@ between v16 and v17:
   CNN inference loop (`ClassFlowCNNGeneral.cpp`). Removes per-cycle heap churn at the default INFO
   level; identical behavior under DEBUG. The macro is reusable for other hot paths
   (`ClassFlowPostProcessing` / `ClassFlowAlignment`) if needed later.
-- ⬜ **`std::string` pass-by-value across signatures** (configFile, ClassControllCamera,
-  server_*). Convert hot ones to `const std::string&` to cut heap alloc/free churn.
-  Note: the per-cycle virtual `doFlow(string time)` (14 sites) was assessed and **skipped**
-  — `time` is a short timestamp copied ~10×/cycle and small strings are SSO (no heap), so
-  it's low value vs. the risk of changing a virtual signature across all overrides. Target
-  instead functions that copy long/variable strings in loops.
-- ⬜ **Shrink `char zw[1024]` stack buffers** (7 sites: configFile, ClassFlow*, server_ota,
-  softAP). Most format short strings; ~128–256 B is plenty. Frees task stack.
+- ✅ **`std::string` pass-by-value → `const&` (alpha.14).** Converted the **read-only** helpers
+  that only `.c_str()`/read the param — the hot file/path utilities in `Helper.{h,cpp}`
+  (`DeleteFile`, `RenameFile`, `RenameFolder`, `MakeDir`, `FileExists`, `FolderExists`,
+  `getFileType`, `getFileFullFileName`, `getDirectory`, `findDelimiterPos`, `numericStrToBool`,
+  `stringToBoolean`) plus `GetFileSize` (CTfLiteClass + CCamera), `delete_all_in_directory`, and
+  `isNewParagraph` (ConfigFile + ClassFlow). The compiler accepting `const&` confirms each is
+  read-only. **Deliberately left by-value:** the transform helpers that *mutate* their param and
+  return it (`toUpper`/`toLower`/`trim`/`ZerlegeZeile`/`FormatFileName`/`CopyFile`/`send_file`) —
+  by-value is idiomatic there and `const&` would just force an internal copy (no win). `doFlow(string
+  time)` stays skipped (SSO, per the earlier note).
+- ✅ **`char zw[1024]` buffers — assessed, kept (alpha.14).** On inspection these are **not**
+  wasteful format buffers: the configFile / ClassFlow / ClassFlowControll ones back `fgets(zw, 1024,
+  …)` over **config-line** reads (lines can legitimately be long — passwords, URLs, multi-token ROI
+  rows), `softAP.cpp` `buf[1024]` is a TCP **recv chunk** (bigger = fewer syscalls), and
+  `MainFlowControl` `_query[512]` is an HTTP **query** parser. Their size is a *correctness* bound,
+  not slack — shrinking risks truncation. The 2–3 genuinely-short readers (align.txt, prevalue.ini,
+  update.txt) run only at boot/save on the large main-flow stack, so the few-hundred-byte saving is
+  negligible. Net: a safe shrink isn't worth the truncation risk; left as-is.
 - ✅ **Removed disabled dead block** at `ClassFlowMQTT.cpp:338` (commented-out "no longer a
   use case" branch).
 - ✅ **Implemented the "Skip Messages on Error" feature** (`ErrorMessage`), which was a
@@ -354,8 +364,15 @@ between v16 and v17:
   valid value** instead. Also fixed the default init (`false`→`true`, matching the documented
   default) and rewrote the contradictory param-doc. `ClassFlowPostProcessing.cpp` +
   `param-docs/.../ErrorMessage.md`. UI label "Skip Messages on Error" now matches behavior.
-- ⬜ **Audit vendored `miniz`** (`jomjol_fileserver_ota/miniz`, ~11k LOC) — confirm which
-  APIs the zip backup/restore actually uses; large surface to carry.
+- ✅ **Audited vendored `miniz` (alpha.14).** The OTA path uses only **6 reader/inflate APIs**
+  (`mz_zip_reader_init_file` / `_get_num_files` / `_file_stat` / `_extract_file_to_heap` / `_end`,
+  `mz_free`) — **no** compression/writer (`tdefl_*` / `mz_zip_writer_*`) usage anywhere first-party.
+  Finding: the unused deflate+writer half is **not** flash bloat — the linker's `--gc-sections`
+  already strips unreferenced functions (measured: defining `MINIZ_NO_DEFLATE_APIS` changed the
+  binary by 32 B). The one real waste was the recursive source glob compiling miniz's **example
+  programs** (`miniz/examples/*.c`, each with its own `main()`); now excluded in the component
+  `CMakeLists.txt`. Kept the full library source (read APIs intact; a future zip *backup* feature
+  could need the writer).
 - 💡 No fully-unused *components*: all 15 are wired into the firmware.
 
 ### SD / flash write-wear review (2026-05-30)
@@ -390,9 +407,11 @@ between v16 and v17:
      buffers). Look for buffers that can be pooled/reused across cycles instead of
      reallocated (PSRAM fragmentation + alloc cost). See `ClassFlowTakeImage.cpp`,
      `ClassFlowAlignment.cpp`, `ClassFlowCNNGeneral.cpp`, `CImageBasis.cpp`.
-   - **Alignment cost:** the rotate/shift search over the full frame each cycle is the
-     heaviest non-inference step — tie in with FastRead §2 (reuse cached transform, only
-     re-align on the full-validation pass).
+   - ✅ **Alignment cost — DONE (alpha.14).** The full-frame rotate/shift + marker search is no
+     longer paid every round: `AlignmentInterval=N` reuses the cached transform between full
+     searches; a no-rotation dead-band skips the full-frame rotate when the angle is ~0; and
+     `Crop`/`Mask` shrink the analysed frame. Validated on device (see §6.1). Remaining tie-in
+     with FastRead §2 (re-align only on the full-validation pass) is now trivial via the interval.
    - **Resize/cut:** `Resize()`/`CutAndSave()` run per ROI every cycle; check the
      interpolation cost and whether output buffers can be reused.
    - **JPEG decode/encode:** confirm decode happens once per capture (not repeatedly) and
@@ -696,13 +715,17 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
        itself**, and a *static* region cut isn't safe across resolutions (a higher-res config would
        crash on the NULL STBI alloc — which is exactly the alpha.11 boot loop). Region kept at the
        known-good ~2.1 MB for safety.
-   - ➡️ **To actually reclaim PSRAM: per-config boot-time sizing.** Determine the configured model
-     size (stat `[Digits]`/`[Analog] Model=` files) **and** the image-step need for the configured
-     camera resolution at boot, then `reserve_psram_shared_region()` to
-     `max(arena+model, image_peak_for_this_res) + margin`. This is per-config (safe for all
-     resolutions) where the static approach is not. Also make the STBI NULL path degrade gracefully
-     (failed round + clear log) instead of crashing, as a safety net. The `MEM-PROFILE` logs stay in
-     to drive this.
+   - ✅ **Per-config boot-time sizing — DONE (alpha.13).** `reserve_psram_shared_region()` now sizes
+     the region at boot to `max(TENSOR_ARENA_SIZE + MAX_MODEL_SIZE, 2 × IMAGE_SIZE)`. The camera
+     output is fixed VGA (`FRAMESIZE_VGA`), so the image-step peak is deterministic — measured
+     **1,536,046 B**, and the `2 × IMAGE_SIZE` (1.84 MB) floor sits ~20% above it. This replaced the
+     static ~2.1 MB worst-case-model size, **freeing ~330 KB** (≈150 KB → ≈480 KB free), and the
+     floor tracks `IMAGE_SIZE` so cropping the analysed area (alpha.14 §6) shrinks the region
+     automatically. `MAX_MODEL_SIZE` also right-sized to 512 KB (largest shipped 356 KB + margin),
+     with oversized models rejected gracefully at load. `MEM-PROFILE` logs retained.
+   - ⬜ **Remaining safety net:** make the STBI NULL path degrade gracefully (failed round + clear
+     log) instead of returning NULL → crash, so a future higher-res/larger-image config can't boot-
+     loop the way alpha.11 did.
    - Other headroom levers: **himem** (upper 4 MB; complex) or the **ESP32-S3** (8 MB+ mapped). TLSF
      is already the IDF default allocator; no change needed there.
 5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**

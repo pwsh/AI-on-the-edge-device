@@ -248,7 +248,7 @@ void CTfLiteClass::GetInputTensorSize()
 }
 
 
-long CTfLiteClass::GetFileSize(std::string filename)
+long CTfLiteClass::GetFileSize(const std::string& filename)
 {
   struct stat stat_buf;
   long rc = -1;

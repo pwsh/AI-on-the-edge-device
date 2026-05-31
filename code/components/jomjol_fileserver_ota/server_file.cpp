@@ -924,7 +924,7 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-void delete_all_in_directory(std::string _directory)
+void delete_all_in_directory(const std::string& _directory)
 {
     struct dirent *entry;
     DIR *dir = opendir(_directory.c_str());

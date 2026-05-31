@@ -1272,7 +1272,7 @@ bool CCamera::loadNextDemoImage(camera_fb_t *fb)
     return true;
 }
 
-long CCamera::GetFileSize(std::string filename)
+long CCamera::GetFileSize(const std::string& filename)
 {
     struct stat stat_buf;
     long rc = stat(filename.c_str(), &stat_buf);

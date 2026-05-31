@@ -16,7 +16,7 @@ void ClassFlow::SetInitialParameter(void)
 	disabled = false;
 }
 
-bool ClassFlow::isNewParagraph(string input)
+bool ClassFlow::isNewParagraph(const string& input)
 {
 	if ((input[0] == '[') || ((input[0] == ';') && (input[1] == '[')))
 	{
