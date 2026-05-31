@@ -21,6 +21,9 @@
 #include "esp_chip_info.h"
 #include "esp_timer.h"
 #include "esp_private/esp_clk.h"
+#include "esp_psram.h"
+#include "esp_heap_caps.h"
+#include "esp_flash.h"
 #include "ClassControllCamera.h"
 
 #include <stdio.h>
@@ -209,6 +212,23 @@ esp_err_t info_get_handler(httpd_req_t *req)
     else if (_task.compare("CPUFrequency") == 0)
     {
         httpd_resp_sendstr(req, (to_string(esp_clk_cpu_freq() / 1000000) + " MHz").c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("PSRAMSize") == 0)   // total external PSRAM chip size (bytes)
+    {
+        httpd_resp_sendstr(req, to_string((unsigned long) esp_psram_get_size()).c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("PSRAMFree") == 0)   // currently free PSRAM (bytes)
+    {
+        httpd_resp_sendstr(req, to_string((unsigned long) heap_caps_get_free_size(MALLOC_CAP_SPIRAM)).c_str());
+        return ESP_OK;
+    }
+    else if (_task.compare("FlashSize") == 0)   // on-device SPI flash chip size (bytes)
+    {
+        uint32_t flashSize = 0;
+        esp_flash_get_size(NULL, &flashSize);
+        httpd_resp_sendstr(req, to_string((unsigned long) flashSize).c_str());
         return ESP_OK;
     }
     else if (_task.compare("CPUTemperature") == 0)
@@ -479,6 +499,15 @@ esp_err_t sysinfo_handler(httpd_req_t *req)
     std::string sdTotalMB = getSDCardPartitionSize();
     std::string sdFreeMB = getSDCardFreePartitionSpace();
 
+    // On-device memory / storage: external PSRAM, internal heap, SPI flash chip (bytes)
+    size_t psramSize    = esp_psram_get_size();
+    size_t psramFree    = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    size_t psramLargest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    size_t intHeapFree  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t intHeapTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    uint32_t flashSize  = 0;
+    esp_flash_get_size(NULL, &flashSize);
+
     zw = string("[{") +
         "\"firmware\": \"" + gitversion + "\"," +
         "\"buildtime\": \"" + buildtime + "\"," +
@@ -499,6 +528,12 @@ esp_err_t sysinfo_handler(httpd_req_t *req)
         "\"cameraResolution\": \"" + camResolution + "\"," +
         "\"sdCardTotalMB\": \"" + sdTotalMB + "\"," +
         "\"sdCardFreeMB\": \"" + sdFreeMB + "\"," +
+        "\"psramSize\": \"" + std::to_string((unsigned long) psramSize) + "\"," +
+        "\"psramFree\": \"" + std::to_string((unsigned long) psramFree) + "\"," +
+        "\"psramLargestFreeBlock\": \"" + std::to_string((unsigned long) psramLargest) + "\"," +
+        "\"flashSize\": \"" + std::to_string((unsigned long) flashSize) + "\"," +
+        "\"internalHeapFree\": \"" + std::to_string((unsigned long) intHeapFree) + "\"," +
+        "\"internalHeapTotal\": \"" + std::to_string((unsigned long) intHeapTotal) + "\"," +
         "\"hostname\": \"" + *getHostname() + "\"," +
         "\"IPv4\": \"" + *getIPAddress() + "\"," +
         "\"freeHeapMem\": \"" + freeheapmem + "\"" +

@@ -197,8 +197,14 @@ table {
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>			
-			<h3>SD Card Info</h3>
+		<tr>
+			<h3>Storage Info</h3>
+		</tr>
+		<tr>
+			<td>On-device flash chip size:</td>
+			<td>
+				<output id="FlashSize"></output>
+			</td>
 		</tr>
 		<tr>
 			<td>SD card manufacturer:</td>
@@ -249,17 +255,23 @@ table {
 			<col span="1" style="width: 35%;">
 			<col span="1" style="width: 65%;">
 		</colgroup>
-		<tr>			
+		<tr>
 			<h3>Memory Info</h3>
 		</tr>
 		<tr>
-			<td>Total Free (Int + Ext):</td>	
+			<td>Total Free (Int + Ext):</td>
 			<td>
 				<output id="RAMTotalFree"></output>
 			</td>
 		</tr>
 		<tr>
-			<td>Ext. RAM - Free:</td>	
+			<td>Ext. RAM (PSRAM) - Total Size:</td>
+			<td>
+				<output id="ExtRAMTotal"></output>
+			</td>
+		</tr>
+		<tr>
+			<td>Ext. RAM - Free:</td>
 			<td>
 				<output id="ExtRAMFree"></output>
 			</td>
@@ -585,9 +597,31 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 		xhttp.send();
 	}
 
+	// bytes -> "8,388,608 byte (8 MB)"
+	function fmtBytes(b) {
+		b = parseInt(b, 10);
+		if (isNaN(b)) return "n/a";
+		var mb = b / 1048576;
+		return b.toLocaleString() + " byte (" + (mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)) + " MB)";
+	}
+
+	function loadBytesField(type, elementId) {
+		var url = getDomainname() + '/info?type=' + type;
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function () {
+			if (this.readyState == 4 && this.status == 200) {
+				document.getElementById(elementId).value = fmtBytes(xhttp.response);
+			}
+		}
+		xhttp.open("GET", url, true);
+		xhttp.send();
+	}
+
 	function init()
 	{
 		loadMemoryInfo();
+		loadBytesField('PSRAMSize', 'ExtRAMTotal');
+		loadBytesField('FlashSize', 'FlashSize');
 		loadLastRestart();
 		loadUptime();
 		loadFWVersion();
