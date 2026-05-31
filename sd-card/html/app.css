@@ -1,0 +1,205 @@
+/* =============================================================================
+ * app.css - shared design system for the AI-on-the-edge-device web UI.
+ *
+ * Loaded by every page (after style.css, before/with theme.css). Components use
+ * var(--token, lightFallback): in light mode the fallback applies; in dark mode
+ * theme.css defines the same --token under html[data-theme="dark"], so every
+ * component themes automatically with no extra dark rules.
+ *
+ * Everything is class-scoped (.app-*, .appnav-*, .acc-*, .btn, .frow ...) so it
+ * never restyles a bare <table>/<input> on legacy pages that haven't migrated.
+ * ========================================================================== */
+
+:root {
+    --app-radius: 8px;
+    --app-gap: 12px;
+    --app-maxw: 1180px;
+    --app-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+    /* light-mode fallbacks for the tokens theme.css overrides in dark mode */
+    --app-accent: #2c7be5;
+    --app-accent-fg: #ffffff;
+}
+
+/* ---- Layout container -------------------------------------------------------*/
+.app-container {
+    max-width: var(--app-maxw);
+    margin: 0 auto;
+    padding: 16px;
+    box-sizing: border-box;
+    color: var(--fg, #1c2024);
+}
+.app-h { margin: 0 0 12px; font-size: 1.4em; font-weight: 600; }
+.app-sub { color: var(--muted, #5a636b); font-size: 0.92em; margin: 0 0 16px; }
+
+/* ---- Cards -----------------------------------------------------------------*/
+.app-card {
+    background: var(--panel, #ffffff);
+    border: 1px solid var(--border, #d8dee4);
+    border-radius: var(--app-radius);
+    box-shadow: var(--app-shadow);
+    padding: 14px 16px;
+    margin: 0 0 14px;
+    box-sizing: border-box;
+}
+.app-cardgrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--app-gap);
+}
+
+/* ---- Buttons ---------------------------------------------------------------*/
+.btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; font-size: 15px; line-height: 1.1;
+    border: 1px solid var(--border, #c3ccd6);
+    border-radius: 6px; cursor: pointer;
+    background: var(--panel, #f4f6f8); color: var(--fg, #1c2024);
+    text-decoration: none;
+}
+.btn:hover { background: var(--panel-alt, #e9edf1); }
+.btn-primary {
+    background: var(--app-accent, #2c7be5); color: var(--app-accent-fg, #fff);
+    border-color: transparent;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-danger { background: #d9534f; color: #fff; border-color: transparent; }
+.btn-danger:hover { filter: brightness(1.06); }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Accordion (generic; built by App.buildAccordions or markup) -----------*/
+.acc { border: 1px solid var(--border, #d8dee4); border-radius: var(--app-radius);
+       overflow: hidden; margin: 0 0 12px; background: var(--panel, #fff); }
+.acc-head {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0; padding: 11px 14px; cursor: pointer; user-select: none;
+    background: var(--panel-alt, #eef3f8); color: var(--fg, #1c2024);
+    font-size: 1.05em; font-weight: 600;
+    border-bottom: 1px solid var(--border, #d8dee4);
+}
+.acc-head:hover { filter: brightness(0.98); }
+.acc-ico { font-size: 1.05em; line-height: 1; }
+.acc-chevron { margin-left: auto; color: var(--muted, #6b7785); font-size: 0.85em;
+               transition: transform .15s ease; }
+.acc.collapsed .acc-chevron { transform: rotate(-90deg); }
+.acc.collapsed .acc-body { display: none; }
+.acc-body { padding: 12px 14px; }
+
+/* ---- Form rows (label + control, stack on mobile) --------------------------*/
+.frow { display: flex; align-items: center; gap: 12px; padding: 6px 0;
+        border-bottom: 1px solid var(--border, #f1f3f5); }
+.frow:last-child { border-bottom: none; }
+.frow > .frow-label { flex: 0 0 38%; max-width: 38%; }
+.frow > .frow-ctrl { flex: 1 1 auto; min-width: 0; }
+.frow .frow-ctrl input[type=text], .frow .frow-ctrl input[type=number],
+.frow .frow-ctrl select { max-width: 100%; box-sizing: border-box; }
+
+/* ---- Sticky action bar -----------------------------------------------------*/
+.actionbar {
+    position: sticky; bottom: 0; z-index: 30;
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding: 10px;
+    background: var(--panel, rgba(255,255,255,0.97));
+    border-top: 1px solid var(--border, #d3dae1);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+}
+.actionbar .app-spacer { flex: 1 1 auto; }
+
+/* ---- Name-anchored help tooltip (shared with the config page) --------------*/
+.app-nt { position: relative; display: inline-block; }
+.app-help { border-bottom: 1px dotted var(--muted, #888); cursor: help; }
+.app-nt .tooltiptext {
+    visibility: hidden;
+    width: 520px; max-width: 92vw; box-sizing: border-box;
+    position: absolute; z-index: 40; top: 100%; left: 0;
+    padding: 6px 8px;
+    background: var(--panel, #fcfcfc); color: var(--fg, #1c2024);
+    border: 1px solid var(--border, #222); border-radius: 6px;
+    box-shadow: var(--app-shadow); font-size: 0.9em; font-weight: normal;
+}
+.app-nt:hover .tooltiptext { visibility: visible; }
+
+/* =============================================================================
+ * Top navigation bar (index.html shell): horizontal + tap dropdowns on desktop,
+ * hamburger -> full-height accordion on mobile. No :hover dependency (touch ok).
+ * ========================================================================== */
+.appnav {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--panel, #2f3b52); color: var(--app-navfg, #fff);
+    box-shadow: var(--app-shadow);
+}
+.appnav-inner {
+    max-width: var(--app-maxw); margin: 0 auto;
+    display: flex; align-items: center; gap: 10px; padding: 0 10px;
+    min-height: 52px;
+}
+.appnav-brand {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--app-navfg, #fff); text-decoration: none; font-weight: 600;
+    font-size: 1.05em; white-space: nowrap;
+}
+.appnav-brand img { width: 30px; height: 30px; }
+.appnav-burger {
+    display: none; margin-left: auto;
+    background: transparent; border: 0; color: var(--app-navfg, #fff);
+    font-size: 26px; line-height: 1; cursor: pointer; padding: 6px 8px;
+}
+.appnav-menu { margin-left: auto; }
+.appnav-menu > ul { list-style: none; display: flex; margin: 0; padding: 0; gap: 2px; }
+.appnav-menu > ul > li { position: relative; }
+.appnav-menu a, .appnav-top {
+    display: block; box-sizing: border-box;
+    background: transparent; border: 0;
+    color: var(--app-navfg, #fff); font: inherit; font-size: 0.97em;
+    padding: 14px 12px; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.appnav-menu a:hover, .appnav-top:hover,
+.appnav-menu li.open > .appnav-top { background: rgba(255,255,255,0.14); }
+.appnav-sub {
+    list-style: none; margin: 0; padding: 6px 0; min-width: 240px;
+    position: absolute; top: 100%; left: 0; display: none;
+    background: var(--panel, #38445e); border: 1px solid var(--border, rgba(0,0,0,0.2));
+    border-radius: 0 0 var(--app-radius) var(--app-radius); box-shadow: var(--app-shadow);
+}
+.appnav-menu li.open > .appnav-sub { display: block; }
+.appnav-sub a { padding: 9px 16px; font-size: 0.95em; }
+.appnav-sub .appnav-group {
+    padding: 8px 16px 2px; font-size: 0.74em; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted, #b9c2d0); cursor: default;
+}
+.appnav-caret { font-size: 0.7em; opacity: 0.8; margin-left: 4px; }
+/* the theme toggle now lives inside the bar instead of floating fixed */
+.appnav #themeToggle { position: static; color: var(--app-navfg, #fff); font-size: 20px; padding: 4px 6px; }
+
+/* item highlighted (e.g. Pause while paused) */
+.appnav .is-active > a, .appnav .is-active > .appnav-top {
+    background: #d39e00; color: #1b1b1b; font-weight: bold;
+}
+
+@media (max-width: 860px) {
+    .appnav-burger { display: block; }
+    .appnav-menu {
+        display: none; position: absolute; top: 100%; left: 0; right: 0;
+        background: var(--panel, #2f3b52);
+        max-height: calc(100vh - 52px); overflow-y: auto;
+        box-shadow: var(--app-shadow);
+    }
+    .appnav-menu.open { display: block; }
+    .appnav-menu > ul { flex-direction: column; gap: 0; }
+    .appnav-menu > ul > li { border-top: 1px solid rgba(255,255,255,0.08); }
+    .appnav-sub {
+        position: static; display: none; min-width: 0; border: 0; box-shadow: none;
+        border-radius: 0; padding: 0 0 6px; background: rgba(0,0,0,0.18);
+    }
+    .appnav-menu li.open > .appnav-sub { display: block; }
+    .appnav-sub a { padding-left: 28px; }
+}
+
+/* ---- Responsive helpers shared by migrated content pages -------------------*/
+@media (max-width: 760px) {
+    .app-container { padding: 10px; }
+    .frow { flex-direction: column; align-items: stretch; gap: 4px; }
+    .frow > .frow-label { flex-basis: auto; max-width: 100%; font-weight: 600; }
+    .frow .frow-ctrl input[type=text], .frow .frow-ctrl input[type=number],
+    .frow .frow-ctrl select { width: 100%; }
+    .actionbar .btn { width: 100%; }
+}
