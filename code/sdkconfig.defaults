@@ -189,3 +189,9 @@ CONFIG_SPIRAM_BANKSWITCH_ENABLE=n
 #CONFIG_SPIRAM_BANKSWITCH_RESERVE is not set
 
 CONFIG_PM_ENABLE=y
+
+# Save a coredump (ELF) to the `coredump` flash partition on panic, so a backtrace
+# can be extracted over USB with espcoredump.py.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECK_BOOT=y
