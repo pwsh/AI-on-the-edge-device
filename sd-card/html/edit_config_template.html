@@ -196,23 +196,69 @@
 		display: inline-block;
 	}
 
-    /* ---- Responsive: on narrow screens stack the fixed 3-column table into blocks ---------------
-       (label / value / help one above the other) and let the inputs use the full width. Desktop
-       layout is unchanged - this only applies below the breakpoint. */
+    /* ---- Modern layout: centre the content on wide desktops so lines aren't absurdly long ---- */
+    body { max-width: 1180px; margin: 0 auto; }
+
+    /* ---- Collapsible accordion sections (built at runtime in buildConfigUI) ------------------ */
+    .cfg-head { cursor: pointer; }
+    .cfg-head td {
+        background: #eef3f8;
+        border-top: 1px solid #d3dae1;
+        border-bottom: 1px solid #d3dae1 !important;
+        padding: 9px 10px !important;
+    }
+    .cfg-head:hover td { background: #e3ebf4; }
+    .cfg-head h4 { display: flex; align-items: center; gap: 8px; margin: 0; }
+    .cfg-head h4 label { cursor: pointer; }
+    .cfg-head h4 a { font-weight: normal; }
+    .cfg-ico { font-size: 1.05em; line-height: 1; }
+    .cfg-chevron {
+        margin-left: auto; color: #6b7785; font-size: 0.85em;
+        transition: transform .15s ease; user-select: none;
+    }
+    tbody.cfg-section.collapsed .cfg-chevron { transform: rotate(-90deg); }
+    tbody.cfg-section.collapsed > tr:not(.cfg-head) { display: none !important; }
+    tbody.cfg-section > tr:not(.cfg-head) > td { border-bottom: 1px solid #f1f3f5; }
+
+    /* ---- Sticky save bar pinned to the bottom of the viewport -------------------------------- */
+    #cfg_savebar {
+        position: sticky; bottom: 0; z-index: 3;
+        margin-top: 14px;
+        padding: 10px;
+        background: rgba(255,255,255,0.97);
+        border-top: 1px solid #d3dae1;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+        display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    #cfg_savebar .button { width: auto; min-width: 150px; }
+    .cfg-linkbtn {
+        background: none; border: 1px solid #c3ccd6; border-radius: 5px;
+        padding: 6px 12px; font-size: 14px; cursor: pointer; color: #2c3e50;
+    }
+    .cfg-linkbtn:hover { background: #eef3f8; }
+    .cfg-spacer { flex: 1 1 auto; }
+
+    /* ---- Responsive: on narrow screens stack the fixed 3-column table into blocks ------------ */
     @media (max-width: 760px) {
         body { padding: 0 8px; }
         .table { table-layout: auto; }
         .table colgroup { display: none; }
         .table tr, .table td { display: block; width: 100%; box-sizing: border-box; }
         .table td { border: none; padding: 2px 0; }
-        .table tr { padding: 4px 0; }
-        /* keep the section-heading rows visually separated */
-        .table td[colspan="3"] { border-bottom: 2px solid lightgray; padding-bottom: 4px; }
+        .table tr { padding: 6px 0; }
+        /* the label cell of each setting: make it stand out above its input */
+        .table td.indent1, .table td.indent2 { font-weight: 600; padding-top: 6px; }
         .indent1, .indent2 { padding-left: 0; }
         input[type=text], input[type=number], select, .select_large, .button {
-            width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+            width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; margin-right: 0;
         }
         input[type=color] { width: 60px; }
+        /* keep accordion headers compact and full-bleed */
+        .cfg-head td { padding: 10px 8px !important; font-weight: 400; }
+        .cfg-head h4 { font-size: 1.1em; }
+        /* the wide 600px tooltip popup would overflow a phone - make it fit the screen */
+        .tooltip .tooltiptext { width: calc(100vw - 24px); left: 0; margin-left: 0; box-sizing: border-box; }
+        #cfg_savebar .button { width: 100%; }
     }
 </style>
 
@@ -236,27 +282,28 @@
     <h2>Configuration</h2>
 
     <details id="desc_details">
-        <summary><b>CLICK HERE</b> for usage description. More infos in documentation: 
-            <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters" target="_blank">Parameter</a>
+        <summary>ℹ️ <b>How to use this page</b> &mdash; click to expand. Full reference:
+            <a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters" target="_blank">Parameter documentation</a>
         </summary>
         <p>
-            This page lists all available configuration parameters of the device.<br>
-            The description of each parameter can be shown by hovering over or by clicking the <img src="help.png" width="16px"> icon.
-        </p>
-        <p>	
-            The page gets opened with the default view which should be sufficient for regular configuration tasks. Enabling the <b>"Show Expert Parameters"</b>
-            some expert parameters (light red background color) will be added to the parameter list. Additionally the button <b>"Edit "Config.ini" File"</b>
-            to edit the underlaying configuration file (config.ini) manually is now shown on top of the page. This function should be only used for special cases.
+            Every device setting lives here, grouped into collapsible sections &mdash; click a section header
+            to fold or unfold it. Hover a setting name (or click its <img src="help.png" width="16px"> icon) to
+            see what it does.
         </p>
         <p>
-            Sections (entire functionality) or single parameters having a checkbox can be enabled or disabled.
-            Disabling a complete section results in a disabled functionality. Whenever only a single parameter of a section is disabled
-            the hard-coded default value is used for the disabled parameter.
+            The default view covers everyday configuration. Tick <b>"Show Expert Parameters"</b> to reveal
+            advanced settings (shown with a light&nbsp;red background); this also adds the
+            <b>"Edit config.ini (raw)"</b> button for editing the raw file directly &mdash; only needed in
+            special cases.
         </p>
         <p>
-            Don't forget to save the changes with the button <b>"Save Config"</b> at the bottom of this page.<br>
+            A checkbox next to a section or a single setting enables or disables it. Disabling a whole section
+            turns that feature off; disabling one setting falls back to its built-in default.
+        </p>
+        <p>
+            Use <b>"💾 Save Config"</b> in the bar at the bottom to store your changes.<br>
             <label id="reboot_text" name="reboot_text">
-                To apply the new configuration a restart of the device is neccessary: <b>"Reboot to apply changes"</b>
+                The new configuration takes effect after a restart: <b>"Reboot to apply changes"</b>.
             </label>
         </p>
     </details>
@@ -280,7 +327,7 @@
                 <label for="ExpertModus_enabled">Show Expert Parameters</label> 
             </td>
             <td>
-                <button style="display:none;" class="button" id="Button_Edit_Config_Raw" onclick="editConfigRaw()">Edit Config file in raw mode</button>
+                <button style="display:none;" class="button" id="Button_Edit_Config_Raw" onclick="editConfigRaw()">✏️ Edit config.ini (raw)</button>
             </td>
         </tr>
 
@@ -2261,8 +2308,12 @@
         </tr>
     </table>
 
-    <hr>
-    <button class="button" onclick="saveTextAsFile()">Save Config</button>
+    <div id="cfg_savebar">
+        <button class="button" onclick="saveTextAsFile()">💾 Save Config</button>
+        <button type="button" class="cfg-linkbtn" onclick="cfgToggleAll()">Collapse / expand all</button>
+        <span class="cfg-spacer"></span>
+        <span class="description">Changes take effect after the next reboot.</span>
+    </div>
 </div>
 
 <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
@@ -2316,8 +2367,9 @@ function LoadConfigNeu() {
     UpdateInputIndividual(sel);
 	
     UpdateExpertModus();
-    UpdateTooltipModus();	
-    document.getElementById("divall").style.display = ''; 
+    UpdateTooltipModus();
+    document.getElementById("divall").style.display = '';
+    try { buildConfigUI(); } catch (e) { console.error('buildConfigUI', e); }
 
     if(!document.getElementById("TakeImage_CamZoom_value1").selectedIndex) {
         // EnDisableItem(_status, _param, _category, _cat, _name, _optional, _number = -1)
@@ -3621,6 +3673,86 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
     EnDisableItem(_category[_cat]["enabled"], _param, _category, _cat, _name, _optional, _number);
 }
 	
+/* Turn the flat parameter table into collapsible, icon-labelled accordion sections.
+   Runs once after the config is loaded; regroups the existing rows into one <tbody> per
+   section heading so a section can be folded without disturbing the per-row show/hide logic
+   (collapse uses display:none !important only while collapsed). */
+function cfgSectionIcon(text) {
+    var t = (text || "").toLowerCase();
+    if (t.indexOf("configuration view") > -1) return "⚙️";   // gear
+    if (t.indexOf("take image") > -1)         return "📷";   // camera
+    if (t.indexOf("alignment") > -1)          return "🎯";   // target
+    if (t.indexOf("digit") > -1)              return "🔢";   // 1234
+    if (t.indexOf("analog") > -1)             return "🕐";   // clock
+    if (t.indexOf("post-processing") > -1)    return "🧮";   // abacus
+    if (t.indexOf("mqtt") > -1)               return "📡";   // antenna
+    if (t.indexOf("influxdb") > -1)           return "🗄️"; // file cabinet
+    if (t.indexOf("webhook") > -1)            return "🔗";   // link
+    if (t.indexOf("gpio") > -1)               return "🔌";   // plug
+    if (t.indexOf("auto timer") > -1)         return "⏱️";   // stopwatch
+    if (t.indexOf("data logging") > -1)       return "📝";   // memo
+    if (t.indexOf("debug") > -1)              return "🐞";   // bug
+    if (t.indexOf("system") > -1)             return "🖥️"; // desktop
+    return "📄";                                             // page
+}
+
+function buildConfigUI() {
+    var table = document.querySelector('#divall table.table');
+    if (!table || table.getAttribute('data-enhanced')) return;
+    table.setAttribute('data-enhanced', '1');
+
+    var body = table.tBodies[0];
+    if (!body) return;
+    var rows = Array.prototype.slice.call(body.rows);
+
+    var sections = [], cur = null;
+    rows.forEach(function (row) {
+        var h = row.querySelector('h4');
+        if (h) { cur = { head: row, h: h, rows: [] }; sections.push(cur); }
+        else if (cur) { cur.rows.push(row); }
+    });
+    if (!sections.length) return;
+
+    sections.forEach(function (sec) {
+        var tb = document.createElement('tbody');
+        tb.className = 'cfg-section';
+        sec.head.classList.add('cfg-head');
+
+        // icon at the front, chevron at the end of the heading
+        var ico = document.createElement('span');
+        ico.className = 'cfg-ico';
+        ico.textContent = cfgSectionIcon(sec.h.textContent);
+        sec.h.insertBefore(ico, sec.h.firstChild);
+        var chev = document.createElement('span');
+        chev.className = 'cfg-chevron';
+        chev.textContent = '▾'; // down triangle
+        sec.h.appendChild(chev);
+
+        tb.appendChild(sec.head);
+        sec.rows.forEach(function (r) { tb.appendChild(r); });
+        table.appendChild(tb);
+
+        sec.head.addEventListener('click', function (e) {
+            // let checkboxes / links / labels in the header behave normally
+            if (e.target.closest('input, a, label')) return;
+            tb.classList.toggle('collapsed');
+        });
+    });
+
+    if (body.rows.length === 0) body.parentNode.removeChild(body);
+}
+
+/* Sticky-bar control: collapse everything if anything is open, otherwise expand all. */
+function cfgToggleAll() {
+    var secs = document.querySelectorAll('tbody.cfg-section');
+    var anyOpen = Array.prototype.some.call(secs, function (s) {
+        return !s.classList.contains('collapsed');
+    });
+    Array.prototype.forEach.call(secs, function (s) {
+        s.classList.toggle('collapsed', anyOpen);
+    });
+}
+
 /* hash #description open the details part of the page */
 function openDescription() {
     if(window.location.hash) {
