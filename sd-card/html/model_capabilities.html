@@ -1,0 +1,137 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="theme.css" type="text/css">
+<script src="theme.js"></script>
+<title>Recognition model capabilities</title>
+<style>
+:root{--ok:#1f9d55;--no:#c0392b;--star:#b8860b;--bd:#d0d4d8;--accent:#2c7be5;}
+html[data-theme=dark]{--bd:#3e3e42;--ok:#3fb96b;--no:#e06c64;--star:#d9b44a;--accent:#4ea3e0;}
+html[data-theme=dark] body{background:#1e1e1e;color:#dcdcdc;}
+html[data-theme=dark] .card,html[data-theme=dark] table{background:#252526;}
+html[data-theme=dark] th{background:#2d2d30;}
+html[data-theme=dark] .sub,html[data-theme=dark] .reslist{color:#9a9a9a;}
+html[data-theme=dark] .pick{background:#2a3441;border-color:#39506b;}
+html[data-theme=dark] .note{background:#33301f;border-color:#5a4a22;}
+html[data-theme=dark] code{background:#2d2d30;}
+html[data-theme=dark] a{color:#4ea3e0;}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:24px;color:#1c2024;background:#fafbfc;line-height:1.45;}
+h1{margin:0 0 4px;font-size:1.6em;}
+h2{margin:26px 0 6px;border-bottom:2px solid var(--bd);padding-bottom:4px;}
+.sub{color:#5a636b;margin:0 0 16px;font-size:.92em;}
+.cards{display:flex;flex-wrap:wrap;gap:14px;}
+.card{flex:1 1 300px;border:1px solid var(--bd);border-radius:8px;padding:12px 14px;background:#fff;}
+.card h3{margin:0 0 6px;}
+.card .fam{font-size:.8em;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);font-weight:bold;}
+.tablewrap{overflow-x:auto;margin:8px 0;}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:.9em;background:#fff;}
+th,td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top;}
+th{background:#eef1f3;}
+td.c,th.c{text-align:center;}
+.ok{color:var(--ok);font-weight:bold;}.no{color:var(--no);font-weight:bold;}
+.pick{background:#eef5ff;border:1px solid #cfe0fb;border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.95em;}
+.pick b{color:var(--accent);}
+.note{background:#fff7e6;border:1px solid #f0d99a;border-radius:6px;padding:10px 14px;margin:16px 0;font-size:.92em;}
+.best{font-weight:bold;color:var(--ok);}
+code{font-family:Consolas,monospace;background:#eef1f3;padding:1px 4px;border-radius:3px;}
+.set{cursor:help;border-bottom:1px dotted #888;}
+</style></head><body>
+
+<h1>Recognition model capabilities</h1>
+<p class="sub">The neural-network (TFLite) models shipped with AI-on-the-edge, what each is for, and how to
+pick the right one for your meter. Based on the official
+<a href="https://jomjol.github.io/AI-on-the-edge-device-docs/Choosing-the-Model/" target="_blank" rel="noopener">Choosing&nbsp;the&nbsp;Model</a> guide.</p>
+
+<div class="note"><b>Two outputs, two jobs.</b> Every digit/analog ROI is read by a model that returns either a
+<b>discrete class</b> (a whole number, e.g. exactly "7") or a <b>continuous value</b> (a fractional reading, e.g.
+"7.3"). Continuous models keep reading correctly <i>while a digit or pointer is rolling between values</i> - that's
+the whole point of them. Pick a <b>digit</b> model for the digit ROIs and an <b>analog</b> model for the analog ROIs;
+they're independent.</p></div>
+
+<h2>The four model families</h2>
+<div class="cards">
+  <div class="card">
+    <div class="fam">Analog &middot; continuous</div>
+    <h3>ana-cont</h3>
+    <div>Reads the <b>angle of an analog pointer</b> as a continuous 0.0-9.9. The recommended choice for
+    <b>all analog dial meters</b>, especially water meters.</div>
+    <div class="reslist">Continuous output &middot; supports Extended&nbsp;Resolution &middot; trained on the same data as ana-class100.</div>
+  </div>
+  <div class="card">
+    <div class="fam">Digit &middot; continuous</div>
+    <h3>dig-cont</h3>
+    <div>Reads a <b>rolling / odometer digit</b> as a continuous 0.0-9.9 using arc-tangent processing, so it stays
+    correct <b>through the transition</b> between numbers (partial digits).</div>
+    <div class="reslist">Continuous output &middot; supports Extended&nbsp;Resolution &middot; best for mechanical counters.</div>
+  </div>
+  <div class="card">
+    <div class="fam">Digit &middot; class-100</div>
+    <h3>dig-class100</h3>
+    <div>Classifies a digit into <b>100 steps (0.0-9.9)</b> - effectively continuous, also handling the
+    in-between (transition) states of rolling digits.</div>
+    <div class="reslist">100-class output &middot; supports Extended&nbsp;Resolution &middot; alternative to dig-cont - try both.</div>
+  </div>
+  <div class="card">
+    <div class="fam">Digit &middot; class-11</div>
+    <h3>dig-class11</h3>
+    <div>Classifies a digit as one of <b>11 discrete states: 0-9 plus "N"</b> (undecided/partial). Simple and
+    robust for <b>clean LCD / seven-segment</b> displays; first-generation model and the safe fallback.</div>
+    <div class="reslist">Discrete output &middot; <span class="no">no</span> Extended&nbsp;Resolution &middot; shows "N" during transitions.</div>
+  </div>
+</div>
+
+<h2>Which model for which meter?</h2>
+<div class="pick"><b>Analog dial meters</b> (water / gas pointers) &rarr; <span class="best">ana-cont</span>
+(newest: <code>ana-cont_1500_s2_q</code>). Use an ana-cont model on every analog ROI.</div>
+<div class="pick"><b>Mechanical / odometer rolling digits</b> (the digits physically roll) &rarr;
+<span class="best">dig-cont</span> (newest: <code>dig-cont_0900_s3_q</code>) or <b>dig-class100</b>. Both read
+correctly while a digit is half-rolled - essential for accurate counts.</div>
+<div class="pick"><b>Clean LCD / seven-segment digits</b> (no rolling, crisp segments) &rarr;
+<span class="best">dig-class11</span> (newest: <code>dig-class11_1910_s2_q</code>). Simplest and very robust;
+note it does <b>not</b> support Extended&nbsp;Resolution.</div>
+<div class="pick"><b>Partial / transition numbers</b> (you need a reading mid-roll) &rarr; use a <b>continuous</b>
+digit model (<span class="best">dig-cont</span> or <b>dig-class100</b>); avoid dig-class11, which reports "N" mid-roll.</div>
+<div class="pick"><b>Mixed meters</b> (digits + an analog sub-dial) &rarr; combine: a digit model on the digit ROIs and
+<b>ana-cont</b> on the analog ROIs. Set "Analog to Digit Transition Start" in post-processing for hybrid readouts.</div>
+
+<h2>Included models</h2>
+<p class="sub">Newest version in each family is generally the best choice. Hover a header for what it means.</p>
+<div class="tablewrap"><table>
+<tr>
+  <th>Model file</th>
+  <th>Family</th>
+  <th class="c"><span class="set" title="Discrete = a whole number/class; Continuous = a fractional value that stays correct mid-transition.">Output</span></th>
+  <th class="c"><span class="set" title="What the network produces per ROI.">Classes / range</span></th>
+  <th>Best for</th>
+  <th class="c"><span class="set" title="Adds an extra interpolated digit of resolution in post-processing. Only continuous / 100-class models support it.">Ext. Res.</span></th>
+  <th class="c"><span class="set" title="Network size: higher s-number = fewer parameters, smaller & faster.">Size</span></th>
+  <th class="c"><span class="set" title="-q = quantized: smaller and faster on the device, with little/no accuracy loss.">Quant.</span></th>
+</tr>
+<tr><td><code>ana-cont_1300_s2.tflite</code></td><td>Analog continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9 (pointer angle)</td><td>Analog dial meters</td><td class="c ok">yes</td><td class="c">s2</td><td class="c no">no</td></tr>
+<tr><td><code>ana-cont_1400_s2_q.tflite</code></td><td>Analog continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9 (pointer angle)</td><td>Analog dial meters</td><td class="c ok">yes</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>ana-cont_1500_s2_q.tflite</code> <span class="best">&#9733; newest</span></td><td>Analog continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9 (pointer angle)</td><td><b>Analog dial meters</b> (recommended)</td><td class="c ok">yes</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-cont_0700_s3_q.tflite</code></td><td>Digit continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9</td><td>Rolling / odometer digits</td><td class="c ok">yes</td><td class="c">s3</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-cont_0712_s3_q.tflite</code></td><td>Digit continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9</td><td>Rolling / odometer digits</td><td class="c ok">yes</td><td class="c">s3</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-cont_0800_s3_q.tflite</code></td><td>Digit continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9</td><td>Rolling / odometer digits</td><td class="c ok">yes</td><td class="c">s3</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-cont_0810_s3_q.tflite</code></td><td>Digit continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9</td><td>Rolling / odometer digits</td><td class="c ok">yes</td><td class="c">s3</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-cont_0900_s3_q.tflite</code> <span class="best">&#9733; newest</span></td><td>Digit continuous</td><td class="c">Continuous</td><td class="c">0.0-9.9</td><td><b>Rolling / odometer digits</b> (recommended)</td><td class="c ok">yes</td><td class="c">s3</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-class100-0173-s2-q.tflite</code></td><td>Digit class-100</td><td class="c">100-class</td><td class="c">0.0-9.9 (100 steps)</td><td>Digital incl. transitions</td><td class="c ok">yes</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-class100-0180-s2-q.tflite</code></td><td>Digit class-100</td><td class="c">100-class</td><td class="c">0.0-9.9 (100 steps)</td><td>Digital incl. transitions</td><td class="c ok">yes</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-class100-0182-s2_q.tflite</code> <span class="best">&#9733; newest</span></td><td>Digit class-100</td><td class="c">100-class</td><td class="c">0.0-9.9 (100 steps)</td><td><b>Digital incl. transitions</b></td><td class="c ok">yes</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-class11_1701_s2.tflite</code></td><td>Digit class-11</td><td class="c">Discrete</td><td class="c">0-9 + N (11)</td><td>Clean LCD / 7-segment</td><td class="c no">no</td><td class="c">s2</td><td class="c no">no</td></tr>
+<tr><td><code>dig-class11_1900_s2_q.tflite</code></td><td>Digit class-11</td><td class="c">Discrete</td><td class="c">0-9 + N (11)</td><td>Clean LCD / 7-segment</td><td class="c no">no</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+<tr><td><code>dig-class11_1910_s2_q.tflite</code> <span class="best">&#9733; newest</span></td><td>Digit class-11</td><td class="c">Discrete</td><td class="c">0-9 + N (11)</td><td><b>Clean LCD / 7-segment</b></td><td class="c no">no</td><td class="c">s2</td><td class="c ok">yes</td></tr>
+</table></div>
+
+<h2>Reading the model name</h2>
+<p>Filenames follow <code>[type]_[version]_[size][-q].tflite</code>:</p>
+<table>
+<tr><th>Part</th><th>Meaning</th></tr>
+<tr><td><code>type</code></td><td><code>ana-cont</code> (analog pointer, continuous), <code>dig-cont</code> (digit, continuous), <code>dig-class100</code> (digit, 100 classes), <code>dig-class11</code> (digit, 0-9+N).</td></tr>
+<tr><td><code>version</code></td><td>Four digits: first two = main version, last two = sub-version. <b>Higher is newer</b> (e.g. 1910 &gt; 1900).</td></tr>
+<tr><td><code>size</code> (s0-s3)</td><td>Network size. Higher s-number = fewer parameters &rarr; smaller and faster, with newer training.</td></tr>
+<tr><td><code>-q</code></td><td>Quantized: significantly smaller and faster on the device, typically with no noticeable accuracy loss.</td></tr>
+</table>
+
+<div class="note"><b>Not sure?</b> The guide's advice: when two models could fit (e.g. dig-cont vs dig-class100, or ana-cont vs ana-class100), <b>try both on your own meter and keep whichever reads more reliably</b>. Start with the newest version of the recommended family for your meter type, and prefer the quantized (<code>-q</code>) build.</div>
+
+</body></html>
