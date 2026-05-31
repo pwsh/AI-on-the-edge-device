@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
 <title>Info</title>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
 h1 {font-size: 2em;}
@@ -25,7 +28,8 @@ output {
 }
 
 table {
-    width: 660px;
+    width: 100%;
+    max-width: 660px;
 	padding: 5px;
 	border-collapse:collapse;
 }
@@ -35,6 +39,7 @@ table {
 </head>
 
 <body style="font-family: arial; padding: 0px 10px;">
+<div class="app-container">
 	<table>
 		<colgroup>
 			<col span="1" style="width: 35%;">
@@ -312,6 +317,7 @@ table {
 <h3>Copyright</h3>
 Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edge-device" target=_blank>Jomjol</a> and others.
 
+</div>
 </body>
 </html>
 

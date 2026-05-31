@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
     <title>Data Export (CSV)</title>
     <meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style>
         h1 {font-size: 2em;}
@@ -30,6 +33,7 @@
 </head>
 
 <body style="font-family: arial; padding: 0px 10px;">
+<div class="app-container">
     <h2>Data Export(CSV)</h2>
     <p>With the following action the <a href="/fileserver/log/data/" target="_self">data</a> folder on the SD-card gets zipped and provided as a download.</p>
     <button class="button" id="startExportData" type="button" onclick="startExportData()">Export Data</button>
@@ -206,5 +210,6 @@ function getFilenameFromUrl(url) {
 }
 
 </script>
+</div>
 </body>
 </html>

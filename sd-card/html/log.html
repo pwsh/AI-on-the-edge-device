@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
     <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
         <title>Log Viewer</title>
         
@@ -45,6 +48,7 @@
         <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script> 
     </head>
     <body>
+<div class="app-container">
         <div class="box">
             <div class="row header">
                 <button class="button" onClick="reload();">Reload</button>
@@ -61,7 +65,8 @@
                 <button class="button" onClick="window.location.href = getDomainname() + '/fileserver/log/message/'">Show Older Log Files</button>
             </div>
           </div>
-    </body>
+    </div>
+</body>
 
     <script>
         var liveTimer = null;

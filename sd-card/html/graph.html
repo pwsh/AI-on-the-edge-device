@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
     <title>Data Graph</title>
     <script type="text/javascript" src='plotly-basic-2.18.2.min.js?v=$COMMIT_HASH'></script>
@@ -188,6 +191,7 @@
 </head>
 
 <body>
+<div class="app-container">
     <h2>Data Graph</h2>
     <div id='chart'><p>Loading...<br></p></div>
     Number sequence:
@@ -251,5 +255,6 @@
     run();
     Refresh();
 </script>
+</div>
 </body>
 </html>
