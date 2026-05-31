@@ -679,15 +679,49 @@ esp_err_t handler_reboot(httpd_req_t *req)
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "handler_reboot");
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "!!! System will restart within 5 sec!!!");
 
-    std::string response = 
-        "<html><head><script>"
-            "function m(h) {"
-                "document.getElementById('t').innerHTML=h;"
-                "setInterval(function (){h +='.'; document.getElementById('t').innerHTML=h;"
-                "fetch('reboot_page.html',{mode: 'no-cors'}).then(r=>{parent.location.href=('index.html');})}, 1000);"
-            "}</script></head></html><body style='font-family: arial'><h3 id=t></h3>"
-            "<script>m('Rebooting!<br>The page will automatically reload in around 25..60s.<br><br>');</script>"
-            "</body></html>";
+    std::string response =
+        "<!DOCTYPE html><html lang='en'><head>"
+            "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+            "<style>"
+                "body{font-family:arial;margin:0;min-height:100vh;display:flex;align-items:center;"
+                     "justify-content:center;background:#fff;color:#1c2024;}"
+                "html[data-theme=dark] body{background:#1e1e1e;color:#dcdcdc;}"
+                ".card{text-align:center;padding:24px;}"
+                ".spinner{width:64px;height:64px;margin:0 auto 20px;border:6px solid rgba(127,127,127,.25);"
+                         "border-top-color:#2c7be5;border-radius:50%;animation:spin .9s linear infinite;}"
+                "@keyframes spin{to{transform:rotate(360deg);}}"
+                "h3{margin:0 0 6px;font-weight:600;}"
+                ".sub{color:#888;font-size:.9em;margin:0 0 16px;}"
+                ".bar{width:240px;max-width:80vw;height:6px;border-radius:3px;"
+                     "background:rgba(127,127,127,.2);margin:0 auto;overflow:hidden;}"
+                ".bar>i{display:block;height:100%;width:35%;border-radius:3px;background:#2c7be5;"
+                       "animation:slide 1.4s ease-in-out infinite;}"
+                "@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}"
+                ".ok{color:#1f9d55;font-weight:600;}"
+            "</style>"
+            "<script>"
+                // honour the user's saved theme (same key theme.js uses), with an OS fallback
+                "try{var s=localStorage.getItem('aiotedge-theme');"
+                "var d=s?(s==='dark'):(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);"
+                "if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}"
+                "var n=0,down=false;"   // only reload after the device has gone down AND come back
+                "function done(){var m=document.getElementById('msg');"
+                    "m.textContent='Back online - reloading...';m.className='ok';"
+                    "var t=(window.top&&window.top!==window)?window.top:window;t.location.href='index.html';}"
+                "function ping(){n++;"
+                    "fetch('reboot_page.html?_='+Date.now(),{cache:'no-store'})"
+                    ".then(function(r){if(r&&r.ok){if(down){done();}else{again();}}else{down=true;again();}})"
+                    ".catch(function(){down=true;again();});}"
+                "function again(){if(n<150){setTimeout(ping,2000);}else{"
+                    "document.getElementById('msg').textContent='Still waiting - try reloading manually.';}}"
+                "window.addEventListener('load',function(){setTimeout(ping,6000);});"
+            "</script>"
+            "</head><body><div class='card'>"
+                "<div class='spinner'></div>"
+                "<h3>Rebooting...</h3>"
+                "<p class='sub' id='msg'>This usually takes about 25-60 seconds.</p>"
+                "<div class='bar'><i></i></div>"
+            "</div></body></html>";
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_send(req, response.c_str(), strlen(response.c_str()));
