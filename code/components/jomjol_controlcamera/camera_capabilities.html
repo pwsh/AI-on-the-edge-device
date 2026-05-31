@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camera sensor capabilities — AI-on-the-edge-device</title>
+<style>
+  :root { --ok:#1f9d55; --no:#c0392b; --star:#b8860b; --bd:#d0d4d8; }
+  body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 24px; color: #1c2024; background:#fafbfc; line-height:1.45; }
+  h1 { margin: 0 0 4px; font-size: 1.6em; }
+  h2 { margin: 28px 0 6px; border-bottom: 2px solid var(--bd); padding-bottom: 4px; }
+  .sub { color:#5a636b; margin: 0 0 20px; font-size: 0.92em; }
+  .cards { display:flex; flex-wrap:wrap; gap:14px; }
+  .card { flex:1 1 320px; border:1px solid var(--bd); border-radius:8px; padding:12px 14px; background:#fff; }
+  .card h3 { margin:0 0 6px; font-size:1.15em; }
+  .mp { color:#2c3e50; font-weight:bold; }
+  .warn { color:var(--no); font-weight:bold; }
+  .reslist { font-size:0.82em; color:#444; margin:6px 0; }
+  .reslist code { background:#eef1f3; padding:1px 4px; border-radius:3px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 6px; font-size: 0.9em; background:#fff; }
+  th, td { border: 1px solid var(--bd); padding: 5px 8px; text-align: left; }
+  th { background:#eef1f3; }
+  td.c, th.c { text-align:center; }
+  .ok { color:var(--ok); font-weight:bold; }
+  .no { color:var(--no); font-weight:bold; }
+  .star { color:var(--star); font-weight:bold; }
+  .legend { font-size:0.85em; color:#5a636b; margin:4px 0 0; }
+  .note { background:#fff7e6; border:1px solid #f0d99a; border-radius:6px; padding:10px 14px; margin:18px 0; font-size:0.92em; }
+  code { font-family: Consolas, monospace; }
+</style>
+</head>
+<body>
+<h1>Camera sensor capabilities</h1>
+<p class="sub">OV2640 / OV3660 / OV5640 / OV7670 / OV7725 — derived from the
+<code>esp32-camera</code> driver source and what this firmware applies. Reviewed 2026-05-31.
+&nbsp;<span class="ok">✅</span> supported &middot; <span class="no">❌</span> stub/unsupported
+&middot; <span class="star">⭐</span> added by this project.</p>
+
+<div class="note"><b>Usable with this firmware?</b> Capture is JPEG, so a sensor must
+support on-chip JPEG: <b>OV2640 / OV3660 / OV5640 are usable; OV7670 / OV7725 are not</b>
+(no JPEG).</div>
+
+<div class="cards">
+  <div class="card">
+    <h3>OV2640 &middot; 2 MP</h3>
+    <div class="mp">Max resolution: 1600×1200 (UXGA, 1.92 MP)</div>
+    <div>Auto focus: <span class="no">no</span></div>
+    <div class="reslist">Frame sizes: <code>96×96</code> <code>QQVGA 160×120</code>
+      <code>QCIF 176×144</code> <code>HQVGA 240×176</code> <code>240×240</code>
+      <code>QVGA 320×240</code> <code>320×320</code> <code>CIF 400×296</code>
+      <code>HVGA 480×320</code> <code>VGA 640×480</code> <code>SVGA 800×600</code>
+      <code>XGA 1024×768</code> <code>HD 1280×720</code> <code>SXGA 1280×1024</code>
+      <code>UXGA 1600×1200</code></div>
+    <div>Pixel formats: <b>JPEG</b>, RGB565, RGB888, YUV422, GRAYSCALE</div>
+    <div class="reslist">Sharpness: ⭐ custom (no native); Denoise: <span class="no">no-op</span> (forced 0).</div>
+  </div>
+  <div class="card">
+    <h3>OV3660 &middot; 3 MP</h3>
+    <div class="mp">Max resolution: 2048×1536 (QXGA, 3.15 MP)</div>
+    <div>Auto focus: <span class="no">no</span></div>
+    <div class="reslist">Frame sizes: OV2640 list + <code>FHD 1920×1080</code>
+      <code>QXGA 2048×1536</code></div>
+    <div>Pixel formats: <b>JPEG</b>, RGB565, RGB888, YUV422, GRAYSCALE, <b>RAW</b></div>
+    <div class="reslist">Auto-sharpness: <span class="no">firmware no-op</span>; manual sharpness works.</div>
+  </div>
+  <div class="card">
+    <h3>OV5640 &middot; 5 MP</h3>
+    <div class="mp">Max resolution: 2560×1920 (QSXGA, 4.92 MP)</div>
+    <div>Auto focus: <span class="ok">yes</span> (driver/VCM; needs AF firmware + AF lens) — <i>not exposed by this firmware</i></div>
+    <div class="reslist">Frame sizes: OV3660 list + <code>QHD 2560×1440</code>
+      <code>WQXGA 2560×1600</code> <code>QSXGA 2560×1920</code></div>
+    <div>Pixel formats: <b>JPEG</b>, RGB565, RGB888, YUV422, GRAYSCALE, <b>RAW</b></div>
+    <div class="reslist">Auto-sharpness: <span class="no">firmware no-op</span>; manual sharpness works.</div>
+  </div>
+  <div class="card">
+    <h3>OV7670 &middot; 0.3 MP <span class="warn">— not usable</span></h3>
+    <div class="mp">Max resolution: 640×480 (VGA, 0.3 MP)</div>
+    <div>Auto focus: <span class="no">no</span></div>
+    <div class="reslist">Frame sizes: up to <code>VGA 640×480</code></div>
+    <div>Pixel formats: RGB565, RGB888, YUV422, GRAYSCALE — <span class="warn">no JPEG, no RAW</span></div>
+    <div class="reslist">Very limited: only AEC/AGC/AWB, mirror/flip, colorbar, framesize, pixformat.</div>
+  </div>
+  <div class="card">
+    <h3>OV7725 &middot; 0.3 MP <span class="warn">— not usable</span></h3>
+    <div class="mp">Max resolution: 640×480 (VGA, 0.3 MP)</div>
+    <div>Auto focus: <span class="no">no</span></div>
+    <div class="reslist">Frame sizes: up to <code>VGA 640×480</code></div>
+    <div>Pixel formats: RGB565, YUV422, GRAYSCALE — <span class="warn">no JPEG, no RAW, no RGB888</span></div>
+    <div class="reslist">Has brightness/contrast/AEC/AGC/AWB; no saturation/sharpness/denoise/special-effect/WB-mode/quality.</div>
+  </div>
+</div>
+
+<h2>Support matrix (native driver)</h2>
+<table>
+  <tr><th>setting</th><th class="c">OV2640</th><th class="c">OV3660</th><th class="c">OV5640</th><th class="c">OV7670</th><th class="c">OV7725</th></tr>
+  <tr><td>brightness</td><td class="c ok">✅ −2..2</td><td class="c ok">✅ −3..3</td><td class="c ok">✅ −3..3</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>contrast</td><td class="c ok">✅ −2..2</td><td class="c ok">✅ −3..3</td><td class="c ok">✅ −3..3</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>saturation</td><td class="c ok">✅ −2..2</td><td class="c ok">✅ −4..4</td><td class="c ok">✅ −4..4</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>sharpness</td><td class="c star">⭐ custom</td><td class="c ok">✅ −3..3</td><td class="c ok">✅ −3..3</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>denoise</td><td class="c no">❌ (forced 0)</td><td class="c ok">✅ 0..8</td><td class="c ok">✅ 0..8</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>AE level</td><td class="c ok">✅ −2..2</td><td class="c ok">✅ −5..5</td><td class="c ok">✅ −5..5</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>special effect</td><td class="c ok">✅ 0..6</td><td class="c ok">✅ 0..6</td><td class="c ok">✅ 0..6</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>WB mode</td><td class="c ok">✅ 0..4</td><td class="c ok">✅ 0..4</td><td class="c ok">✅ 0..4</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>gain ceiling</td><td class="c ok">✅ 2X..128X</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>AGC gain</td><td class="c ok">✅ 0..30</td><td class="c ok">✅ 0..30</td><td class="c ok">✅ 0..30</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>AEC value</td><td class="c ok">✅ 0..1200</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>exposure(AEC)/gain(AGC)/AWB</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td>aec2 / awb_gain</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>hmirror / vflip</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td>bpc / wpc / raw_gma / lenc / dcw</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c ok">✅</td></tr>
+  <tr><td>JPEG quality</td><td class="c ok">✅ 0..63</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌ no JPEG</td><td class="c no">❌ no JPEG</td></tr>
+  <tr><td>colorbar (test pattern)</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td><b>auto focus</b></td><td class="c no">❌</td><td class="c no">❌</td><td class="c ok">✅ driver (unused)</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+</table>
+<p class="legend">Ranges shown are the settable min..max. Digital zoom (firmware feature):
+OV2640 offset X ±480 / Y ±360 / size 0..29; OV3660 ±704 / ±528 / 0..43; OV5640 ±960 / ±720 / 0..59.</p>
+
+<h2>Pixel formats &amp; colour depth</h2>
+<table>
+  <tr><th>format</th><th>colours</th><th class="c">OV2640</th><th class="c">OV3660</th><th class="c">OV5640</th><th class="c">OV7670</th><th class="c">OV7725</th></tr>
+  <tr><td>JPEG (compressed)</td><td>full colour</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+  <tr><td>RGB565</td><td>65,536 (16-bit)</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td>RGB888</td><td>16,777,216 (24-bit)</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td></tr>
+  <tr><td>YUV422</td><td>full colour (chroma-subsampled)</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td>GRAYSCALE</td><td>256 (8-bit)</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c ok">✅</td></tr>
+  <tr><td>RAW (Bayer)</td><td>8/10-bit raw</td><td class="c no">❌</td><td class="c ok">✅</td><td class="c ok">✅</td><td class="c no">❌</td><td class="c no">❌</td></tr>
+</table>
+
+<h2>API <code>set_*</code> functions not used by this firmware</h2>
+<ul>
+  <li><code>set_colorbar</code> — sensor test pattern (all support it); the only user-relevant capability never surfaced.</li>
+  <li><code>set_pixformat</code>, <code>set_pll</code>, <code>set_xclk</code> — set once at camera init.</li>
+  <li><code>set_reg</code>, <code>set_res_raw</code> — low-level register / raw-resolution escapes.</li>
+  <li>OV5640 autofocus (<code>ov5640_af_init</code>, <code>ov5640_af_get_status</code>, …) — present in the driver but not wired up.</li>
+</ul>
+</body>
+</html>
