@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en">
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
     <title>Set PreValue</title>
     <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <style>
     h1 {font-size: 2em;}
@@ -65,6 +68,7 @@
 </head>
 
 <body style="font-family: arial; padding: 0px 10px;">
+<div class="app-container">
     <h2>Set "Previous Value"</h2>
     <details id="desc_details">
         <summary><b>CLICK HERE</b> for usage description. More infos in documentation: 
@@ -132,6 +136,7 @@
         </tr>	 
     </table>
 
+</div>
 </body>
 </html>
 

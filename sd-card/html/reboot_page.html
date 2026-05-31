@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" xml:lang="en"> 
 <head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
 <title>Reboot</title>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
 h1 {font-size: 2em;}
@@ -24,6 +27,7 @@ p {font-size: 1em;}
 </head>
 
 <body style="font-family: arial; padding: 0px 10px;">
+<div class="app-container">
 	
 <h3>Do you really want to reboot now?</h3>
 
@@ -45,5 +49,6 @@ function doReboot() {
 }
 </script>
 
+</div>
 </body>
 </html>

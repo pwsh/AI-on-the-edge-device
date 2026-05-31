@@ -1,7 +1,10 @@
 <html lang="en" xml:lang="en"> 
     <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
     <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
     <script src="theme.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
  
         <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet">
         <script type="text/javascript" src="jquery-3.6.0.min.js?v=$COMMIT_HASH"></script>  
@@ -9,6 +12,7 @@
         <script type="text/javascript" src="/common.js?v=$COMMIT_HASH"> 
     </head>
 <body>
+<div class="app-container">
     <table>
 <tr><td>WLAN-SSID</td><td><input type="text" name="ssid" id="ssid"></td><td>SSID of the WLAN</td></tr>
 <tr><td>WLAN-Password</td><td><input type="text" name="password" id="password"></td><td>ATTENTION: the password will not be encrypted during the sending.</td>
@@ -114,5 +118,6 @@ if (!file.name.includes("remote-setup")){
 
     
     </script>
+</div>
 </body>
 </html>
