@@ -94,11 +94,6 @@
         color:rgb(122, 122, 122);
     }
 
-    #GPIO_LEDColor_value1 #GPIO_LEDColor_value2 #GPIO_LEDColor_value3 {
-        width: 30px;
-        font-size: 16px;
-    }
-
     .invalid-input {
         background-color: #FFAA00;
     }
@@ -1917,29 +1912,10 @@
                 <span class="GPIO_item" id="GPIO_LEDColor_text">LED Color</span>
             </td>
             <td>
-                R <input required type="number" class="GPIO_IO12 GPIO_item" id="GPIO_LEDColor_value1"
-                    min="0" max="255" step="1" oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=255)) && 
-                        (!validity.stepMismatch||(value=parseInt(this.value)));">
+                <input type="color" class="GPIO_IO12 GPIO_item" id="GPIO_LEDColor_color" oninput="syncStatusColorToRgb('LEDColor')">
+                <input type="hidden" id="GPIO_LEDColor_value1"><input type="hidden" id="GPIO_LEDColor_value2"><input type="hidden" id="GPIO_LEDColor_value3">
             </td>
             <td>$TOOLTIP_GPIO_LEDColor</td>
-        </tr>
-
-        <tr class="GPIO_item" unused_id="LEDRGBex9">
-            <td></td>
-            <td>			
-                G <input required type="number" class="GPIO_IO12 GPIO_item" id="GPIO_LEDColor_value2"
-                    min="0" max="255" step="1" oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=255)) && 
-                        (!validity.stepMismatch||(value=parseInt(this.value)));">
-            </td>
-        </tr>
-
-        <tr class="GPIO_item" unused_id="LEDRGBex9">
-            <td></td>		
-            <td>				
-                B <input required type="number" class="GPIO_IO12 GPIO_item" id="GPIO_LEDColor_value3"
-                    min="0" max="255" step="1" oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=255)) && 
-                        (!validity.stepMismatch||(value=parseInt(this.value)));">
-            </td>
         </tr>
 
         <!------------- Status LED (processing-stage colours) ------------------>
@@ -2641,7 +2617,7 @@ function syncStatusColorToRgb(name) {
 }
 
 function syncStatusColorsFromValues() {
-    var stages = ['StatusLEDIdle', 'StatusLEDTakeImage', 'StatusLEDAlign', 'StatusLEDDigitize',
+    var stages = ['LEDColor', 'StatusLEDIdle', 'StatusLEDTakeImage', 'StatusLEDAlign', 'StatusLEDDigitize',
                   'StatusLEDPostProc', 'StatusLEDTransmit', 'StatusLEDError'];
     for (var i = 0; i < stages.length; i++) {
         var name = stages[i];
