@@ -759,6 +759,40 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      the per-target default (`code/CMakeLists.txt`). Any board defined in `include/defines.h`
      (`BOARD_WROVER_KIT`, `BOARD_M5STACK_PSRAM`, `BOARD_ESP32CAM_AITHINKER`, `BOARD_ESP32S3_CAM`) works;
      all the PSRAM-ESP32 boards share the same `esp32` binary type.
+
+   #### ESP32-CAM vs ESP32-WROVER — which to use when (dev board on hand, verified on hardware)
+   Both are the **same silicon for this project**: classic ESP32 (dual-core LX6) **+ PSRAM + 4 MB flash**
+   — so there is **no compute or memory difference**. The choice is purely form-factor / I-O / workflow:
+
+   | | **ESP32-CAM (AI-Thinker)** | **ESP32-WROVER-DEV** |
+   |---|---|---|
+   | Camera | ✅ **integrated** OV2640 + FPC connector (no wiring) | ⚠️ none — hand-wire an OV2640 |
+   | SD card | ✅ **on-board microSD slot** (4-bit SDMMC) | ⚠️ add a microSD module |
+   | Flashing | ⚠️ needs an external USB-serial + IO0/reset jumper dance | ✅ **on-board USB-serial + auto-reset** (one cable) |
+   | Free GPIOs | ⚠️ almost none (camera+SD use most pins) | ✅ **many broken out** (sensors, logic analyzer, JTAG) |
+   | Flash LED | ✅ on-board high-power LED (GPIO4) | ⚠️ none (WROVER-KIT maps a small LED) |
+   | Size / cost | ✅ tiny, ~$5, enclosure-friendly | ⚠️ larger DevKit, pricier |
+   | Validation | ✅ **the reference platform** — defaults/models/tests tuned on it | ⚠️ needs a pin map + re-tune |
+
+   **Verdict:** the **ESP32-CAM is the deployment/production board** (integrated, cheap, validated,
+   fits a meter enclosure); the **ESP32-WROVER-DEV is the better *development/bench* board** (flash over
+   one USB cable with auto-reset, exposed GPIOs for probing, easy to swap cameras). They produce the
+   **same `esp32` binary** — only the GPIO map (and here the partition table) differs. *(8 MB/16 MB
+   WROVER modules also exist and would relax the §8 flash-storage math — this dev unit is 4 MB.)*
+
+   #### ✅ ESP32-WROVER single-app-slot (4 MB, no dual-OTA) — built + flashed + boot-tested this session
+   - `code/partitions_wrover.csv` + `code/sdkconfig.defaults.wrover` (merged when
+     `AIOTEDGE_BOARD=BOARD_WROVER_KIT`): **factory 2 MB** app (no `ota_0/ota_1/otadata`) + **`storage`
+     spiffs 1.86 MB** reserved for the web UI + the **best-models** CNN set (the §8 flash-serving path —
+     the best-models-only cut, **688 KB**, is what makes ~1.5 MB of content fit a 4 MB board). Trade-off:
+     **no OTA** (re-flash over USB); the ESP32-CAM keeps dual-OTA `partitions.csv`.
+   - **On-hardware boot test (the connected CH340 WROVER-DEV, `/dev/ttyUSB0`):** flashed the single-slot
+     image; serial boot log confirms ✅ **PSRAM** (`Found 4MB PSRAM device` + `SPI SRAM memory test OK`,
+     4082 KB pool), ✅ the single-slot **partition table active** (`coredump @ 0x210000`), ✅ clean boot
+     on **IDF v6.0.1 / app v17.0.0-alpha.14**. The **OV2640 was not reached**: with **no SD card** the
+     firmware fails the early SD R/W check (`0x107`) and **aborts init before camera bring-up** — so an
+     SD card (or the §8 flash-storage feature, which must also stop the init from *requiring* SD) is the
+     next prerequisite to validate the camera + a meter read on the WROVER.
    - **Each chip needs its own compiled binary** (Xtensa ESP32 vs Xtensa ESP32-S3 differ in ISA
      extensions + memory map; IDF builds per `set-target`). **One codebase**, per-target build configs
      + compile-time feature gating (`#if CONFIG_IDF_TARGET_ESP32S3 ...`) so the 4 MB ESP32-CAM is

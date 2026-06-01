@@ -1,0 +1,11 @@
+# ESP32-WROVER single-app-slot 4 MB layout (NO dual-OTA).
+# Trades A/B OTA rollback safety for: (a) a larger app slot, and (b) a ~1.86 MB flash `storage`
+# partition reserved for the web UI + the best-models CNN set (PLAN sec 8 flash-serving path),
+# which the best-models-only cut (~688 KB) finally makes fit on 4 MB. OTA-update is disabled in this
+# layout (re-flash over USB); the ESP32-CAM keeps its dual-OTA partitions.csv.
+# Name,     Type, SubType, Offset,  Size, Flags
+nvs,        data, nvs,     ,        0x6000,
+phy_init,   data, phy,     ,        0x1000,
+factory,    app,  factory, ,        0x200000,
+coredump,   data, coredump,,        0x10000,
+storage,    data, spiffs,  ,        0x1D0000,

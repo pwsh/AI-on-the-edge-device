@@ -8,15 +8,18 @@ ADD_CUSTOM_COMMAND(
     COMMAND ${CMAKE_COMMAND} -P
             ${CMAKE_CURRENT_SOURCE_DIR}/version.cmake)
 
-if(EXISTS "${SDKCONFIG}.defaults")
-    if(EXISTS "sdkconfig.defaults")
-        set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults;sdkconfig.defaults")
-        message(STATUS "-- Using defaults: ${SDKCONFIG_DEFAULTS} + sdkconfig.defaults")
-    else()
-        set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults")
-    endif()
-    message(STATUS "-- Using defaults: ${SDKCONFIG_DEFAULTS}")
+# A board override can add its own defaults file (IDF also auto-merges sdkconfig.defaults.<target>).
+# The ESP32-WROVER uses a single-app-slot 4 MB partition table (no dual-OTA): sdkconfig.defaults.wrover.
+set(_board_defaults "")
+if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT")
+    set(_board_defaults ";sdkconfig.defaults.wrover")
 endif()
+if(EXISTS "${SDKCONFIG}.defaults")
+    set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults;sdkconfig.defaults${_board_defaults}")
+else()
+    set(SDKCONFIG_DEFAULTS "sdkconfig.defaults${_board_defaults}")
+endif()
+message(STATUS "-- Using defaults: ${SDKCONFIG_DEFAULTS}")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 

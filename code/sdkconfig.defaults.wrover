@@ -1,0 +1,5 @@
+# ESP32-WROVER overrides (merged by CMakeLists when AIOTEDGE_BOARD=BOARD_WROVER_KIT, on top of
+# sdkconfig.defaults). Single-app-slot 4 MB partition table - no dual-OTA - see partitions_wrover.csv.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_wrover.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions_wrover.csv"
