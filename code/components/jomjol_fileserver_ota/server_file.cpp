@@ -562,6 +562,24 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    /* HEAD request: return the headers - including the real Content-Length - with no body. The GET
+     * path streams with chunked encoding (no Content-Length); without this, a HEAD fell through to
+     * the catch-all handler and reported a bogus fixed size. httpd_resp_send() always writes its own
+     * Content-Length from the body length, so emit the header block directly. */
+    if (req->method == HTTP_HEAD) {
+        char head[320];
+        int n = snprintf(head, sizeof(head),
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: %s\r\n"
+            "Content-Length: %ld\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "Connection: close\r\n"
+            "\r\n",
+            get_content_type_from_file(filename), (long) file_stat.st_size);
+        httpd_send(req, head, n);
+        return ESP_OK;
+    }
+
     fd = fopen(filepath, "r");
     if (!fd) {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read file: " + std::string(filepath) + "!");
@@ -1204,6 +1222,16 @@ void register_server_file_uri(httpd_handle_t server, const char *base_path)
         .user_ctx  = server_data    // Pass server data as context
     };
     httpd_register_uri_handler(server, &file_download);
+
+    /* Same handler for HEAD requests, so they report the real file size (Content-Length) instead of
+     * falling through to the catch-all. */
+    httpd_uri_t file_download_head = {
+        .uri       = "/fileserver*",
+        .method    = HTTP_HEAD,
+        .handler   = APPLY_BASIC_AUTH_FILTER(download_get_handler),
+        .user_ctx  = server_data
+    };
+    httpd_register_uri_handler(server, &file_download_head);
 
     httpd_uri_t file_datafileact = {
         .uri       = "/datafileact",  // Match all URIs of type /path/to/file

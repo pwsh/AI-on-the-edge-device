@@ -163,49 +163,27 @@ const char* get_path_from_uri(char *dest, const char *base_path, const char *uri
 }
 
 /* Set HTTP response content type according to file extension */
+const char* get_content_type_from_file(const char *filename)
+{
+    if (IS_FILE_EXT(filename, ".pdf"))       return "application/x-pdf";
+    else if (IS_FILE_EXT(filename, ".htm"))  return "text/html";
+    else if (IS_FILE_EXT(filename, ".html")) return "text/html";
+    else if (IS_FILE_EXT(filename, ".jpeg")) return "image/jpeg";
+    else if (IS_FILE_EXT(filename, ".jpg"))  return "image/jpeg";
+    else if (IS_FILE_EXT(filename, ".gif"))  return "image/gif";
+    else if (IS_FILE_EXT(filename, ".png"))  return "image/png";
+    else if (IS_FILE_EXT(filename, ".ico"))  return "image/x-icon";
+    else if (IS_FILE_EXT(filename, ".js"))   return "application/javascript";
+    else if (IS_FILE_EXT(filename, ".css"))  return "text/css";
+    else if (IS_FILE_EXT(filename, ".xml"))  return "text/xml";
+    else if (IS_FILE_EXT(filename, ".zip"))  return "application/x-zip";
+    else if (IS_FILE_EXT(filename, ".gz"))   return "application/x-gzip";
+
+    /* This is a limited set only; for any other type always serve as plain text. */
+    return "text/plain";
+}
+
 esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename)
 {
-    if (IS_FILE_EXT(filename, ".pdf")) {
-        return httpd_resp_set_type(req, "application/x-pdf");
-    }
-    else if (IS_FILE_EXT(filename, ".htm")) {
-        return httpd_resp_set_type(req, "text/html");
-    }
-    else if (IS_FILE_EXT(filename, ".html")) {
-        return httpd_resp_set_type(req, "text/html");
-    }
-    else if (IS_FILE_EXT(filename, ".jpeg")) {
-        return httpd_resp_set_type(req, "image/jpeg");
-    }
-    else if (IS_FILE_EXT(filename, ".jpg")) {
-        return httpd_resp_set_type(req, "image/jpeg");
-    }
-    else if (IS_FILE_EXT(filename, ".gif")) {
-        return httpd_resp_set_type(req, "image/gif");
-    }
-    else if (IS_FILE_EXT(filename, ".png")) {
-        return httpd_resp_set_type(req, "image/png");
-    }
-    else if (IS_FILE_EXT(filename, ".ico")) {
-        return httpd_resp_set_type(req, "image/x-icon");
-    }
-    else if (IS_FILE_EXT(filename, ".js")) {
-        return httpd_resp_set_type(req, "application/javascript");
-    }
-    else if (IS_FILE_EXT(filename, ".css")) {
-        return httpd_resp_set_type(req, "text/css");
-    }
-    else if (IS_FILE_EXT(filename, ".xml")) {
-        return httpd_resp_set_type(req, "text/xml");
-    }
-    else if (IS_FILE_EXT(filename, ".zip")) {
-        return httpd_resp_set_type(req, "application/x-zip");
-    }
-    else if (IS_FILE_EXT(filename, ".gz")) {
-        return httpd_resp_set_type(req, "application/x-gzip");
-    }
-
-    /* This is a limited set only */
-    /* For any other type always set as plain text */
-    return httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_set_type(req, get_content_type_from_file(filename));
 }

@@ -13,5 +13,6 @@ const char* get_path_from_uri(char *dest, const char *base_path, const char *uri
 esp_err_t send_file(httpd_req_t *req, std::string filename);
 
 esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename);
+const char* get_content_type_from_file(const char *filename);
 
 #endif //SERVERHELP_H

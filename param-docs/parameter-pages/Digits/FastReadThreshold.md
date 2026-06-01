@@ -1,17 +1,38 @@
 # Parameter `FastReadThreshold`
-Default Value: `8`
-
-!!! Warning
-    This is an **Expert Parameter**! Only change it if you understand what it does!
+Default Value: `8` (Medium sensitivity)
 
 Only relevant when [FastRead](FastRead.md) is enabled.
 
-Mean absolute per-pixel difference (range `0`–`255`) between the current cropped digit
-image and the cached one, below which the digit is treated as **unchanged** and its
-previous result is reused without running the CNN.
+**What it does:** FastRead skips the neural-network inference for digits that have not changed since
+the last real reading, reusing the previous result to save time. To decide whether a digit
+"changed", it measures the **mean absolute per-pixel difference** between the freshly cropped digit
+image and the cached one from the last actual inference. This setting (range `0`–`255`) is the
+threshold for that comparison:
 
-- Lower values are stricter (more digits get re-read; safer, slower).
-- Higher values are more permissive (fewer inferences; risk of missing a slow digit
-  transition under noisy lighting).
+- If the measured difference is **below** the threshold, the digit is treated as **unchanged** and
+  its previous value is reused (no inference — this is the time saving).
+- If it is **at or above** the threshold, the digit is **re-read** with the CNN.
 
-A "changed" decision only ever costs one extra inference, so a moderate value is safe.
+So the value is really a **sensitivity** control:
+
+| Setting | Value | Behaviour |
+| --- | --- | --- |
+| Very high sensitivity | 3 | Re-reads on the slightest pixel change. Safest, fewest skips. |
+| High sensitivity | 5 | Re-reads on small changes. |
+| Medium sensitivity | 8 | Balanced default. |
+| Lower sensitivity | 12 | Tolerates more change before re-reading. |
+| Low sensitivity | 20 | Skips unless the digit clearly changes. |
+| Very low sensitivity | 32 | Maximum skipping; only obvious changes trigger a re-read. |
+
+**Trade-off:**
+
+- **Higher sensitivity (lower value)** → more digits get re-read: more accurate (catches subtle or
+  partial transitions), but less time saved.
+- **Lower sensitivity (higher value)** → fewer inferences (faster, less load), but a slowly changing
+  or partially-rolling digit may be missed until the periodic full re-read
+  ([FastReadFullInterval](FastReadFullInterval.md)) forces a complete pass.
+
+**Choosing a value:** start with the **Medium** default. If image noise (flickering lighting, JPEG
+artefacts) causes unnecessary re-reads, move toward lower sensitivity. If a digit occasionally
+changes without being picked up, move toward higher sensitivity. A wrong "changed" decision only
+ever costs one extra inference, so erring on the sensitive side is safe.
