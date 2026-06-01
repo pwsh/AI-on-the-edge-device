@@ -601,7 +601,8 @@ Two independent reductions:
      (it already skips the delay when a round runs longer than the interval).
    - MQTT keep-alive/LWT timeout gets a 60 s floor so short intervals don't make it too aggressive.
    - Tooltip doc updated (`param-docs/.../AutoTimer/Interval.md`). Default stays **5 minutes**.
-- 🟡 **Live log viewer (auto-scroll / tail).** The log viewer page currently requires a manual
+- ✅ **Live log viewer (auto-scroll / tail) — DONE** (already implemented: log.html `liveToggle` checkbox auto-refreshes `/log` and scrolls to newest; pauses when the tab is hidden). Original:
+- 💤 **Live log viewer (auto-scroll / tail).** The log viewer page currently requires a manual
    reload (or button press) to see new entries. Add a "Live / auto-scroll" checkbox that polls
    (or streams) new log lines and appends them, auto-scrolling to the bottom; unchecking pauses
    the tail. Keep it lightweight (periodic fetch of the log tail; avoid re-rendering the whole
