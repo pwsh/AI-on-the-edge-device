@@ -4,6 +4,7 @@
 
 #include <math.h>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <esp_log.h>
 #include "psram.h"
@@ -37,52 +38,58 @@ void CAlignAndCutImage::GetRefSize(int *ref_dx, int *ref_dy)
 bool CAlignAndCutImage::Align(RefInfo *_temp1, RefInfo *_temp2)
 {
     int dx, dy;
-    int r0_x, r0_y, r1_x, r1_y;
     bool isSimilar1, isSimilar2;
 
     CFindTemplate* ft = new CFindTemplate("align", rgb_image, channels, width, height, bpp);
 
-    r0_x = _temp1->target_x;
-    r0_y = _temp1->target_y;
     ESP_LOGD(TAG, "Before ft->FindTemplate(_temp1); %s", _temp1->image_file.c_str());
     isSimilar1 = ft->FindTemplate(_temp1);
     _temp1->width = ft->tpl_width;
-    _temp1->height = ft->tpl_height; 
+    _temp1->height = ft->tpl_height;
 
-    r1_x = _temp2->target_x;
-    r1_y = _temp2->target_y;
     ESP_LOGD(TAG, "Before ft->FindTemplate(_temp2); %s", _temp2->image_file.c_str());
     isSimilar2 = ft->FindTemplate(_temp2);
     _temp2->width = ft->tpl_width;
-    _temp2->height = ft->tpl_height; 
+    _temp2->height = ft->tpl_height;
 
     delete ft;
 
+    // A marker pinned to the edge of its search window is an unreliable (clamped) match: the true
+    // minimum lies outside the window - typically a false match on a low-detail feature (e.g. a
+    // plain horizontal line, which is ambiguous in y) or one washed out by glare. Deriving the
+    // transform from it yields a large bogus translation/rotation that skews the whole frame.
+    bool rel1 = (abs(_temp1->found_x - _temp1->target_x) < _temp1->search_x) &&
+                (abs(_temp1->found_y - _temp1->target_y) < _temp1->search_y);
+    bool rel2 = (abs(_temp2->found_x - _temp2->target_x) < _temp2->search_x) &&
+                (abs(_temp2->found_y - _temp2->target_y) < _temp2->search_y);
 
-    dx = _temp1->target_x - _temp1->found_x;
-    dy = _temp1->target_y - _temp1->found_y;
+    // Translation: derive from a reliable marker (prefer the first). If neither is reliable, leave
+    // the frame unshifted rather than jump to a bogus position.
+    if (rel1) {
+        dx = _temp1->target_x - _temp1->found_x;
+        dy = _temp1->target_y - _temp1->found_y;
+    }
+    else if (rel2) {
+        dx = _temp2->target_x - _temp2->found_x;
+        dy = _temp2->target_y - _temp2->found_y;
+    }
+    else {
+        dx = 0;
+        dy = 0;
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment: both reference markers matched at their search-window edge (unreliable) - leaving this frame unshifted/unrotated");
+    }
 
-    r0_x += dx;
-    r0_y += dy;
-
-    r1_x += dx;
-    r1_y += dy;
-
-    float w_org, w_ist, d_winkel;
-
-    w_org = atan2(_temp2->found_y - _temp1->found_y, _temp2->found_x - _temp1->found_x);
-    w_ist = atan2(r1_y - r0_y, r1_x - r0_x);
-
-    d_winkel = (w_ist - w_org) * 180 / M_PI;
-
-/*#ifdef DEBUG_DETAIL_ON
-    std::string zw = "\tdx:\t" + std::to_string(dx) + "\tdy:\t" + std::to_string(dy) + "\td_winkel:\t" + std::to_string(d_winkel);
-    zw = zw + "\tt1_x_y:\t" + std::to_string(_temp1->found_x) + "\t" + std::to_string(_temp1->found_y);
-    zw = zw + "\tpara1_found_min_avg_max_SAD:\t" + std::to_string(_temp1->fastalg_min) + "\t" + std::to_string(_temp1->fastalg_avg) + "\t" + std::to_string(_temp1->fastalg_max) + "\t"+ std::to_string(_temp1->fastalg_SAD);
-    zw = zw + "\tt2_x_y:\t" + std::to_string(_temp2->found_x) + "\t" + std::to_string(_temp2->found_y);
-    zw = zw + "\tpara2_found_min_avg_max:\t" + std::to_string(_temp2->fastalg_min) + "\t" + std::to_string(_temp2->fastalg_avg) + "\t" + std::to_string(_temp2->fastalg_max) + "\t"+ std::to_string(_temp2->fastalg_SAD);
-    LogFile.WriteToDedicatedFile("/sdcard/alignment.txt", zw);
-#endif*/
+    // Rotation needs both markers and is the destructive part when wrong; only trust it when BOTH
+    // markers matched confidently (neither clamped to its search edge).
+    float d_winkel = 0;
+    if (rel1 && rel2) {
+        float w_org = atan2(_temp2->found_y - _temp1->found_y, _temp2->found_x - _temp1->found_x);
+        float w_ist = atan2(_temp2->target_y - _temp1->target_y, _temp2->target_x - _temp1->target_x);
+        d_winkel = (w_ist - w_org) * 180 / M_PI;
+    }
+    else if (rel1 != rel2) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment: one reference marker is an unreliable (edge-clamped) match - applying translation only, skipping rotation");
+    }
 
     // Remember the computed transform so periodic alignment can re-apply it on rounds where the
     // marker search is skipped (see ClassFlowAlignment / AlignByTransform).
@@ -97,7 +104,7 @@ bool CAlignAndCutImage::Align(RefInfo *_temp1, RefInfo *_temp2)
     if (fabs(d_winkel) >= ALIGNMENT_ROTATION_DEADBAND_DEG) {
         rt.Rotate(d_winkel, _temp1->target_x, _temp1->target_y);
     }
-    ESP_LOGD(TAG, "Alignment: dx %d - dy %d - rot %f", dx, dy, d_winkel);
+    ESP_LOGD(TAG, "Alignment: dx %d - dy %d - rot %f (rel1=%d rel2=%d)", dx, dy, d_winkel, rel1, rel2);
 
     return (isSimilar1 && isSimilar2);
 }

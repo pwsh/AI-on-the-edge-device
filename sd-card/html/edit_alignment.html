@@ -162,7 +162,11 @@
             <td>y: <input type="number" name="refy" id="refy" step=1 onchange="valuemanualchanged()"></td>
             <td>dy: <input type="number" name="refdy" id="refdy" step=1 onchange="valuemanualchanged()"></td>
         </tr>
-	  
+
+        <tr>
+            <td colspan="2" style="padding-bottom:6px;"><span id="markerSizeHint" style="font-size:0.9em;"></span></td>
+        </tr>
+
         <tr>
             <td style="vertical-align: bottom;">Selected Image Area:</td>
             <td style="vertical-align: bottom;">Resulting Marker:</td>
@@ -564,18 +568,55 @@
             // ctx.restore();
         }
 
+        // Recommended alignment-marker size (pixels per side). Too small -> too few features to
+        // match uniquely, so the search can lock onto the wrong spot (false match -> bad rotation).
+        // Too large -> slow, and more likely to include changing content (digits). Any size is still
+        // allowed; this is guidance only.
+        var MARKER_REC_MIN = 25;
+        var MARKER_REC_MAX = 90;
+
+        function markerSizeStatus(w, h) {
+            w = Math.round(Math.abs(w)); h = Math.round(Math.abs(h));
+            if (w < MARKER_REC_MIN || h < MARKER_REC_MIN) {
+                return { ok: false, color: "#E53935",
+                    msg: "Marker " + w + "×" + h + " px is small - aim for " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side (too small risks false matches)." };
+            }
+            if (w > MARKER_REC_MAX || h > MARKER_REC_MAX) {
+                return { ok: false, color: "#E53935",
+                    msg: "Marker " + w + "×" + h + " px is large - aim for " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side (too large is slow / may include digits)." };
+            }
+            return { ok: true, color: "#2E7D32",
+                msg: "Marker " + w + "×" + h + " px - good (recommended " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side)." };
+        }
+
+        function updateMarkerSizeHint() {
+            var hint = document.getElementById("markerSizeHint");
+            if (!hint) return "#FF0000";
+            var st = markerSizeStatus(rect.w, rect.h);
+            if (parseInt(rect.w) > 0 && parseInt(rect.h) > 0) {
+                hint.textContent = (st.ok ? "✔ " : "⚠ ") + st.msg;
+                hint.style.color = st.color;
+            } else {
+                hint.textContent = "Draw a box on the image around a fixed, distinctive feature (recommended " +
+                    MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side).";
+                hint.style.color = "#5a636b";
+            }
+            return st.color;
+        }
+
         function draw() {
             var canvas = document.getElementById('canvas');
             var context = canvas.getContext('2d');
             context.drawImage(imageObj, 0, 0);
             var lw = 4
             context.lineWidth = lw;
-            context.strokeStyle = "#FF0000";
+            // Green when the marker is within the recommended size range, red otherwise.
+            context.strokeStyle = updateMarkerSizeHint();
             var x0 = parseInt(rect.startX) - parseInt(lw/2);
             var y0 = parseInt(rect.startY) - parseInt(lw/2);
             var dx = parseInt(rect.w) + parseInt(lw);
             var dy = parseInt(rect.h) + parseInt(lw);
-            context.strokeRect(x0, y0, dx, dy);           
+            context.strokeRect(x0, y0, dx, dy);
         }
 
         function mouseDown(e) {
