@@ -746,44 +746,26 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
     zwcnn = FormatFileName(zwcnn);
     ESP_LOGD(TAG, "%s", zwcnn.c_str());
 
-    // Model lifecycle: with FastRead the model is kept resident across cycles (load/allocate
-    // is pure overhead on a 5-10s cadence). Without FastRead it is loaded and freed each cycle
-    // as before, to keep the heap free between rounds.
+    // Model lifecycle: load + allocate the model each cycle, then free it at the end (see below).
+    // The tflite model and tensor arena live in the SHARED PSRAM region (psram_get_shared_*),
+    // which the TakeImage step reuses for the camera image every round. Keeping the model resident
+    // across cycles (an earlier FastRead optimisation) therefore let TakeImage clobber the resident
+    // model's flatbuffer/arena, so the next inference dereferenced garbage in interpreter->input()
+    // and panicked. Loading per cycle keeps the shared region correctly time-multiplexed. FastRead
+    // still saves work by skipping the inference for unchanged digits.
     CTfLiteClass *tflite;
-    if (FastReadEnabled) {
-        if (residentTflite == NULL) {
-            residentTflite = new CTfLiteClass;
-            if (!residentTflite->LoadModel(zwcnn)) {
-                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
-                LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
-                delete residentTflite;
-                residentTflite = NULL;
-                return false;
-            }
-            if (!residentTflite->MakeAllocate()) {
-                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
-                LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
-                delete residentTflite;
-                residentTflite = NULL;
-                return false;
-            }
-        }
-        tflite = residentTflite;
+    tflite = new CTfLiteClass;
+    if (!tflite->LoadModel(zwcnn)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
+        LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
+        delete tflite;
+        return false;
     }
-    else {
-        tflite = new CTfLiteClass;
-        if (!tflite->LoadModel(zwcnn)) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
-            LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
-            delete tflite;
-            return false;
-        }
-        if (!tflite->MakeAllocate()) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
-            LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
-            delete tflite;
-            return false;
-        }
+    if (!tflite->MakeAllocate()) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
+        LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
+        delete tflite;
+        return false;
     }
 
     // Decide whether this cycle re-reads every digit (full validation) or may reuse the
@@ -1032,10 +1014,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         setRoundReadType(readFast, _digitsAnalyzed, _digitsTotal);
     }
 
-    // Resident model (FastRead) is kept for the next cycle; otherwise free it now.
-    if (!FastReadEnabled) {
-        delete tflite;
-    }
+    // Free the model now: it lives in the shared PSRAM region that TakeImage reuses next round, so
+    // it must not be kept resident across cycles (that is what corrupted it and crashed inference).
+    delete tflite;
 
     return true;
 }
