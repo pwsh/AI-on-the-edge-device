@@ -63,6 +63,7 @@ static const char *TAG = "WIFI";
 static bool APWithBetterRSSI = false;
 static bool WIFIConnected = false;
 static int WIFIReconnectCnt = 0;
+static bool everConnectedSinceBoot = false;   // true once we have had an IP this boot
 
 esp_netif_t *my_sta;
 
@@ -505,6 +506,21 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				vTaskDelay(backoffMs / portTICK_PERIOD_MS);
 			}
 
+			// Persistent failure to reach the configured Wi-Fi -> fall back to AP mode so the user can
+			// fix the settings. Quicker when we never connected this boot (likely wrong credentials);
+			// more patient if we had been connected (tolerate a router reboot / brief outage). A marker
+			// file makes CheckStartAPMode start the AP on the next boot, from where the device keeps
+			// periodically retrying the configured network.
+			int apFallbackThreshold = everConnectedSinceBoot ? 40 : 15;
+			if (WIFIReconnectCnt >= apFallbackThreshold) {
+				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Cannot reach Wi-Fi after " +
+					std::to_string(WIFIReconnectCnt) + " attempts -> rebooting into AP mode for reconfiguration");
+				FILE *f = fopen("/sdcard/.force_ap", "w");
+				if (f) fclose(f);
+				vTaskDelay(300 / portTICK_PERIOD_MS);
+				esp_restart();
+			}
+
 			esp_wifi_connect(); // Try to connect again
 		}
 	}
@@ -526,6 +542,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 	{
         WIFIConnected = true;
 		WIFIReconnectCnt = 0;
+		everConnectedSinceBoot = true;
 
 		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         wlan_config.ipaddress = std::string(ip4addr_ntoa((const ip4_addr*) &event->ip_info.ip));

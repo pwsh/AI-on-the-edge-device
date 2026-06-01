@@ -40,7 +40,7 @@ NOTICE: [5/5] idf (6.0.1)
 -- Detecting C compiler ABI info - done
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
--- App "AI-on-the-edge" version: v17.0.0-alpha.14-72-g4b5af7ec-d
+-- App "AI-on-the-edge" version: v17.0.0-alpha.14-73-g3535aade-d
 -- Found Python3: /home/eric/.espressif/python_env/idf6.0_py3.12_env/bin/python (found version "3.12.3") found components: Interpreter
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
@@ -76,6 +76,6 @@ NOTICE: [5/5] idf (6.0.1)
 -- Perf: building component 'esp-nn' at -O2
 -- Perf: building component 'jomjol_image_proc' at -O2
 -- Perf: building component 'jomjol_tfliteclass' at -O2
--- Configuring done (10.5s)
--- Generating done (0.8s)
+-- Configuring done (11.2s)
+-- Generating done (0.9s)
 -- Build files have been written to: /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb

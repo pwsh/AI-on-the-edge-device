@@ -19,6 +19,7 @@
 #include "esp_wifi.h"
 
 #include "esp_log.h"
+#include "esp_system.h"
 #include "nvs_flash.h"
 
 #include "stdio.h"
@@ -44,18 +45,26 @@ bool isWlanINI = false;
 
 static const char *TAG = "WIFI AP";
 
+static volatile int s_apClientCount = 0;   // stations currently connected to our AP
+bool s_apForcedReconfig = false;           // AP started because Wi-Fi connect failed (not missing setup)
+
+// Seconds with no client connected to the AP before we reboot to retry the configured Wi-Fi (only
+// when the AP was entered due to a Wi-Fi connection failure, i.e. settings exist but didn't work).
+#define WIFI_AP_RETRY_SECONDS 300
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                     int32_t event_id, void* event_data)
 {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        s_apClientCount++;
+        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d (clients=%d)",
+                 MAC2STR(event->mac), event->aid, s_apClientCount);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        if (s_apClientCount > 0) s_apClientCount--;
+        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d (clients=%d)",
+                 MAC2STR(event->mac), event->aid, s_apClientCount);
     }
 }
 
@@ -98,8 +107,27 @@ void wifi_init_softAP(void)
 
 void SendHTTPResponse(httpd_req_t *req)
 {
-    std::string message = "<h1>AI-on-the-edge - BASIC SETUP</h1><p>This is an access point with a minimal server to setup the minimum required files and information on the device and the SD-card. ";
-    message += "This mode is always started if one of the following files is missing: /wlan.ini or the /config/config.ini.<p>";
+    // Device identity + a reboot control, always shown at the top of the AP page.
+    uint8_t mac[6] = {0};
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char macbuf[24];
+    snprintf(macbuf, sizeof(macbuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    char hnbuf[20];
+    snprintf(hnbuf, sizeof(hnbuf), "edgeai-%02x%02x%02x", mac[3], mac[4], mac[5]);
+
+    std::string message = "<h1>AI-on-the-edge - BASIC SETUP</h1>";
+    message += "<p><b>Device MAC:</b> " + std::string(macbuf) +
+               " &nbsp;&middot;&nbsp; <b>Default hostname:</b> " + std::string(hnbuf) + "</p>";
+    message += "<button class=\"button\" type=\"button\" onclick=\"if(confirm('Reboot the device now?')){fetch('/reboot');setTimeout(function(){location.reload();},2000);}\">Reboot device</button>";
+    message += "<hr>";
+    if (s_apForcedReconfig) {
+        message += "<p style=\"color:#b00\"><b>The device could not connect to the configured Wi-Fi.</b> "
+                   "Re-enter the network credentials below, then reboot. (It also retries the saved network "
+                   "automatically every few minutes while no one is connected here.)</p>";
+    }
+    message += "<p>This is an access point with a minimal server to setup the minimum required files and information on the device and the SD-card. ";
+    message += "This mode is started when /wlan.ini or /config/config.ini is missing, or when the device could not connect to the configured Wi-Fi.<p>";
     message += "The setup is done in 3 steps: 1. upload full inital configuration (sd-card content), 2. store WLAN access information, 3. reboot (and connect to WLANs)<p><p>";
     message += "Please follow the below instructions.<p>";
     httpd_resp_send_chunk(req, message.c_str(), strlen(message.c_str()));
@@ -129,7 +157,7 @@ void SendHTTPResponse(httpd_req_t *req)
         httpd_resp_send_chunk(req, message.c_str(), strlen(message.c_str()));
         return;
     }
-    if (!isWlanINI)
+    if (!isWlanINI || s_apForcedReconfig)
     {
         message = "<h3>2. WLAN access credentials</h3><p>";
         message += "<table>";
@@ -508,20 +536,44 @@ void CheckStartAPMode()
     isConfigINI = FileExists(CONFIG_FILE);
     isWlanINI = FileExists(WLAN_CONFIG_FILE);
 
+    // A previous boot could not connect to the configured Wi-Fi and left this marker, asking us to
+    // come up in AP mode so the settings can be fixed. One-shot: remove it so the *next* boot tries
+    // the configured network again (this AP session periodically reboots to retry too - see below).
+    bool forceAP = FileExists("/sdcard/.force_ap");
+    if (forceAP) {
+        DeleteFile("/sdcard/.force_ap");
+        ESP_LOGW(TAG, "Previous Wi-Fi connection failed -> starting AP mode for reconfiguration");
+    }
+
     if (!isConfigINI)
         ESP_LOGW(TAG, "config.ini not found!");
 
     if (!isWlanINI)
         ESP_LOGW(TAG, "wlan.ini not found!");
 
-    if (!isConfigINI || !isWlanINI)
+    if (!isConfigINI || !isWlanINI || forceAP)
     {
+        // Distinguish "couldn't connect" (settings exist) from "needs initial setup" (files missing):
+        // only the former periodically retries the configured Wi-Fi.
+        s_apForcedReconfig = forceAP && isConfigINI && isWlanINI;
+
         ESP_LOGI(TAG, "Starting access point for remote configuration");
         StatusLED(AP_OR_OTA, 2, true);
         wifi_init_softAP();
         start_webserverAP();
-        while(1) { // wait until reboot within task_do_Update_ZIP
+
+        int idleSeconds = 0;
+        while(1) { // wait until reboot (within task_do_Update_ZIP, the reboot button, or the retry below)
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+            if (s_apForcedReconfig) {
+                if (s_apClientCount > 0) {
+                    idleSeconds = 0;   // someone is connected and configuring -> don't disrupt them
+                }
+                else if (++idleSeconds >= WIFI_AP_RETRY_SECONDS) {
+                    ESP_LOGW(TAG, "No client on AP for a while -> rebooting to retry the configured Wi-Fi");
+                    esp_restart();
+                }
+            }
         }
     }
 }
