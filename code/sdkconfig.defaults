@@ -195,3 +195,9 @@ CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 # (ELF format is auto-selected by ENABLE_TO_FLASH in IDF 6 - the explicit
 #  CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF key is no longer user-settable, so it was removed.)
 CONFIG_ESP_COREDUMP_CHECK_BOOT=y
+
+# OTA rollback: a freshly OTA'd app boots on trial (PENDING_VERIFY) and is only committed by
+# ConfirmOTAUpdateAfterInit() once init completes (web server up). If it crash-loops before then, the
+# bootloader auto-rolls-back to the previous working app. Dual-OTA boards only (no effect on the
+# WROVER factory slot, which is never PENDING_VERIFY).
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

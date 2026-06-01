@@ -758,6 +758,13 @@ extern "C" void app_main(void)
     //setSystemStatusFlag(SYSTEM_STATUS_CAM_FB_BAD);
     //setSystemStatusFlag(SYSTEM_STATUS_PSRAM_BAD);
 
+    // Confirm a post-OTA trial firmware now that init has completed and the web server is up (so the
+    // device is healthy enough to be re-flashed). On a normal boot this is a no-op; if the new app had
+    // crash-looped before reaching here, the bootloader would already have rolled it back. The
+    // diagnostic inside also rolls back a build that came up with no usable PSRAM / too little heap.
+    // ********************************************
+    ConfirmOTAUpdateAfterInit();
+
     // Check main init + start TFlite task
     // ********************************************
     if (getSystemStatus() == 0) { // No error flag is set

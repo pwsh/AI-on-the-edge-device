@@ -305,8 +305,19 @@ static void print_sha256 (const uint8_t *image_hash, const char *label)
 }
 
 
+// Validate a freshly-OTA'd firmware before the bootloader commits to it. Returns false to trigger a
+// rollback to the previous app. Called from ConfirmOTAUpdateAfterInit() *after* the web server is up,
+// so simply reaching it already means the app didn't crash-loop through init (the main protection -
+// a crash before this point never confirms, and the bootloader rolls back). On top of that, reject the
+// two flags that mean the new firmware fundamentally cannot run on this hardware (no usable PSRAM /
+// too little heap) so a broken build rolls back instead of sitting bricked. Flags that reflect the
+// SD card / camera / network (which a re-flash of the same image wouldn't fix, and which still leave a
+// serving web UI to recover from) are intentionally NOT grounds for rollback.
 static bool diagnostic(void)
 {
+    if (isSetSystemStatusFlag(SYSTEM_STATUS_PSRAM_BAD) || isSetSystemStatusFlag(SYSTEM_STATUS_HEAP_TOO_SMALL)) {
+        return false;
+    }
     return true;
 }
 
@@ -336,49 +347,38 @@ void CheckOTAUpdate(void)
     esp_partition_get_sha256(esp_ota_get_running_partition(), sha_256);
     print_sha256(sha_256, "SHA-256 for current firmware: ");
 
+    // If this is a post-OTA *trial* boot (PENDING_VERIFY), only LOG it here - do NOT confirm the image
+    // yet. Confirmation is deferred to ConfirmOTAUpdateAfterInit() once the device has proven it can
+    // finish initialization (web server up). If it instead crash-loops before that point, the
+    // bootloader (CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE) rolls back to the previous working app.
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_ota_img_states_t ota_state;
-    esp_err_t res_stat_partition = esp_ota_get_state_partition(running, &ota_state);
-    switch (res_stat_partition)
-    {
-        case ESP_OK:
-            ESP_LOGD(TAG, "CheckOTAUpdate Partition: ESP_OK");
-            if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-                if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-                    // run diagnostic function ...
-                    bool diagnostic_is_ok = diagnostic();
-                    if (diagnostic_is_ok) {
-                        ESP_LOGI(TAG, "Diagnostics completed successfully! Continuing execution...");
-                        esp_ota_mark_app_valid_cancel_rollback();
-                    } else {
-                        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Diagnostics failed! Start rollback to the previous version...");
-                        esp_ota_mark_app_invalid_rollback_and_reboot();
-                    }
-                }
-            }            
-            break;
-        case ESP_ERR_INVALID_ARG:
-            ESP_LOGD(TAG, "CheckOTAUpdate Partition: ESP_ERR_INVALID_ARG");
-            break;
-        case ESP_ERR_NOT_SUPPORTED:
-            ESP_LOGD(TAG, "CheckOTAUpdate Partition: ESP_ERR_NOT_SUPPORTED");
-            break;
-        case ESP_ERR_NOT_FOUND:
-            ESP_LOGD(TAG, "CheckOTAUpdate Partition: ESP_ERR_NOT_FOUND");
-            break;
+    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK && ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Running a freshly updated firmware on trial - it will be "
+            "confirmed once initialization completes; if it crash-loops before then, the bootloader "
+            "rolls back to the previous version.");
     }
-    if (esp_ota_get_state_partition(running, &ota_state) == ESP_OK) {
-        if (ota_state == ESP_OTA_IMG_PENDING_VERIFY) {
-            // run diagnostic function ...
-            bool diagnostic_is_ok = diagnostic();
-            if (diagnostic_is_ok) {
-                ESP_LOGI(TAG, "Diagnostics completed successfully! Continuing execution...");
-                esp_ota_mark_app_valid_cancel_rollback();
-            } else {
-                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Diagnostics failed! Start rollback to the previous version...");
-                esp_ota_mark_app_invalid_rollback_and_reboot();
-            }
-        }
+}
+
+
+// Called AFTER initialization completes (web server + handlers up). On a post-OTA trial boot, run the
+// diagnostic and either commit the new app (cancel the pending rollback) or mark it invalid and reboot
+// into the previous app. No-op on a normal boot, or on a board with no OTA partitions (the WROVER
+// factory slot is never PENDING_VERIFY). Requires CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE to do anything.
+void ConfirmOTAUpdateAfterInit(void)
+{
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (esp_ota_get_state_partition(running, &ota_state) != ESP_OK || ota_state != ESP_OTA_IMG_PENDING_VERIFY) {
+        return; // normal boot (already valid) or no OTA state -> nothing to confirm
+    }
+
+    if (diagnostic()) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "OTA trial firmware passed diagnostics - confirming the update (rollback cancelled).");
+        esp_ota_mark_app_valid_cancel_rollback();
+    } else {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "OTA trial firmware failed diagnostics (PSRAM/heap) - rolling back to the previous version!");
+        esp_ota_mark_app_invalid_rollback_and_reboot(); // reboots; bootloader boots the previous app
     }
 }
 
