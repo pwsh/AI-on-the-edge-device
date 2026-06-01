@@ -875,8 +875,18 @@ function SaveConfigToServer(_domainname){
         config_gesamt = config_gesamt + config_split[i] + "\n";
     } 
 
+    // Roll-back safety: snapshot the current config.ini into /config/backup/ before overwriting it,
+    // unless the "create backup on save" option was turned off. Default on. Server keeps the latest 10.
+    try {
+        if (localStorage.getItem('aiotedge-cfg-backup') !== 'off') {
+            var _bx = new XMLHttpRequest();
+            _bx.open("GET", _domainname + "/config_backup", false);
+            _bx.send();
+        }
+    } catch (e) {}
+
     FileDeleteOnServer("/config/config.ini", _domainname);
-    FileSendContent(config_gesamt, "/config/config.ini", _domainname);          
+    FileSendContent(config_gesamt, "/config/config.ini", _domainname);
 }
 
 function getConfig() {

@@ -1184,6 +1184,107 @@ void unzip(std::string _in_zip_file, std::string _target_directory){
     ESP_LOGD(TAG, "Success.");
 }
 
+// ---- Config backups ---------------------------------------------------------------------------
+// Timestamped copies of config.ini under /sdcard/config/backup/, so a configuration change can be
+// rolled back. config_<epoch>.ini names sort lexically = chronologically. Keep only the latest 10.
+#define CONFIG_INI_PATH    "/sdcard/config/config.ini"
+#define CONFIG_BACKUP_DIR  "/sdcard/config/backup"
+#define CONFIG_BACKUP_KEEP 10
+
+static void pruneConfigBackups(int keep)
+{
+    std::vector<std::string> files;
+    DIR *dir = opendir(CONFIG_BACKUP_DIR);
+    if (!dir) return;
+    struct dirent *e;
+    while ((e = readdir(dir)) != NULL) {
+        std::string n = e->d_name;
+        if (n.rfind("config_", 0) == 0 && n.size() >= 12 && n.substr(n.size() - 4) == ".ini")
+            files.push_back(n);
+    }
+    closedir(dir);
+    std::sort(files.begin(), files.end());   // epoch-padded names -> oldest first
+    for (int i = 0; i + keep < (int)files.size(); ++i)
+        DeleteFile(std::string(CONFIG_BACKUP_DIR) + "/" + files[i]);
+}
+
+// Snapshot the current config.ini into the backup dir, then prune to the latest CONFIG_BACKUP_KEEP.
+static bool createConfigBackup()
+{
+    if (!FileExists(CONFIG_INI_PATH)) return false;
+    MakeDir(CONFIG_BACKUP_DIR);
+    char path[96];
+    time_t now; time(&now);
+    snprintf(path, sizeof(path), "%s/config_%010ld.ini", CONFIG_BACKUP_DIR, (long)now);
+    bool ok = CopyFile(CONFIG_INI_PATH, path);
+    if (ok) pruneConfigBackups(CONFIG_BACKUP_KEEP);
+    return ok;
+}
+
+// GET /config_backup -> snapshot the current config.ini (called by the editor before saving when the
+// "create backup" option is on).
+esp_err_t config_backup_handler(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    bool ok = createConfigBackup();
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, ok ? "Config backup created" : "Config backup: nothing to back up");
+    httpd_resp_sendstr(req, ok ? "backup created" : "no config to back up");
+    return ESP_OK;
+}
+
+// GET /config_backups -> newline-separated list of backup filenames, newest first.
+esp_err_t config_backups_list_handler(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    std::vector<std::string> files;
+    DIR *dir = opendir(CONFIG_BACKUP_DIR);
+    if (dir) {
+        struct dirent *e;
+        while ((e = readdir(dir)) != NULL) {
+            std::string n = e->d_name;
+            if (n.rfind("config_", 0) == 0 && n.size() >= 12 && n.substr(n.size() - 4) == ".ini")
+                files.push_back(n);
+        }
+        closedir(dir);
+    }
+    std::sort(files.rbegin(), files.rend());   // newest first
+    std::string out;
+    for (auto &f : files) out += f + "\n";
+    httpd_resp_sendstr(req, out.c_str());
+    return ESP_OK;
+}
+
+// GET /config_restore?file=config_<epoch>.ini -> snapshot the current config (so the restore is
+// itself reversible), then overwrite config.ini with the chosen backup. Caller reboots to apply.
+esp_err_t config_restore_handler(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    char query[160], fnbuf[96];
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK ||
+        httpd_query_key_value(query, "file", fnbuf, sizeof(fnbuf)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing 'file' parameter");
+        return ESP_FAIL;
+    }
+    std::string fn = fnbuf;
+    // sanitize: a plain backup basename only (no path traversal)
+    if (fn.find('/') != std::string::npos || fn.find("..") != std::string::npos ||
+        fn.rfind("config_", 0) != 0 || fn.size() < 12 || fn.substr(fn.size() - 4) != ".ini") {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid backup filename");
+        return ESP_FAIL;
+    }
+    std::string src = std::string(CONFIG_BACKUP_DIR) + "/" + fn;
+    if (!FileExists(src)) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "backup not found");
+        return ESP_FAIL;
+    }
+    createConfigBackup();   // snapshot the current config first so the restore can be undone
+    bool ok = CopyFile(src, CONFIG_INI_PATH);
+    LogFile.WriteToFile(ESP_LOG_WARN, TAG, ok ? ("Config restored from " + fn + " - reboot to apply")
+                                              : ("Config restore from " + fn + " failed"));
+    httpd_resp_sendstr(req, ok ? "restored - reboot to apply" : "restore failed");
+    return ESP_OK;
+}
+
 void register_server_file_uri(httpd_handle_t server, const char *base_path)
 {
     static struct file_server_data *server_data = NULL;
@@ -1282,4 +1383,15 @@ void register_server_file_uri(httpd_handle_t server, const char *base_path)
         .user_ctx  = server_data    // Pass server data as context
     };
     httpd_register_uri_handler(server, &file_delete);
+
+    /* Config backup / restore (timestamped config.ini copies, keep latest 10) */
+    httpd_uri_t cfg_backup = { .uri = "/config_backup", .method = HTTP_GET,
+        .handler = APPLY_BASIC_AUTH_FILTER(config_backup_handler), .user_ctx = server_data };
+    httpd_register_uri_handler(server, &cfg_backup);
+    httpd_uri_t cfg_backups = { .uri = "/config_backups", .method = HTTP_GET,
+        .handler = APPLY_BASIC_AUTH_FILTER(config_backups_list_handler), .user_ctx = server_data };
+    httpd_register_uri_handler(server, &cfg_backups);
+    httpd_uri_t cfg_restore = { .uri = "/config_restore", .method = HTTP_GET,
+        .handler = APPLY_BASIC_AUTH_FILTER(config_restore_handler), .user_ctx = server_data };
+    httpd_register_uri_handler(server, &cfg_restore);
 }

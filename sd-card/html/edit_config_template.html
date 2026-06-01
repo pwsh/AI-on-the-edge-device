@@ -2359,10 +2359,68 @@
     <div id="cfg_savebar" class="actionbar">
         <button class="btn btn-primary" onclick="saveTextAsFile()">💾 Save Config</button>
         <button type="button" class="btn" onclick="cfgToggleAll()">Collapse / expand all</button>
+        <label style="margin-left:10px;" title="Save a timestamped copy of the configuration before overwriting it, so you can roll back. The latest 10 are kept.">
+            <input type="checkbox" id="cfgBackupOnSave" onchange="cfgBackupPrefChanged()"> Backup on save
+        </label>
+        <button type="button" class="btn" onclick="cfgShowBackups()">↩ Restore backup</button>
         <span class="cfg-spacer"></span>
         <span class="description">Changes take effect after the next reboot.</span>
     </div>
+    <div id="cfgBackupList" style="display:none; margin:8px 0; padding:8px; border:1px solid var(--border,#ccc); border-radius:6px;"></div>
 </div>
+
+<script type="text/javascript">
+    // "Backup on save" preference (default ON), persisted in localStorage.
+    function cfgBackupPrefChanged() {
+        try { localStorage.setItem('aiotedge-cfg-backup', document.getElementById('cfgBackupOnSave').checked ? 'on' : 'off'); } catch (e) {}
+    }
+    (function () {
+        try {
+            var cb = document.getElementById('cfgBackupOnSave');
+            if (cb) cb.checked = (localStorage.getItem('aiotedge-cfg-backup') !== 'off'); // default on
+        } catch (e) {}
+    })();
+
+    // List config backups (newest first) with a Restore action.
+    function cfgShowBackups() {
+        var box = document.getElementById('cfgBackupList');
+        box.style.display = 'block';
+        box.innerHTML = 'Loading backups...';
+        var x = new XMLHttpRequest();
+        x.onreadystatechange = function () {
+            if (x.readyState != 4) return;
+            if (x.status != 200) { box.innerHTML = 'Could not load backups.'; return; }
+            var names = (x.responseText || '').split('\n').filter(function (s) { return s.trim().length; });
+            if (!names.length) { box.innerHTML = 'No backups yet. They are created when you save (with "Backup on save" on).'; return; }
+            var html = '<b>Restore a previous configuration</b> (newest first) - the current config is itself backed up first, then a reboot applies the restore:<br>';
+            names.forEach(function (n) {
+                var m = n.match(/^config_(\d+)\.ini$/);
+                var when = m ? new Date(parseInt(m[1], 10) * 1000).toLocaleString() : n;
+                html += '<div style="margin:4px 0;">' + when +
+                    ' <button type="button" class="btn" onclick="cfgRestore(\'' + n + '\')">Restore</button></div>';
+            });
+            box.innerHTML = html;
+        };
+        x.open('GET', getDomainname() + '/config_backups', true);
+        x.send();
+    }
+
+    function cfgRestore(name) {
+        if (!confirm('Restore configuration "' + name + '"? The current configuration is backed up first, then the device reboots to apply it.')) return;
+        var x = new XMLHttpRequest();
+        x.onreadystatechange = function () {
+            if (x.readyState != 4) return;
+            if (x.status == 200) {
+                firework.launch('Configuration restored. Rebooting to apply...', 'success', 5000);
+                var r = new XMLHttpRequest(); try { r.open('GET', getDomainname() + '/reboot', true); r.send(); } catch (e) {}
+            } else {
+                firework.launch('Restore failed: ' + x.responseText, 'danger', 8000);
+            }
+        };
+        x.open('GET', getDomainname() + '/config_restore?file=' + encodeURIComponent(name), true);
+        x.send();
+    }
+</script>
 
 <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
 <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
