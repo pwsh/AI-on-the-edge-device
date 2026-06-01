@@ -619,10 +619,26 @@ updates the UI; keep models, logs, and config on the SD card for portability.
 4. Package the web partition image in the release flow; OTA-update it via a second OTA image
    (data-OTA) so the UI can still be updated without a full SD swap.
 
-**Decision (2026-05-30): keep the UI on the SD card (status quo).** The web UI stays on SD and is
-updated via the existing OTA Update page (no card swap needed); flash space is reserved for the
-firmware + dual-OTA rollback safety. Revisit only if the project targets 8 MB+ boards, where a
-dedicated `web` LittleFS partition (option c above) becomes the clean path.
+**Decision (2026-05-30): keep the UI on the SD card (status quo) for the ESP32-CAM.** The web UI
+stays on SD and is updated via the existing OTA Update page (no card swap needed); flash space is
+reserved for the firmware + dual-OTA rollback safety.
+
+**✅ IMPLEMENTED (2026-06-01) for the ESP32-WROVER single-slot — SD-free from flash.** Verified on
+hardware (the 4 MB WROVER-DEV). What made it fit on 4 MB: the **best-models-only cut (~688 KB vs
+3 MB)** + dropping dual-OTA (single 1.9 MB `factory` slot) to free a 2 MB `storage` partition.
+- A **LittleFS image** (`code/flashfs`: gzipped web UI + the 4 best models, ~1.5 MB) is built into
+  the `storage` partition (`littlefs_create_partition_image`, `tools/build-flashfs.sh`) and flashed
+  with the app.
+- At boot, if the **SD mount fails**, `main.cpp` mounts that LittleFS **at `/sdcard`**, so every
+  existing `/sdcard/...` path transparently reads/writes flash - no per-file changes. The image is
+  read-write, so config/prevalue/log saves persist. Boot log confirmed: PSRAM OK, "mounted in-flash
+  LittleFS at /sdcard (1944/2048 KB)", OV2640 detected, Wi-Fi setup AP (no config.ini yet).
+- All gated behind **`USE_FLASH_FS`** (set only for `BOARD_WROVER_KIT`); the ESP32-CAM build is
+  byte-unaffected (littlefs gc-stripped, dual-OTA kept). Trade-off on the WROVER: **no OTA**
+  (re-flash over USB) and no A/B rollback.
+- Remaining/optional: an OTA path for the data partition; a SD-present-and-flash-present precedence
+  rule (today SD wins, flash is the fallback); de-duplicate the tooltip images copied into both
+  `html/` and `html/img/` to reclaim ~200 KB if the image gets tight.
 
 ## 9. ESP-IDF 6.0 build-flag parity + opportunities
 
