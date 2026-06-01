@@ -35,6 +35,11 @@ std::string starttime = "";
 
 static const char *TAG = "MAIN SERVER";
 
+// Defined in softAP.cpp - the authoritative wlan.ini writer. Shared so the normal (STA) web UI's
+// "Wi-Fi Configuration" page (wlan_config.html -> GET /config?ssid=...) can save wlan.ini too, not
+// just the soft-AP setup page. It only writes the file; new settings apply on the next reboot.
+extern esp_err_t config_ini_handler(httpd_req_t *req);
+
 // --- Analysis diagnostics helpers (shared by /info?type=Diagnostics and /sysinfo) ---------------
 // Format a local-time wall clock from an epoch, "-" when unknown (clock not set / not scheduled yet).
 static std::string diagFormatClock(time_t e)
@@ -678,6 +683,16 @@ void register_server_main_uri(httpd_handle_t server, const char *base_path)
         .user_ctx  = (void*) base_path    // Pass server data as context
     };
     httpd_register_uri_handler(server, &img_tmp_handle);
+
+    // Wi-Fi configuration save from the normal web UI (wlan_config.html). Must be registered before
+    // the "/*" catch-all below, otherwise the wildcard handler matches "/config" first.
+    httpd_uri_t config_ini_handle = {
+        .uri       = "/config",
+        .method    = HTTP_GET,
+        .handler = APPLY_BASIC_AUTH_FILTER(config_ini_handler),
+        .user_ctx  = NULL
+    };
+    httpd_register_uri_handler(server, &config_ini_handle);
 
     httpd_uri_t main_rest_handle = {
         .uri       = "/*",  // Match all URIs of type /path/to/file
