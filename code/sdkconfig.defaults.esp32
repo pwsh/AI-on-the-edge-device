@@ -1,0 +1,22 @@
+# ESP32 (classic, LX6) target overrides - auto-merged by IDF on top of sdkconfig.defaults when the
+# target is esp32 (the AI-Thinker ESP32-CAM and the ESP32-WROVER both build as IDF_TARGET=esp32).
+#
+# These keys are ESP32-only Kconfig symbols. They previously lived in the shared sdkconfig.defaults
+# and produced "unknown kconfig symbol" warnings on the ESP32-S3 build (where the symbols don't
+# exist). Moving them here keeps the ESP32 resolved config byte-identical while removing the noise
+# from the S3/other-target builds.
+
+# Accept any silicon revision (min rev 0). S3 uses its own CONFIG_ESP32S3_REV_MIN_* instead.
+CONFIG_ESP32_REV_MIN_0=y
+
+# Legacy alias for PSRAM support on the ESP32; the generic CONFIG_SPIRAM (in sdkconfig.defaults) is
+# the real switch. Kept for parity with the long-standing config.
+CONFIG_ESP32_SPIRAM_SUPPORT=y
+
+# Work around the ESP32 PSRAM cache bug (ECO-dependent). ESP32-only; not present on the S3.
+CONFIG_SPIRAM_CACHE_WORKAROUND=y
+
+# HIMEM bank-switching disabled by default (can be enabled via [env:esp32cam-dev-himem]); frees
+# ~256 KB of internal memory when off. ESP32-only PSRAM bank-switching feature.
+CONFIG_SPIRAM_BANKSWITCH_ENABLE=n
+#CONFIG_SPIRAM_BANKSWITCH_RESERVE is not set
