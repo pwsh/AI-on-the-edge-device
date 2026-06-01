@@ -688,8 +688,21 @@ The native `idf.py` build does **not** read `platformio.ini build_flags`. Audite
 - 🚫 **Commented out** (never active): `MQTT_PROTOCOL_311`, `MQTT_ENABLE_WS`, `MQTT_ENABLE_WSS`,
   `MQTT_SUPPORTED_FEATURE_CRT_CMN_NAME`, `MQTT_SUPPORTED_FEATURE_CLIENT_KEY_PASSWORD`, the `DEBUG_*`
   and `HEAP_TRACING_*` / `TASK_ANALYSIS_ON` switches.
-- ⬜ **Recreate the alternate build envs** for the native toolchain (board-rev3, cpu-freq-240,
-  power-management, no-softap, himem, task-analysis) as idf.py build profiles / sdkconfig variants.
+- ✅ **Recreated the alternate build envs** for the native toolchain (commit *recreate the platformio
+  alternate build envs*). An `AIOTEDGE_VARIANTS` env var (comma/space separated) in `code/CMakeLists.txt`
+  merges `sdkconfig.defaults.<variant>` (last, so it wins) and adds the variant's code `-D` defines:
+  `AIOTEDGE_VARIANTS="power-management,cpu-freq-240" idf.py -B build_pm build`. Shipped six clean,
+  IDF6-correct variants (intent re-created, not the old cruft): **power-management** (DFS + tickless),
+  **cpu-freq-240**, **board-rev3**, **task-analysis** (FreeRTOS run-time stats + heap tracking),
+  **himem** (PSRAM bank-switching, ESP32-only), **debug** (assertions/err-name/verbose logging +
+  `DEBUG_DETAIL_ON`/`DEBUG_ENABLE_SYSINFO`/`DEBUG_ENABLE_PERFMON`). All six reconfigure with 0 Kconfig
+  warnings; debug/himem/task-analysis full-build green. Building them surfaced (and fixed) IDF-6
+  bit-rot in the sysinfo path: `esp_sys.{h,cpp}` used the removed `esp_spi_flash.h` /
+  `spi_flash_get_chip_size()` → now `esp_flash.h` / `esp_flash_get_size()`, with `spi_flash`+`esp_psram`
+  added to `jomjol_helper` REQUIRES. (`no-softap` not shipped as a variant — `ENABLE_SOFTAP` is a code
+  define, so a no-softap build is just dropping it from `CMakeLists.txt`; not worth a profile.)
+  Note: the **debug** variant is a tight fit on the 4 MB dual-OTA `partitions.csv` (~0% slack); it's a
+  dev/profiling build, not for release.
 
 ### 9.2 ⬜ IDF 6.0 features worth adopting (evaluate)
 Opportunities the 5.3→6.0 jump opens up for this project (each TBD / measure before adopting):
