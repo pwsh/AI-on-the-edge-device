@@ -542,7 +542,8 @@ Two independent reductions:
    - ⬜ Follow-up (optional): expose a server-side "Theme" config so the default can be set
      in `config.ini`; on-device visual pass across every page.
 - ✅ FastRead config options added to the UI (see §1).
-- ⬜ **Highlight changed digits on the overview page.** On each refresh, visually highlight the
+- ✅ **Highlight changed digits on the overview page** (commit *flash changed digits*; single-value cards, light+dark flash, never on first render; future: multi-number cells + FastRead per-digit flag). Original:
+- 💤 **Highlight changed digits on the overview page.** On each refresh, visually highlight the
    digit(s) whose value changed since the previous reading on the overview (`overview.html`) — a
    brief flash / background tint on the changed character(s) of the displayed value. Goal: see at a
    glance which digits are moving and spot a stuck or jumpy digit. Pairs naturally with the FastRead
@@ -551,7 +552,8 @@ Two independent reductions:
    diff the rendered value against the prior render as a fallback when FastRead is off. Keep it cheap
    (CSS transition, no layout shift) and respect dark mode. (Ties in with the §10 confidence vote: a
    digit that keeps flipping is exactly what the vote should catch.)
-- ⬜ **"Pause processing" menu item.** Add a control in the web UI to pause/resume the flow
+- ✅ **"Pause processing" menu item — DONE** (already implemented: `flowPaused` flag + `/pause` endpoint + `task_autodoFlow` honoring it + the `#PauseToggle` menu item in index.html; verified pause/getstatus/resume on hardware). Original:
+- 💤 **"Pause processing" menu item.** Add a control in the web UI to pause/resume the flow
    (CNN reading loop). Very useful while setting up reference image, alignment, and ROIs so
    the device doesn't keep capturing/processing mid-setup. Implementation: a flag checked by
    the flow task (`MainFlowControl`/`server_tflite`) + a REST endpoint
