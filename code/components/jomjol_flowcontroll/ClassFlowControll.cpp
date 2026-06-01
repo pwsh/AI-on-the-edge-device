@@ -475,15 +475,15 @@ bool ClassFlowControll::doFlow(string time)
             // numeric reading, so a skipped round is simply a gap in the series (no datapoint).
             if (FlowControll[i]->name() == "ClassFlowAlignment") {
                 setProcessingStage(PROC_STAGE_ERROR);
-                aktstatus = "Alignment error - could not read alignment data (check reference image / markers)";
+                aktstatus = "Alignment step could not complete this round";
                 aktstatusWithTime = aktstatus + " (" + getCurrentTimeString("%H:%M:%S") + ")";
-                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed (alignment cache unreadable) - "
-                    "reporting status/error to REST + MQTT and skipping the rest of this round without "
-                    "rebooting; will retry on the next round.");
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - reporting status/error "
+                    "to REST + MQTT and skipping the rest of this round without rebooting; will retry "
+                    "on the next round.");
                 #ifdef ENABLE_MQTT
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "error",
-                                "Alignment: could not read alignment data", qos, false);
+                                "Alignment step could not complete", qos, false);
                 #endif //ENABLE_MQTT
                 return false;   // skip the post-loop "Flow finished" so the failure status persists
             }

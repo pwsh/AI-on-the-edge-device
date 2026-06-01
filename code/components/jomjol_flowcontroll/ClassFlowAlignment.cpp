@@ -410,10 +410,13 @@ bool ClassFlowAlignment::doFlow(string time)
 
     // no align algo if set to 3 = off => no draw ref //add disable aligment algo |01.2023
     if (References[0].alignment_algo != 3) {
-        // Best-effort alignment: the frame has already been aligned/cut using the found marker
-        // positions. The round only fails if the regenerable align.txt cache can't be read back
-        // (missing/corrupt) - the flow controller treats that as a graceful skip, not a reboot.
-        return LoadReferenceAlignmentValues();
+        // Best-effort alignment: the frame has already been aligned & cut above using the found
+        // marker positions, and References[].fastalg_* are current in memory. Refreshing the
+        // regenerable align.txt cache here is only an optimisation for the next round's fast-align,
+        // so a missing/partial/corrupt cache must NOT fail the round - just leave the fast-align
+        // un-primed (the next round falls back to a full marker search). Returning true keeps the
+        // device reading the meter instead of skipping every round over a cache quirk.
+        LoadReferenceAlignmentValues();
     }
 
     return true;
@@ -534,9 +537,11 @@ bool ClassFlowAlignment::LoadReferenceAlignmentValues(void)
     fclose(pFile);
 
     if (!ok) {
-        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment cache (align.txt) is missing fields or malformed - "
-                                               "discarding it; it will be recomputed on the next full alignment.");
-        remove(FileStoreRefAlignment.c_str());
+        // The regenerable fast-align cache is partial/corrupt. This is NOT fatal and NOT deleted:
+        // the next full alignment's SaveReferenceAlignmentValues() overwrites it ("w"), and the
+        // in-memory fastalg values set by Align() this round are already current. Just report the
+        // cache as not-loaded so the caller knows the fast-align starting point isn't primed.
+        ESP_LOGD(TAG, "align.txt incomplete/malformed - ignoring (will be rewritten by next alignment)");
         return false;
     }
 
