@@ -537,7 +537,41 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         rect.h = ROIInfo[aktindex]["dy"];
         draw();
     }
-    
+
+    // Keyboard nudging of the selected ROI for precise placement: Arrow keys move it 1 px;
+    // Shift+Arrow resizes it (Right/Down grow, Left/Up shrink). Ignored while typing in a field.
+    function nudgeROI(ddx, ddy, resize) {
+        if (!ROIInfo || !ROIInfo.length || aktindex < 0 || aktindex >= ROIInfo.length) return;
+        var r = ROIInfo[aktindex];
+        if (resize) {
+            r["dx"] = Math.max(1, parseInt(r["dx"]) + ddx);
+            r["dy"] = Math.max(1, parseInt(r["dy"]) + ddy);
+        } else {
+            r["x"] = parseInt(r["x"]) + ddx;
+            r["y"] = parseInt(r["y"]) + ddy;
+        }
+        document.getElementById("refx").value = r["x"];
+        document.getElementById("refy").value = r["y"];
+        document.getElementById("refdx").value = r["dx"];
+        document.getElementById("refdy").value = r["dy"];
+        rect.startX = r["x"]; rect.startY = r["y"]; rect.w = r["dx"]; rect.h = r["dy"];
+        draw();
+        var sv = document.getElementById("saveroi"); if (sv) sv.disabled = false;   // mark dirty
+    }
+
+    document.addEventListener("keydown", function (e) {
+        var tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        var ddx = 0, ddy = 0;
+        if (e.key === "ArrowLeft") ddx = -1;
+        else if (e.key === "ArrowRight") ddx = 1;
+        else if (e.key === "ArrowUp") ddy = -1;
+        else if (e.key === "ArrowDown") ddy = 1;
+        else return;
+        e.preventDefault();
+        nudgeROI(ddx, ddy, e.shiftKey);
+    });
+
     function loadCanvas(dataURL) {
         var canvas = document.getElementById('canvas');
         var context = canvas.getContext('2d');
