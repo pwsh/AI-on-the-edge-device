@@ -13,7 +13,7 @@
 
 // Device libraries (ESP-IDF)
 #include <esp_system.h>
-#include <esp_spi_flash.h>
+#include <esp_flash.h>   // IDF 6: replaces the removed esp_spi_flash.h (esp_flash_get_size)
 #include <esp_heap_caps.h>
 
 // for esp_psram_get_size

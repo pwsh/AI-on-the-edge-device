@@ -1,0 +1,8 @@
+# Debug variant - native equivalent of platformio [env:esp32cam-debug]. Re-enables the assertions,
+# error-name lookup and verbose logging that the size-optimized default turns off, and switches on
+# the DEBUG_DETAIL_ON / DEBUG_ENABLE_SYSINFO / DEBUG_ENABLE_PERFMON code paths (added as -D in
+# CMakeLists). A development build (larger, slower) - not for production.
+CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y
+CONFIG_ESP_ERR_TO_NAME_LOOKUP=y
+CONFIG_LOG_DEFAULT_LEVEL_DEBUG=y
+CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y

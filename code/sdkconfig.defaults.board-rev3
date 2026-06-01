@@ -1,0 +1,3 @@
+# Minimum chip revision v3.0 - native equivalent of platformio [env:esp32cam-board-rev3].
+# Rejects older ESP32 silicon at boot (a choice; selecting _3 deselects the default _0).
+CONFIG_ESP32_REV_MIN_3=y

@@ -11,6 +11,6 @@ endif()
 idf_component_register(SRCS ${app_sources}
                     INCLUDE_DIRS "."
                     REQUIRES esp_timer esp-tflite-micro jomjol_logfile fatfs sdmmc vfs
-                             esp_driver_gpio esp_driver_sdmmc esp_driver_sdspi ${extra_requires})
+                             esp_driver_gpio esp_driver_sdmmc esp_driver_sdspi spi_flash esp_psram ${extra_requires})
 
 

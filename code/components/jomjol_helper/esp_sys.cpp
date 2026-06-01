@@ -100,7 +100,10 @@ std::string get_device_info()
     espInfoResultStr += std::string(aMsgBuf);
     sprintf(aMsgBuf,"CPU Cores: %d\n", chip_info.cores);
     espInfoResultStr += std::string(aMsgBuf);
-    sprintf(aMsgBuf,"Flash Memory: %dMB\n", spi_flash_get_chip_size()/(1024*1024));
+    // IDF 6: spi_flash_get_chip_size() was removed with esp_spi_flash.h; use esp_flash_get_size().
+    uint32_t flash_size_bytes = 0;
+    esp_flash_get_size(NULL, &flash_size_bytes);
+    sprintf(aMsgBuf,"Flash Memory: %luMB\n", (unsigned long)(flash_size_bytes/(1024*1024)));
     espInfoResultStr += std::string(aMsgBuf);
     if(chip_info.features & CHIP_FEATURE_WIFI_BGN)
         //espInfoResultStr += "Base MAC: " + std::string(getMac()) +"\n";

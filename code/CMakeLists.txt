@@ -19,10 +19,32 @@ endif()
 if("$ENV{IDF_TARGET}" STREQUAL "esp32s3" AND "$ENV{AIOTEDGE_S3_FLASH}" STREQUAL "16mb")
     set(_board_defaults "${_board_defaults};sdkconfig.defaults.esp32s3_16mb")
 endif()
+
+# Optional build variants - the native-idf.py equivalent of the old platformio.ini [env:*] alternates.
+# Select one or more via AIOTEDGE_VARIANTS (comma/space separated). Each variant <v> merges
+# sdkconfig.defaults.<v> (Kconfig overrides, applied last so they win) and, where it has code-level
+# switches, adds the matching -D defines in the non-PLATFORMIO block below. Examples:
+#   AIOTEDGE_VARIANTS=debug              idf.py -B build_debug build
+#   AIOTEDGE_VARIANTS="power-management,cpu-freq-240" idf.py -B build_pm build
+# Available: debug, power-management, cpu-freq-240, board-rev3, himem, task-analysis.
+set(_variant_defaults "")
+set(_aiotedge_variants "")
+if(DEFINED ENV{AIOTEDGE_VARIANTS})
+    string(REGEX REPLACE "[ ,]+" ";" _aiotedge_variants "$ENV{AIOTEDGE_VARIANTS}")
+    foreach(_v ${_aiotedge_variants})
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdkconfig.defaults.${_v}")
+            set(_variant_defaults "${_variant_defaults};sdkconfig.defaults.${_v}")
+        else()
+            message(WARNING "AIOTEDGE_VARIANTS: '${_v}' has no sdkconfig.defaults.${_v} (code -D defines only, if any)")
+        endif()
+    endforeach()
+    message(STATUS "-- AIOTEDGE variants: ${_aiotedge_variants}")
+endif()
+
 if(EXISTS "${SDKCONFIG}.defaults")
-    set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults;sdkconfig.defaults${_board_defaults}")
+    set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults;sdkconfig.defaults${_board_defaults}${_variant_defaults}")
 else()
-    set(SDKCONFIG_DEFAULTS "sdkconfig.defaults${_board_defaults}")
+    set(SDKCONFIG_DEFAULTS "sdkconfig.defaults${_board_defaults}${_variant_defaults}")
 endif()
 message(STATUS "-- Using defaults: ${SDKCONFIG_DEFAULTS}")
 
@@ -70,6 +92,22 @@ if(NOT DEFINED ENV{PLATFORMIO})
     idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_INFLUXDB" APPEND)
     idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_WEBHOOK" APPEND)
     idf_build_set_property(COMPILE_DEFINITIONS "ENABLE_SOFTAP" APPEND)
+
+    # Build-variant code-level switches (the Kconfig side is merged via sdkconfig.defaults.<variant>
+    # above). Only the variants that have C/C++ #ifdef switches appear here; the pure-Kconfig ones
+    # (power-management, cpu-freq-240, board-rev3) need nothing in this block.
+    foreach(_v ${_aiotedge_variants})
+        if(_v STREQUAL "debug")
+            idf_build_set_property(COMPILE_DEFINITIONS "DEBUG_DETAIL_ON" APPEND)
+            idf_build_set_property(COMPILE_DEFINITIONS "DEBUG_ENABLE_SYSINFO" APPEND)
+            idf_build_set_property(COMPILE_DEFINITIONS "DEBUG_ENABLE_PERFMON" APPEND)
+        elseif(_v STREQUAL "task-analysis")
+            idf_build_set_property(COMPILE_DEFINITIONS "TASK_ANALYSIS_ON" APPEND)
+        elseif(_v STREQUAL "himem")
+            idf_build_set_property(COMPILE_DEFINITIONS "USE_HIMEM_IF_AVAILABLE" APPEND)
+            idf_build_set_property(COMPILE_DEFINITIONS "DEBUG_HIMEM_MEMORY_CHECK" APPEND)
+        endif()
+    endforeach()
 
     # ESP-IDF 6.0 hardcodes -Werror in build.cmake (no Kconfig toggle) with only a small
     # exemption list. This project vendors third-party C/C++ (stb, miniz, SmartLeds, ...)

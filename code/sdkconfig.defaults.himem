@@ -1,0 +1,6 @@
+# HIMEM variant - native equivalent of platformio [env:esp32cam-dev-himem]. ESP32-only.
+# Enables PSRAM bank-switching to reach the upper ~4 MB of an 8 MB PSRAM (the part not memory-mapped),
+# freeing internal RAM. Pairs with the USE_HIMEM_IF_AVAILABLE / DEBUG_HIMEM_MEMORY_CHECK code paths
+# (added as -D in CMakeLists). Overrides the default's CONFIG_SPIRAM_BANKSWITCH_ENABLE=n.
+CONFIG_SPIRAM_BANKSWITCH_ENABLE=y
+CONFIG_SPIRAM_BANKSWITCH_RESERVE=8
