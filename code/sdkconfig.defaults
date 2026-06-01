@@ -29,6 +29,10 @@ CONFIG_HAL_DEFAULT_ASSERTION_LEVEL=0
 #CONFIG_LOG_DEFAULT_LEVEL_NONE=y
 #CONFIG_LOG_DEFAULT_LEVEL=0
 CONFIG_LOG_MAXIMUM_EQUALS_DEFAULT=y
+# esp_log v2: smaller/faster console logging backend + cleaner runtime per-tag levels. Only affects the
+# ESP_LOGx console path; the custom LogFile writes to file directly (fputs) and does not hook the log
+# backend, so file logs are unaffected.
+CONFIG_LOG_VERSION_2=y
 CONFIG_LWIP_ESP_LWIP_ASSERT=n
 CONFIG_OPTIMIZATION_ASSERTIONS_DISABLED=y
 CONFIG_OPTIMIZATION_ASSERTION_LEVEL=0
