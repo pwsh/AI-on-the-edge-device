@@ -14,9 +14,11 @@ CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
 CONFIG_SPIRAM_RODATA=y
 
-# Bigger OTA app slots (see partitions_esp32s3.csv)
+# Dual-OTA + coredump + in-flash LittleFS 'storage' (web UI + best-models + config). Runs with no SD
+# card; a usable SD present at boot is used instead. 16 MB boards: set AIOTEDGE_S3_FLASH=16mb (merges
+# sdkconfig.defaults.esp32s3_16mb -> bigger app slots + ~9.5 MB storage).
 CONFIG_PARTITION_TABLE_CUSTOM=y
-CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_esp32s3.csv"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_esp32s3_8mb.csv"
 
 # S3 can run the camera/CNN at the full clock
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y

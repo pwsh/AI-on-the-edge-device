@@ -1,0 +1,6 @@
+# ESP32-S3 16 MB override (merged on top of sdkconfig.defaults.esp32s3 when AIOTEDGE_S3_FLASH=16mb).
+# Uses the full 16 MB: bigger dual-OTA app slots + a large (~9.5 MB) in-flash 'storage' partition.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=n
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_esp32s3_16mb.csv"

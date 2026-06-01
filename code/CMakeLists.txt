@@ -14,6 +14,11 @@ set(_board_defaults "")
 if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT")
     set(_board_defaults ";sdkconfig.defaults.wrover")
 endif()
+# ESP32-S3 flash-size variant: default is 8 MB (sdkconfig.defaults.esp32s3). Set AIOTEDGE_S3_FLASH=16mb
+# to merge the 16 MB overrides (bigger app slots + a larger in-flash storage partition).
+if("$ENV{IDF_TARGET}" STREQUAL "esp32s3" AND "$ENV{AIOTEDGE_S3_FLASH}" STREQUAL "16mb")
+    set(_board_defaults "${_board_defaults};sdkconfig.defaults.esp32s3_16mb")
+endif()
 if(EXISTS "${SDKCONFIG}.defaults")
     set(SDKCONFIG_DEFAULTS "${SDKCONFIG}.defaults;sdkconfig.defaults${_board_defaults}")
 else()
@@ -44,6 +49,10 @@ if(NOT DEFINED ENV{PLATFORMIO})
         endif()
     elseif("$ENV{IDF_TARGET}" STREQUAL "esp32s3")
         idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32S3_CAM" APPEND)
+        # S3 builds carry an in-flash LittleFS 'storage' partition (web UI + best-models + config),
+        # mounted at /sdcard, so the device runs with NO SD card. A usable SD card present at boot is
+        # used instead (Init_NVS_SDCard tries SD first, falls back to flash).
+        idf_build_set_property(COMPILE_DEFINITIONS "USE_FLASH_FS" APPEND)
     else()
         idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32CAM_AITHINKER" APPEND)
     endif()
@@ -75,7 +84,7 @@ project(AI-on-the-edge)
 # best-models + default config, assembled by build-flashfs.sh) into the `storage` partition and
 # flash it with the app. Only when USE_FLASH_FS is active (BOARD_WROVER_KIT) and the staging dir
 # exists. littlefs_create_partition_image comes from the joltwallet/littlefs managed component.
-if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT")
+if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT" OR "$ENV{IDF_TARGET}" STREQUAL "esp32s3")
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/flashfs")
         littlefs_create_partition_image(storage "${CMAKE_CURRENT_SOURCE_DIR}/flashfs" FLASH_IN_PROJECT)
         message(STATUS "Flash-FS: building LittleFS 'storage' image from code/flashfs/")

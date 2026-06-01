@@ -1,0 +1,12 @@
+# ESP32-S3, 16 MB flash: dual-OTA (A/B rollback) + coredump + a large in-flash LittleFS 'storage'.
+# 'storage' (~9.5 MB) holds the web UI + models + config + room for logs (mounted at /sdcard), so the
+# device runs with NO SD card. A usable SD card present at boot is used instead - see main.cpp.
+# 3 MB app slots; ~9.5 MB storage.
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     ,        0x4000,
+otadata,  data, ota,     ,        0x2000,
+phy_init, data, phy,     ,        0x1000,
+ota_0,    app,  ota_0,   ,        0x300000,
+ota_1,    app,  ota_1,   ,        0x300000,
+coredump, data, coredump,,        0x10000,
+storage,  data, spiffs,  ,        0x980000,
