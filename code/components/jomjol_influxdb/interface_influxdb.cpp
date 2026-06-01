@@ -1,5 +1,6 @@
 #ifdef ENABLE_INFLUXDB
 #include "interface_influxdb.h"
+#include "esp_crt_bundle.h"
 
 #include "esp_log.h"
 #include <time.h>
@@ -128,6 +129,9 @@ void InfluxDB::connectHTTP() {
     config.event_handler = http_event_handler;
     config.buffer_size = MAX_HTTP_OUTPUT_BUFFER;
     config.user_data = response_buffer;
+    // Verify an https:// InfluxDB endpoint (e.g. InfluxDB Cloud) against the built-in Mozilla CA
+    // bundle - no manual cert upload needed; a no-op for a plaintext http:// endpoint.
+    config.crt_bundle_attach = esp_crt_bundle_attach;
 
 
     switch (version) {

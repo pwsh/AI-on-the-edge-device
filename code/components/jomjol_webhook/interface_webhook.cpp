@@ -1,5 +1,6 @@
 #ifdef ENABLE_WEBHOOK
 #include "interface_webhook.h"
+#include "esp_crt_bundle.h"
 
 #include "esp_log.h"
 #include <time.h>
@@ -75,6 +76,8 @@ bool WebhookPublish(std::vector<NumberPost*>* numbers)
         .buffer_size = MAX_HTTP_OUTPUT_BUFFER,
         .user_data = response_buffer
     };
+    // Verify an https:// webhook against the built-in Mozilla CA bundle (no-op for http://).
+    http_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t http_client = esp_http_client_init(&http_config);
 
@@ -112,6 +115,8 @@ void WebhookUploadPic(ImageData *Img) {
         .buffer_size = MAX_HTTP_OUTPUT_BUFFER,
         .user_data = response_buffer
     };
+    // Verify an https:// webhook against the built-in Mozilla CA bundle (no-op for http://).
+    http_config.crt_bundle_attach = esp_crt_bundle_attach;
 
     esp_http_client_handle_t http_client = esp_http_client_init(&http_config);
 

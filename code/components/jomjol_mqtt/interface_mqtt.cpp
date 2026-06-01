@@ -7,6 +7,7 @@
 #endif
 #include "connect_wlan.h"
 #include "mqtt_client.h"
+#include "esp_crt_bundle.h"   // Mozilla CA bundle fallback for mqtts:// without a user-uploaded cert
 #include "ClassLogFile.h"
 #include "MainFlowControl.h"
 #include "cJSON.h"
@@ -319,6 +320,13 @@ int MQTT_Init() {
         // Skip any validation of server certificate CN field, this reduces the
         // security of TLS and makes the *MQTT* client susceptible to MITM attacks
         mqtt_cfg.broker.verification.skip_cert_common_name_check = !validateServerCert;
+    }
+    else if (validateServerCert) {
+        // No user-supplied CA cert: fall back to the built-in Mozilla CA bundle (esp_crt_bundle), so a
+        // TLS broker (mqtts://) with a publicly-trusted certificate is verified without the user having
+        // to upload a CA cert. Ignored for a plaintext mqtt:// transport. (If validateServerCert is off
+        // the user explicitly opted out of verification, so leave it unset.)
+        mqtt_cfg.broker.verification.crt_bundle_attach = esp_crt_bundle_attach;
     }
 
     if (clientCert.length() && clientKey.length()) {
