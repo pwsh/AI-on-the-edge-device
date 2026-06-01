@@ -589,19 +589,77 @@
                 msg: "Marker " + w + "×" + h + " px - good (recommended " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side)." };
         }
 
-        function updateMarkerSizeHint() {
+        // Pixel-content thresholds (0-255 grayscale). A good marker needs brightness contrast AND
+        // edge detail in BOTH directions. If it is featureless in one direction the template match
+        // can slide along that direction and "edge-clamp": it lands hard against the edge of its
+        // search window because there is no clear best position, which skews the whole alignment.
+        var MARKER_MIN_CONTRAST = 12;   // std-dev of brightness; low = flat / featureless area
+        var MARKER_MIN_GRADIENT = 6;    // edge strength in one direction; low = slides that way
+
+        // Measure the selected region's contrast and its horizontal vs vertical edge strength.
+        function analyzeMarkerPixels(context) {
+            try {
+                var x = Math.round(rect.startX), y = Math.round(rect.startY);
+                var w = Math.round(Math.abs(rect.w)), h = Math.round(Math.abs(rect.h));
+                if (w < 3 || h < 3) return null;
+                var data = context.getImageData(x, y, w, h).data;
+                var n = w * h, gray = new Float32Array(n), sum = 0;
+                for (var i = 0; i < n; i++) {
+                    var g = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
+                    gray[i] = g; sum += g;
+                }
+                var mean = sum / n, varSum = 0, gxe = 0, gye = 0, nx = 0, ny = 0;
+                for (var yy = 0; yy < h; yy++) {
+                    for (var xx = 0; xx < w; xx++) {
+                        var idx = yy*w + xx, dv = gray[idx] - mean;
+                        varSum += dv*dv;
+                        if (xx+1 < w) { var dxv = gray[idx+1]-gray[idx]; gxe += dxv*dxv; nx++; }
+                        if (yy+1 < h) { var dyv = gray[idx+w]-gray[idx]; gye += dyv*dyv; ny++; }
+                    }
+                }
+                return {
+                    contrast: Math.sqrt(varSum / n),
+                    gradX: nx ? Math.sqrt(gxe / nx) : 0,   // left-right localisation strength
+                    gradY: ny ? Math.sqrt(gye / ny) : 0    // up-down localisation strength
+                };
+            } catch (e) { return null; }   // tainted/cross-origin canvas -> skip the pixel check
+        }
+
+        // Combined verdict (size + content) shown live as the box is drawn. Returns the box colour.
+        function evaluateMarker(context) {
             var hint = document.getElementById("markerSizeHint");
+            var w = parseInt(rect.w), h = parseInt(rect.h);
             if (!hint) return "#FF0000";
-            var st = markerSizeStatus(rect.w, rect.h);
-            if (parseInt(rect.w) > 0 && parseInt(rect.h) > 0) {
-                hint.textContent = (st.ok ? "✔ " : "⚠ ") + st.msg;
-                hint.style.color = st.color;
-            } else {
-                hint.textContent = "Draw a box on the image around a fixed, distinctive feature (recommended " +
-                    MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side).";
+            if (!(w > 0 && h > 0)) {
+                hint.innerHTML = "Draw a box around a fixed, <b>distinctive</b> feature with edges in " +
+                    "both directions (e.g. a corner or printed mark), " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side.";
                 hint.style.color = "#5a636b";
+                return "#FF0000";
             }
-            return st.color;
+            var sz = markerSizeStatus(w, h);
+            var px = context ? analyzeMarkerPixels(context) : null;
+            var v;
+            if (!sz.ok) {
+                v = { ok: false, color: "#E53935", msg: sz.msg };
+            } else if (px && px.contrast < MARKER_MIN_CONTRAST) {
+                v = { ok: false, color: "#E53935",
+                    msg: "Low contrast (flat / featureless area) - the match is unreliable. Pick a spot with clear dark/light detail." };
+            } else if (px && px.gradX < MARKER_MIN_GRADIENT && px.gradY < MARKER_MIN_GRADIENT) {
+                v = { ok: false, color: "#E53935",
+                    msg: "Too little edge detail in either direction - pick a more distinctive feature (a corner or mark)." };
+            } else if (px && px.gradY < MARKER_MIN_GRADIENT) {
+                v = { ok: false, color: "#FB8C00",
+                    msg: "Weak up/down localisation (looks like a horizontal line): the match can slide up/down and edge-clamp. Include a horizontal edge - a corner works best." };
+            } else if (px && px.gradX < MARKER_MIN_GRADIENT) {
+                v = { ok: false, color: "#FB8C00",
+                    msg: "Weak left/right localisation (looks like a vertical line): the match can slide sideways and edge-clamp. Include a vertical edge - a corner works best." };
+            } else {
+                v = { ok: true, color: "#2E7D32",
+                    msg: "Good alignment point (" + Math.abs(w) + "×" + Math.abs(h) + " px, detail in both directions)." };
+            }
+            hint.textContent = (v.ok ? "✔ " : "⚠ ") + v.msg;
+            hint.style.color = v.color;
+            return v.color;
         }
 
         function draw() {
@@ -610,8 +668,8 @@
             context.drawImage(imageObj, 0, 0);
             var lw = 4
             context.lineWidth = lw;
-            // Green when the marker is within the recommended size range, red otherwise.
-            context.strokeStyle = updateMarkerSizeHint();
+            // Green = good marker; orange/red = poor (size, low contrast, or featureless in a direction).
+            context.strokeStyle = evaluateMarker(context);
             var x0 = parseInt(rect.startX) - parseInt(lw/2);
             var y0 = parseInt(rect.startY) - parseInt(lw/2);
             var dx = parseInt(rect.w) + parseInt(lw);
