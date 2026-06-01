@@ -8,7 +8,7 @@
 struct wlan_config {
     std::string ssid = "";
     std::string password = "";
-    std::string hostname = "watermeter";    // Default: watermeter
+    std::string hostname = "";               // empty -> auto "edgeai-<last6 of MAC>" (see connect_wlan)
     std::string ipaddress = "";
     std::string gateway = "";
     std::string netmask = "";

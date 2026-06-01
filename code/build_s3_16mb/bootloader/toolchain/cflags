@@ -1,0 +1,5 @@
+"-specs=/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/bootloader/specs/picolibc.specs"
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero

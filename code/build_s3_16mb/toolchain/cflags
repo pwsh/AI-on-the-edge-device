@@ -1,0 +1,6 @@
+-mlongcalls
+-fno-builtin-memcpy
+-fno-builtin-memset
+-fno-builtin-bzero
+-mdisable-hardware-atomics
+"-specs=/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/specs/picolibc.specs"

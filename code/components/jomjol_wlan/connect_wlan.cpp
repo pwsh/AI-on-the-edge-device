@@ -675,6 +675,18 @@ esp_err_t wifi_init_sta(void)
 		return retval;
 	}
 
+    // No hostname configured -> default to "edgeai-<last 6 hex of the MAC>", which is unique per
+    // device so multiple units never collide on the network (mDNS <name>.local).
+    if (wlan_config.hostname.empty())
+    {
+        uint8_t mac[6] = {0};
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        char hn[24];
+        snprintf(hn, sizeof(hn), "edgeai-%02x%02x%02x", mac[3], mac[4], mac[5]);
+        wlan_config.hostname = hn;
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "No hostname configured -> using default: " + wlan_config.hostname);
+    }
+
     if (!wlan_config.hostname.empty())
     {
         retval = esp_netif_set_hostname(my_sta, wlan_config.hostname.c_str());

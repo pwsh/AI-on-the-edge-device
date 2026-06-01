@@ -267,7 +267,7 @@ bool ChangeHostName(std::string fn, std::string _newhostname)
         line  = "\n;++++++++++++++++++++++++++++++++++\n";
         line += "; Hostname: Name of device in network\n";
         line += "; This parameter can be configured via WebUI configuration\n";
-        line += "; Default: \"watermeter\", if nothing is configured\n\n";
+        line += "; Default: \"edgeai-<last 6 of MAC>\" (unique per device), if nothing is configured\n\n";
         line = "hostname = \"" + _newhostname + "\"\n";
         neuesfile.push_back(line);        
     }
