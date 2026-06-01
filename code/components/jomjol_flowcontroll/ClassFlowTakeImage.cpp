@@ -23,6 +23,17 @@
 
 static const char *TAG = "TAKEIMAGE";
 
+// Per-sensor clamp limit for brightness / contrast / saturation. The OV2640 is the tuned reference
+// sensor (kept at the historical +-2, so the ESP32-CAM is byte-for-byte unchanged); the OV3660 and
+// OV5640 accept a wider native envelope. See jomjol_controlcamera/SENSOR_CAPABILITIES.md for the
+// driver-level ranges. Unknown sensors fall back to the conservative OV2640 range.
+static int sensorClampLimit(uint16_t pid, int ov2640, int ov3660, int ov5640)
+{
+    if (pid == OV3660_PID) return ov3660;
+    if (pid == OV5640_PID) return ov5640;
+    return ov2640;
+}
+
 esp_err_t ClassFlowTakeImage::camera_capture(void)
 {
     string nm = namerawimage;
@@ -201,7 +212,8 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageBrightness = std::stoi(splitted[1]);
-                CCstatus.ImageBrightness = clipInt(_ImageBrightness, 2, -2);
+                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                CCstatus.ImageBrightness = clipInt(_ImageBrightness, lim, -lim);
             }
         }
 
@@ -210,7 +222,8 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageContrast = std::stoi(splitted[1]);
-                CCstatus.ImageContrast = clipInt(_ImageContrast, 2, -2);
+                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                CCstatus.ImageContrast = clipInt(_ImageContrast, lim, -lim);
             }
         }
 
@@ -219,7 +232,8 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageSaturation = std::stoi(splitted[1]);
-                CCstatus.ImageSaturation = clipInt(_ImageSaturation, 2, -2);
+                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 4, 4);
+                CCstatus.ImageSaturation = clipInt(_ImageSaturation, lim, -lim);
             }
         }
 

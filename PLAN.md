@@ -765,8 +765,90 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
    - **⬜ Remaining (needs a real S3 board + a debugging pass, like the IDF-6 migration):**
      - Get the S3 build green: `idf.py -B build_s3 -D SDKCONFIG=build_s3/sdkconfig -D IDF_TARGET=esp32s3 build`
        (separate build dir/sdkconfig so the esp32 build is untouched). Expect S3-specific fixes
-       (camera LCD_CAM init, PSRAM octal, GPIO/SD pins, USB).
-     - **Camera interface abstraction**: wrap capture behind an interface with a **DVP** backend
-       (esp32-camera, today) and a **USB-UVC** backend (S3 USB host) — the big code item; gate by
-       target/config. Validate image quality + a meter read on hardware.
+       (camera LCD_CAM init, PSRAM octal, GPIO/SD pins, USB). Prereq: `install.sh esp32s3` (adds the
+       Xtensa-S3 toolchain — not installed yet; the local IDF was provisioned `esp32`-only).
+     - **Camera interface abstraction**: see §9.4 — wrap capture behind an interface with a **DVP**
+       backend (esp32-camera, today) and a **USB-UVC** backend (S3 USB host). The big code item.
      - Per-board pin verification, S3 build in CI next to esp32, web-installer entry.
+
+### 9.4 🟡 Camera support: more DVP sensors (OV3660 / OV5640) + USB-UVC cameras (ESP32-S3)
+Goal: broaden beyond the OV2640 to the other DVP sensors **and** add USB-connected (UVC) cameras,
+the latter only meaningful on the **ESP32-S3** (it has the USB-OTG host the classic ESP32 lacks).
+Scope split: the two extra DVP sensors work on **both** ESP32 and S3 (shared `esp32-camera` DVP
+driver); **USB-UVC is S3-only**.
+
+#### 9.4.1 OV3660 / OV5640 (DVP) — partly here already, finish it
+**Current state (verified in `code/components/jomjol_controlcamera/`):**
+- ✅ Sensor auto-detect handles all three PIDs (`OV2640_PID` / `OV3660_PID` / `OV5640_PID`);
+  anything else fails init with "Camera module is unknown" (`ClassControllCamera.cpp` ~L156).
+- ✅ Per-sensor branches already exist for several controls (e.g. sharpness, the OV2640-only
+  contrast/brightness/special-effect emulation in `ov2640_*.cpp`, OV5640/OV3660 cases in the
+  effect/whitebalance paths) and a thorough `SENSOR_CAPABILITIES.md` documents the real
+  driver-level ranges per sensor.
+- ⚠️ **Gap — settings are clamped to the OV2640 envelope.** `ClassFlowTakeImage::ReadParameter`
+  clips brightness/contrast/saturation to **±2** for *all* sensors, but the OV3660/OV5640 natively
+  accept **brightness/contrast ±3** and **saturation ±4** (and native denoise 0..8 + native
+  sharpness ±3, vs the OV2640's firmware emulation). So the extra sensors *run* but can't be tuned
+  to their full range.
+
+**🟡 To finish DVP multi-sensor support:**
+- 🟡 Make the brightness/contrast/saturation (and AE-level, denoise, gain-ceiling) clamps
+  **per-sensor**, keyed off `CCstatus.CamSensor_id` (the sharpness path is the existing template).
+  **OV2640 ranges unchanged** (the bundled CNN models + defaults are tuned for it), so the live
+  ESP32-CAM is byte-for-byte unaffected; only OV3660/OV5640 gain their wider envelope.
+  - ✅ **Firmware done:** added `sensorClampLimit()` in `ClassFlowTakeImage.cpp` and applied it to
+    **brightness/contrast (±2 OV2640 → ±3 OV3660/OV5640)** and **saturation (±2 → ±4)**. Verified the
+    esp32 build stays green and the OV2640 limits are identical (the helper returns 2 for OV2640).
+  - ⬜ Remaining: widen the matching UI min/max in `edit_config_template.html` (+ any client-side range
+    checks) **conditioned on the detected sensor**, and extend the same per-sensor treatment to
+    AE-level / denoise / gain-ceiling.
+- **Frame-size / resolution:** capture is hardcoded `FRAMESIZE_VGA`. OV3660 (QXGA) / OV5640 (QSXGA)
+  can deliver much higher res, but only the **S3** has the mapped PSRAM to decode it (the §4 STBI
+  peak is `~1.67×IMAGE_SIZE` and the shared region floor is `2×IMAGE_SIZE`). Plan: keep VGA the
+  default everywhere; expose a higher capture size **only when `CONFIG_IDF_TARGET_ESP32S3`** and let
+  the existing crop (§6) keep the analysed area small. The CNN ROIs are downscaled to the model input
+  regardless, so higher res only buys cropping headroom for small/distant meters.
+- **Autofocus (OV5640):** the driver has a VCM AF path (`ov5640_af.c`) that is **not wired in**;
+  leave fixed-focus for now, note it as a future S3 extra (needs the AF firmware blob + AF lens).
+- Validate on hardware: an OV3660 and an OV5640 module each read a meter; capture per-sensor
+  reference notes (exposure/ROI re-tune guidance) for the docs.
+
+#### 9.4.2 USB-UVC cameras (ESP32-S3 only) — new backend
+**Why S3-only:** UVC needs a **USB-OTG host**, which the classic ESP32 does not have; the S3 (and
+S2) do. So this is gated `#if CONFIG_IDF_TARGET_ESP32S3` and never compiled into the 4 MB ESP32-CAM.
+**Why it's wanted:** decouples the camera from the board (use a standard USB webcam / a longer cable /
+a better lens/AF module), and many UVC cams output **MJPEG** which drops straight into the existing
+JPEG-decode path.
+
+**Building blocks:**
+- Espressif **`usb_host_uvc`** managed component (`espressif/usb_host_uvc`) on top of the IDF USB
+  host stack — add to `code/main/idf_component.yml` gated to the s3 target. (Pin a known-good
+  version, like the mqtt/cjson deps in §3.6.)
+- USB host needs a **5 V VBUS supply** to the camera and the OTG D+/D- pins; document per-board
+  (the S3 dev boards differ). This is a hardware/power note for the board matrix, not code.
+- MJPEG UVC frames → feed the existing `CImageBasis::LoadFromMemory` (STBI JPEG decode) unchanged.
+  Uncompressed/YUY2 UVC streams would need a YUYV→RGB step (avoid by selecting an MJPEG format).
+
+**The enabling refactor — a camera backend interface (shared by §9.3 item 5):**
+- Define a thin `ICameraBackend` (capture-to-`CImageBasis` / capture-to-file / sensor-settings)
+  and move today's `esp_camera_*` calls in `ClassControllCamera.cpp` behind a **DVP backend**
+  (no behaviour change on ESP32/ESP32-CAM — this is a pure extract-interface step, buildable and
+  testable on the current esp32 toolchain *before* any S3 hardware exists).
+- Add a **UVC backend** implementing the same interface, compiled only for the s3 target.
+- Selection: auto (probe DVP first, fall back to USB) or an explicit `[Camera] Interface = dvp|usb`
+  config key; surface the active backend + sensor on the system-info / capabilities page.
+- The camera-settings UI already keys off the sensor; for UVC, expose only the controls the UVC
+  device actually reports (UVC exposes a different, device-dependent control set than the OV sensors).
+
+**Staged tasks (lowest risk first):**
+1. ⬜ **Extract `ICameraBackend` + DVP backend** from `ClassControllCamera.cpp`; keep the esp32
+   build green and the OV2640 device byte-identical (interface extraction only). *(Doable now, no S3.)*
+2. 🟡 **Per-sensor DVP ranges** (§9.4.1) — firmware clamps done (brightness/contrast/saturation);
+   UI min/max + remaining controls (AE-level/denoise/gain-ceiling) still to do. *(Doable now, no S3.)*
+3. ⬜ **S3 build green** (§9.3 item 5) once the S3 toolchain is installed.
+4. ⬜ **UVC backend** behind the interface, s3-gated; bring up an MJPEG USB cam, validate a meter read.
+5. ⬜ Optional S3 capture-resolution option + OV5640 autofocus; CI + web-installer entries per board.
+
+> Reminder: every camera change must keep the **OV2640 / ESP32-CAM** path unchanged (it's the
+> validated reference and the overwhelming majority of installs). All new sensors/backends are
+> additive and target/sensor-gated.
