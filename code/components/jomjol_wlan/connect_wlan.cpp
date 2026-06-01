@@ -65,6 +65,7 @@ static bool APWithBetterRSSI = false;
 static bool WIFIConnected = false;
 static int WIFIReconnectCnt = 0;
 static bool everConnectedSinceBoot = false;   // true once we have had an IP this boot
+static int authFailCount = 0;                 // consecutive auth/handshake failures (wrong password)
 
 esp_netif_t *my_sta;
 
@@ -484,6 +485,15 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Auth fail)");
 				StatusLED(WLAN_CONN, 2, true);
 				driveSystemStatusWs281x(90, 0, 0);    // red = authentication failure
+				// Auth failures are definitive (wrong password) - don't wait out the generic retry
+				// budget; fall back to AP mode quickly so the user can fix the credentials.
+				if (++authFailCount >= 5) {
+					LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Repeated authentication failures (wrong Wi-Fi password?) -> rebooting into AP mode for reconfiguration");
+					FILE *fap = fopen("/sdcard/.force_ap", "w");
+					if (fap) fclose(fap);
+					vTaskDelay(300 / portTICK_PERIOD_MS);
+					esp_restart();
+				}
 			}
 			else if (disconn->reason == WIFI_REASON_BEACON_TIMEOUT) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Timeout)");
@@ -555,6 +565,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         WIFIConnected = true;
 		WIFIReconnectCnt = 0;
 		everConnectedSinceBoot = true;
+		authFailCount = 0;
 		StatusLEDOff();   // connected -> stop the "attempting/failing" onboard-LED blink
 		driveSystemStatusWs281x(0, 40, 0);   // RGB green = connected (overwritten by stage LED later)
 
