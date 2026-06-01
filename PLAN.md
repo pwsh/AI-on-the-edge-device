@@ -744,8 +744,21 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
    - Other headroom levers: **himem** (upper 4 MB; complex) or the **ESP32-S3** (8 MB+ mapped). TLSF
      is already the IDF default allocator; no change needed there.
 5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**
-   Scope is deliberately limited to **ESP32 (ESP32-CAM) + ESP32-S3**. P4/C6/C3 are **out of scope**
-   (C3/C6 verified non-viable — no PSRAM / no camera / no USB host; P4 dropped to keep focus).
+   Scope is deliberately limited to **ESP32 (ESP32-CAM-class, i.e. any ESP32 *with PSRAM*) + ESP32-S3**.
+   P4/C6/C3 are **out of scope** (C3/C6 verified non-viable — no PSRAM / no camera / no USB host; P4
+   dropped to keep focus).
+
+   **Board suitability — the only hard requirement is PSRAM** (the shared ~1.84 MB region holds the
+   JPEG-decode buffer + the tflite arena/model; without PSRAM the firmware cannot run):
+   | Board | Verdict | Notes |
+   |---|---|---|
+   | **ESP32-CAM (AI-Thinker)** | ✅ reference | ESP32-D0WDQ6 + PSRAM; the validated default (`BOARD_ESP32CAM_AITHINKER`). |
+   | **ESP32-WROVER / WROVER-DEV/KIT** | ✅ **suitable** | Same `esp32` target — ESP32 **+ PSRAM**. It's effectively "an ESP32-CAM with a different GPIO map", so it needs **no new toolchain/binary type**, just a board pin map (`BOARD_WROVER_KIT` already exists in `defines.h`). Good **dev/test** board (USB-serial + breakout). ✅ **Build verified green this session** (1.75 MB) via the new `AIOTEDGE_BOARD` override. The OV2640 + SD must be wired to the selected map (the `BOARD_WROVER_KIT` default = the Espressif WROVER-KIT camera-header pinout; a hand-wired DevKit needs its own `CAM_PIN_*`/`GPIO_SDCARD_*`). |
+   | **ESP32-WROOM (WROOM-32/32D/32E)** | ❌ **not suitable** | **No PSRAM.** The CNN + full-frame image buffers can't fit in the ~520 KB internal SRAM, so the digitization pipeline cannot run. (Only a non-standard PSRAM-equipped WROOM variant would qualify — the common WROOM modules do not have PSRAM.) |
+   - **Board selection (native idf.py):** `AIOTEDGE_BOARD=<BOARD_*> idf.py -B build_<x> build` overrides
+     the per-target default (`code/CMakeLists.txt`). Any board defined in `include/defines.h`
+     (`BOARD_WROVER_KIT`, `BOARD_M5STACK_PSRAM`, `BOARD_ESP32CAM_AITHINKER`, `BOARD_ESP32S3_CAM`) works;
+     all the PSRAM-ESP32 boards share the same `esp32` binary type.
    - **Each chip needs its own compiled binary** (Xtensa ESP32 vs Xtensa ESP32-S3 differ in ISA
      extensions + memory map; IDF builds per `set-target`). **One codebase**, per-target build configs
      + compile-time feature gating (`#if CONFIG_IDF_TARGET_ESP32S3 ...`) so the 4 MB ESP32-CAM is

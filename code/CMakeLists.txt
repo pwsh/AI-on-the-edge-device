@@ -25,9 +25,16 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # default board as a global IDF compile definition (must use idf_build_set_property so it
 # propagates to every component) so include/defines.h does not hit "Board not selected".
 if(NOT DEFINED ENV{PLATFORMIO})
-    # Board pin map per target (idf.py set-target sets IDF_TARGET): ESP32 -> AiThinker ESP32-CAM;
-    # ESP32-S3 -> the S3 camera board scaffolding (defines.h BOARD_ESP32S3_CAM).
-    if("$ENV{IDF_TARGET}" STREQUAL "esp32s3")
+    # Board pin map. Default per target (idf.py set-target sets IDF_TARGET): ESP32 -> AiThinker
+    # ESP32-CAM; ESP32-S3 -> the S3 camera board scaffolding (defines.h BOARD_ESP32S3_CAM).
+    # Override with the AIOTEDGE_BOARD env var to pick any board defined in include/defines.h, e.g.
+    #   AIOTEDGE_BOARD=BOARD_WROVER_KIT idf.py build        (ESP32-WROVER dev board + OV2640)
+    # Both WROVER and the ESP32-CAM are the same `esp32` target (ESP32 + PSRAM) - no new toolchain;
+    # only the camera/SD/LED GPIO map differs. (ESP32-WROOM has no PSRAM and is NOT supported.)
+    if(DEFINED ENV{AIOTEDGE_BOARD})
+        idf_build_set_property(COMPILE_DEFINITIONS "$ENV{AIOTEDGE_BOARD}" APPEND)
+        message(STATUS "-- Board (AIOTEDGE_BOARD override): $ENV{AIOTEDGE_BOARD}")
+    elseif("$ENV{IDF_TARGET}" STREQUAL "esp32s3")
         idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32S3_CAM" APPEND)
     else()
         idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32CAM_AITHINKER" APPEND)
