@@ -3666,6 +3666,10 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
 			
             if (element.tagName.toLowerCase() == "select") {
                 var textToFind = _param[_cat][_name]["value"+j];
+                // Fall back to the registered default when the config has no (or an empty) value.
+                if ((textToFind == undefined || textToFind === "") && _param[_cat][_name]["defaultValue"]) {
+                    textToFind = _param[_cat][_name]["defaultValue"];
+                }
 				
                 if (textToFind == undefined) {
                     continue;
@@ -3693,7 +3697,11 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
                 element.checked = _param[_cat][_name]["value"+j] == "true";
             }
             else {
-                element.value = _param[_cat][_name]["value"+j];
+                var _val = _param[_cat][_name]["value"+j];
+                if ((_val == undefined || _val === "") && _param[_cat][_name]["defaultValue"]) {
+                    _val = _param[_cat][_name]["defaultValue"];
+                }
+                element.value = _val;
             }
         }	
     }
