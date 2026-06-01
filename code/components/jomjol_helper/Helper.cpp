@@ -113,6 +113,10 @@ string getSDCardPartitionSize()
 	FATFS *fs;
 	uint32_t fre_clust, tot_sect;
 
+	if (SDCardCsd.sector_size <= 0) {   // no physical SD card (e.g. in-flash storage on the S3)
+		return "0";
+	}
+
 	/* Get volume information and free clusters of drive 0 */
 	f_getfree("0:", (DWORD *)&fre_clust, &fs);
 	tot_sect = ((fs->n_fatent - 2) * fs->csize) / 1024 / (1024 / SDCardCsd.sector_size); // corrected by SD Card sector size (usually 512 bytes) and convert to MB
@@ -127,6 +131,10 @@ string getSDCardFreePartitionSpace()
 	FATFS *fs;
 	uint32_t fre_clust, fre_sect;
 
+	if (SDCardCsd.sector_size <= 0) {   // no physical SD card (e.g. in-flash storage on the S3)
+		return "0";
+	}
+
 	/* Get volume information and free clusters of drive 0 */
 	f_getfree("0:", (DWORD *)&fre_clust, &fs);
 	fre_sect = (fre_clust * fs->csize) / 1024 / (1024 / SDCardCsd.sector_size); // corrected by SD Card sector size (usually 512 bytes) and convert to MB
@@ -140,6 +148,10 @@ string getSDCardPartitionAllocationSize()
 {
 	FATFS *fs;
 	uint32_t fre_clust, allocation_size;
+
+	if (SDCardCsd.sector_size <= 0) {   // no physical SD card (e.g. in-flash storage on the S3)
+		return "0";
+	}
 
 	/* Get volume information and free clusters of drive 0 */
 	f_getfree("0:", (DWORD *)&fre_clust, &fs);
@@ -175,7 +187,14 @@ string getSDCardName()
 
 string getSDCardCapacity()
 {
-	int SDCardCapacity = SDCardCsd.capacity / (1024 / SDCardCsd.sector_size) / 1024; // total sectors * sector size  --> Byte to MB (1024*1024)
+	// No physical SD card (e.g. running from the in-flash LittleFS on the S3): the CSD is zeroed, so
+	// sector_size is 0 -> guard against the divide-by-zero.
+	if (SDCardCsd.sector_size <= 0) {
+		return "0";
+	}
+	// total bytes = capacity (sectors) * sector_size  ->  MB
+	long long bytes = (long long)SDCardCsd.capacity * (long long)SDCardCsd.sector_size;
+	int SDCardCapacity = (int)(bytes / (1024 * 1024));
 	// ESP_LOGD(TAG, "SD Card Capacity: %s", std::to_string(SDCardCapacity).c_str());
 
 	return std::to_string(SDCardCapacity);
