@@ -58,22 +58,24 @@
             response.text()
             .then( result => {
                 var lines = result.split("\n");
-                var traceValue =          { x: [], y: [], type: 'scatter', line: {width: 6}, name: 'Value'};
-                var tracePreValue =       { x: [], y: [], type: 'scatter', line: {width: 2}, name: 'Previous Value', visible: 'legendonly'};
+                // scattergl (WebGL) renders large series far faster than the SVG 'scatter' trace.
+                var traceValue =          { x: [], y: [], type: 'scattergl', line: {width: 6}, name: 'Value'};
+                var tracePreValue =       { x: [], y: [], type: 'scattergl', line: {width: 2}, name: 'Previous Value', visible: 'legendonly'};
                 var traceChangeRate =     { x: [], y: [], type: 'bar', yaxis: 'y2', opacity: 0.2, name: 'Change Rate'};
                 var traceChangeAbsolute = { x: [], y: [], type: 'bar', yaxis: 'y2', opacity: 0.2, name: 'Change Absolute', visible: 'legendonly'};
 
                 var timex = 1;
                 for (let line of lines) {
                     {
-                        //console.log(line);
-                        if (line.split(",")[1] == numbername)
+                        // Split each row once (was split 6x per row -> a big cost on large data files).
+                        var cols = line.split(",");
+                        if (cols[1] == numbername)
                         {
-                            var value = line.split(",")[3];
-                            var preValue = line.split(",")[4];
-                            var changeRate = line.split(",")[5];
-                            var changeAbsolute = line.split(",")[6];
-                            var time  = line.split(",")[0];
+                            var value = cols[3];
+                            var preValue = cols[4];
+                            var changeRate = cols[5];
+                            var changeAbsolute = cols[6];
+                            var time  = cols[0];
                             //console.log("> "+time+" "+value+"\n");
 
                             traceValue.x.push(time);
