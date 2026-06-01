@@ -20,6 +20,11 @@ CONFIG_SPIRAM_RODATA=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions_esp32s3_8mb.csv"
 
+# Larger main-task stack: the default 3584 B is tight for this build's heavy init, and the S3-only
+# additions (WS2812/RMT status LED created on the stack, reset-check) overflowed it. The S3 has
+# ample RAM, so give it headroom.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
 # S3 can run the camera/CNN at the full clock
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
