@@ -150,8 +150,11 @@ the IDF 6.0.1 build.
      esp32-camera / esp-tflite-micro / esp-nn — they are at the latest tag. Note: `esp-protocols`
      shows harmless drift in **unused** nested submodules (`asio` / `libwebsockets`); only `mdns` is
      compiled, so it's left as-is.
-   - ⬜ Remaining: pin exact managed-dep versions in `dependencies.lock` and a full
-     flash + camera + CNN + MQTT smoke-test on hardware after any future bump.
+   - ✅ **Pinned exact managed-dep versions** (commit *pin managed-dependency versions exactly*):
+     `main/idf_component.yml` went from `"*"` to `espressif/mqtt ==1.0.0`, `espressif/cjson ==1.7.19~2`
+     (exact revision), `joltwallet/littlefs ==1.22.1`. A fresh resolve reproduces a byte-identical
+     `dependencies.lock` (only `manifest_hash` differs; every component_hash unchanged) and builds green.
+   - ⬜ Remaining: a full flash + camera + CNN + MQTT smoke-test on hardware after any future bump.
 
 ### 3.4 Effort estimate
 - Code changes (gpio swap, himem gate, sdkconfig): **~0.5–1 day**.
