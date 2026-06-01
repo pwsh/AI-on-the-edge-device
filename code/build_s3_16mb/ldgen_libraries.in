@@ -230,7 +230,7 @@ $<TARGET_FILE:__idf_esp_driver_ledc>
 $<TARGET_FILE:__idf_espressif__esp_jpeg>
 $<TARGET_FILE:idf::espressif__mqtt>
 $<TARGET_FILE:idf::mdns>
-$<TARGET_FILE:idf::jomjol_wlan>
+$<TARGET_FILE:idf::jomjol_controlGPIO>
 $<TARGET_FILE:__idf_jomjol_mqtt>
 $<TARGET_FILE:__idf_espressif__mqtt>
 $<TARGET_FILE:__idf_jomjol_tfliteclass>
@@ -247,6 +247,7 @@ $<TARGET_FILE:__idf_espressif__cjson>
 $<TARGET_FILE:__idf_jomjol_wlan>
 $<TARGET_FILE:__idf_openmetrics>
 $<TARGET_FILE:__idf_spiffs>
+$<TARGET_FILE:idf::jomjol_wlan>
 $<TARGET_FILE:idf::espressif__cjson>
 $<TARGET_FILE:idf::jomjol_mqtt>
 $<TARGET_FILE:idf::jomjol_influxdb>
@@ -254,7 +255,6 @@ $<TARGET_FILE:idf::jomjol_webhook>
 $<TARGET_FILE:idf::openmetrics>
 $<TARGET_FILE:idf::jomjol_flowcontroll>
 $<TARGET_FILE:idf::jomjol_tfliteclass>
-$<TARGET_FILE:idf::jomjol_controlGPIO>
 $<TARGET_FILE:idf::jomjol_fileserver_ota>
 $<TARGET_FILE:idf::jomjol_image_proc>
 $<TARGET_FILE:idf::jomjol_controlcamera>

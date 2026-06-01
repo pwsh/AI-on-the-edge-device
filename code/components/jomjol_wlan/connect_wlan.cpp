@@ -39,6 +39,7 @@
 #include "read_wlanini.h"
 #include "Helper.h"
 #include "statusled.h"
+#include "server_GPIO.h"   // driveSystemStatusWs281x() - onboard RGB Wi-Fi status (S3)
 
 #include "../../include/defines.h"
 
@@ -453,6 +454,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         WIFIConnected = false;
         // Onboard LED: blink continuously while attempting/failing to connect (turned off on GOT_IP).
         StatusLED(WLAN_CONN, 1, true);
+        driveSystemStatusWs281x(60, 20, 0);   // RGB orange = attempting to connect
         esp_wifi_connect();
     }
 	else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) 
@@ -488,6 +490,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 				StatusLED(WLAN_CONN, 4, true);
 			}
 			WIFIReconnectCnt++;
+			driveSystemStatusWs281x(60, 20, 0);   // RGB orange = (re)connecting / failing
 
 			// Exponential backoff before retrying: the first few attempts are immediate (covers a
 			// transient blip / single missed beacon), then the delay grows 1,2,4,8,16 s capped at
@@ -548,6 +551,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 		WIFIReconnectCnt = 0;
 		everConnectedSinceBoot = true;
 		StatusLEDOff();   // connected -> stop the "attempting/failing" onboard-LED blink
+		driveSystemStatusWs281x(0, 40, 0);   // RGB green = connected (overwritten by stage LED later)
 
 		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         wlan_config.ipaddress = std::string(ip4addr_ntoa((const ip4_addr*) &event->ip_info.ip));

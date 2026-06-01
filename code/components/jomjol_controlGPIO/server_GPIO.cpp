@@ -648,6 +648,23 @@ void GpioHandler::setStatusStageLED(int stage)
     driveWs281x(statusLedColors[stage]);
 }
 
+// Standalone WS2812 (RGB) write, independent of the GpioHandler instance/config - used to signal
+// Wi-Fi status during boot and AP mode, before the GPIO handler is initialised (it never is in AP
+// mode). Transient SmartLed so the RMT channel is freed immediately, leaving it for the handler's
+// processing-stage LED once it comes up. Gated to the S3 (its onboard RGB is a WS2812 on FLASH_GPIO);
+// a no-op elsewhere so it never pulses the ESP32-CAM's plain flash LED.
+void driveSystemStatusWs281x(uint8_t r, uint8_t g, uint8_t b)
+{
+#if defined(BOARD_ESP32S3_CAM) && defined(FLASH_GPIO)
+    SmartLed leds(LED_WS2812, 1, (int)FLASH_GPIO, 0, DoubleBuffer);
+    leds[0] = Rgb{ r, g, b };
+    leds.show();
+    leds.wait();
+#else
+    (void)r; (void)g; (void)b;
+#endif
+}
+
 // Free-function trampoline registered with jomjol_helper so the flow can signal stages
 // without jomjol_controlGPIO <-> jomjol_flowcontroll forming a circular dependency.
 static void statusLedStageTrampoline(int stage)

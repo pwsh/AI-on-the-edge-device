@@ -31,6 +31,7 @@
 #include "statusled.h"
 #include "server_ota.h"
 #include "basic_auth.h"
+#include "server_GPIO.h"   // driveSystemStatusWs281x() - onboard RGB status (S3)
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -559,6 +560,7 @@ void CheckStartAPMode()
 
         ESP_LOGI(TAG, "Starting access point for remote configuration");
         StatusLED(AP_OR_OTA, 2, true);
+        driveSystemStatusWs281x(0, 0, 60);   // RGB blue = AP setup / reconfiguration mode
         wifi_init_softAP();
         start_webserverAP();
 

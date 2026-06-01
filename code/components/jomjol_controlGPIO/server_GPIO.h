@@ -63,6 +63,10 @@ private:
 esp_err_t callHandleHttpRequest(httpd_req_t *req);
 void taskGpioHandler(void *pvParameter);
 
+// Drive the onboard WS2812 (RGB) LED to a single colour for system/Wi-Fi status (S3 only; no-op
+// elsewhere). Safe to call before the GpioHandler is initialised (e.g. during Wi-Fi connect / AP).
+void driveSystemStatusWs281x(uint8_t r, uint8_t g, uint8_t b);
+
 class GpioHandler {
 public:
     GpioHandler(std::string configFile, httpd_handle_t httpServer);

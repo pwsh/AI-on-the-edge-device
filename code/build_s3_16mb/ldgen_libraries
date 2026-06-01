@@ -230,7 +230,7 @@
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/espressif__esp_jpeg/libespressif__esp_jpeg.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/espressif__mqtt/libespressif__mqtt.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/mdns/libmdns.a
-/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_wlan/libjomjol_wlan.a
+/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_controlGPIO/libjomjol_controlGPIO.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_mqtt/libjomjol_mqtt.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/espressif__mqtt/libespressif__mqtt.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_tfliteclass/libjomjol_tfliteclass.a
@@ -247,6 +247,7 @@
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_wlan/libjomjol_wlan.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/openmetrics/libopenmetrics.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/spiffs/libspiffs.a
+/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_wlan/libjomjol_wlan.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/espressif__cjson/libespressif__cjson.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_mqtt/libjomjol_mqtt.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_influxdb/libjomjol_influxdb.a
@@ -254,7 +255,6 @@
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/openmetrics/libopenmetrics.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_flowcontroll/libjomjol_flowcontroll.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_tfliteclass/libjomjol_tfliteclass.a
-/home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_controlGPIO/libjomjol_controlGPIO.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_fileserver_ota/libjomjol_fileserver_ota.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_image_proc/libjomjol_image_proc.a
 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/esp-idf/jomjol_controlcamera/libjomjol_controlcamera.a
