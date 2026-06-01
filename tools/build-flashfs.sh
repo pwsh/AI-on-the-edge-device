@@ -21,6 +21,7 @@ echo "== Web UI -> flashfs/html (tooltips + commit hash + gzip) =="
 ( cd tools/parameter-tooltip-generator && "$PY" generate-param-doc-tooltips.py >/dev/null )
 cp -r ./sd-card/html/* "$FFS/html/"
 rm -f "$FFS/html/edit_config_template.html"   # template not needed on device
+find "$FFS/html" -name "*.map" -delete        # JS/CSS source maps are devtools-only, not needed
 # Sync version.txt to the firmware's GIT_REV (kept plain - getHTMLversion reads it un-gzipped)
 FWREV="$(sed -n 's/.*GIT_REV="\([^"]*\)".*/\1/p' code/main/version.cpp 2>/dev/null || true)"
 [ -n "$FWREV" ] && printf 'Development-Branch: %s (Commit: %s)\n%s' "$(git rev-parse --abbrev-ref HEAD)" "$FWREV" "$FWREV" > "$FFS/html/version.txt"
