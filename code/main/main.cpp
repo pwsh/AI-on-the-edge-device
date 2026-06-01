@@ -41,6 +41,7 @@
     #include "server_mqtt.h"
 #endif //ENABLE_MQTT
 #include "Helper.h"
+#include "crash_dump.h"
 #include "statusled.h"
 #include "sdcard_check.h"
 
@@ -482,6 +483,10 @@ extern "C" void app_main(void)
     else {
         LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Reset reason: " + getResetReason());
     }
+
+    // If a panic left a coredump in flash, copy it (summary + raw ELF) to /sdcard/log/crash/ so the
+    // backtrace can be retrieved remotely via the fileserver without USB. No-op on a clean boot.
+    saveCoreDumpToSD();
 
     #ifdef HEAP_TRACING_MAIN_START
         ESP_ERROR_CHECK( heap_trace_stop() );

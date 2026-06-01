@@ -76,6 +76,12 @@ public:
 
     void DrawRef(CImageBasis *_zw);
 
+    // True only when every configured reference-marker image exists and is large enough to be a real
+    // JPEG. A truncated/half-written marker (e.g. corrupted by a collision with a running round)
+    // decodes to garbage dimensions and crashes the template search, so the round must skip alignment
+    // rather than panic when this returns false.
+    bool referenceMarkersUsable();
+
     bool ReadParameter(FILE *pfile, string &aktparamgraph);
     bool doFlow(string time);
     string getHTMLSingleStep(string host);

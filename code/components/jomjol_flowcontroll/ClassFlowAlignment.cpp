@@ -9,6 +9,8 @@
 #include "ClassLogFile.h"
 #include "Helper.h"
 #include "psram.h"
+
+#include <sys/stat.h>
 #include "../../include/defines.h"
 
 #include <algorithm>    // std::min / std::max
@@ -359,8 +361,17 @@ bool ClassFlowAlignment::doFlow(string time)
         }
     }
 
+    // Guard against corrupt/missing reference-marker images: searching or drawing with a truncated
+    // marker decodes garbage dimensions and panics. When unusable, skip alignment for this round
+    // (best-effort: read ROIs off the rotated raw image) instead of crashing, and tell the user.
+    bool refsUsable = (References[0].alignment_algo == 3) || referenceMarkersUsable();
+    if (!refsUsable) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Alignment reference marker image(s) are missing or corrupt - "
+            "skipping alignment this round. Re-create the reference image / alignment markers in the web UI.");
+    }
+
     // no align algo if set to 3 = off //add disable aligment algo |01.2023
-    if (References[0].alignment_algo != 3) {
+    if (refsUsable && References[0].alignment_algo != 3) {
         // Periodic alignment: run the full reference-marker search only every Nth round; on the
         // rounds in between, re-apply the cached transform (camera framing is stable between
         // captures). alignmentInterval == 1 keeps the legacy behaviour (search every round).
@@ -402,7 +413,8 @@ bool ClassFlowAlignment::doFlow(string time)
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
     if (AlgROI) {
         // no align algo if set to 3 = off => no draw ref //add disable aligment algo |01.2023
-        if (References[0].alignment_algo != 3) {
+        // also skipped when the reference markers are unusable (DrawRef loads them -> would crash).
+        if (refsUsable && References[0].alignment_algo != 3) {
             DrawRef(ImageTMP);
         }
 
@@ -569,6 +581,25 @@ bool ClassFlowAlignment::LoadReferenceAlignmentValues(void)
         LogFile.WriteToDedicatedFile("/sdcard/alignment.txt", _zw);
     #endif*/
 
+    return true;
+}
+
+bool ClassFlowAlignment::referenceMarkersUsable()
+{
+    // A real reference-marker JPEG is well over a few hundred bytes; a missing file or a truncated
+    // one (e.g. corrupted by a write that collided with a running round) is far smaller and decodes
+    // to garbage dimensions that crash the template search. Reject anything implausibly small.
+    const long minBytes = 256;
+    int count = (anz_ref > 0) ? anz_ref : 2;
+    for (int i = 0; i < count && i < 2; ++i) {
+        struct stat st;
+        if (stat(References[i].image_file.c_str(), &st) != 0 || st.st_size < minBytes) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Reference marker '" + References[i].image_file +
+                "' missing or too small (" + (stat(References[i].image_file.c_str(), &st) == 0 ?
+                std::to_string((long)st.st_size) + " bytes" : "missing") + ")");
+            return false;
+        }
+    }
     return true;
 }
 

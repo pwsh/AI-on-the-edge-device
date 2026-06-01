@@ -5,6 +5,8 @@
 #include "string.h"
 #include "esp_log.h"
 #include <esp_timer.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include <iomanip>
 #include <sstream>
@@ -42,6 +44,45 @@ TaskHandle_t xHandletask_autodoFlow = NULL;
 
 bool bTaskAutoFlowCreated = false;
 bool flowisrunning = false;
+
+// Re-entrancy guard: serialises a full processing round (camera + shared PSRAM + reference files,
+// run by task_autodoFlow) against the web-editor camera/reference operations (test take-image,
+// test alignment, reference-marker cut - run in the HTTP server task). Without this, an editor
+// action during a round shares the single camera/PSRAM region and can corrupt the reference images
+// (a half-written 45-byte JPEG), which then crashes alignment. The flow task holds it for the whole
+// round; editor handlers try-take it non-blocking and report "busy" rather than colliding.
+static SemaphoreHandle_t flowRoundMutex = NULL;
+
+void initFlowRoundMutex(void)
+{
+    if (flowRoundMutex == NULL) {
+        flowRoundMutex = xSemaphoreCreateMutex();
+    }
+}
+
+// Non-blocking attempt - used by HTTP handlers. Returns true if the caller now holds the lock (and
+// must call flowRoundUnlock), false if a round is in progress. If the mutex doesn't exist yet
+// (very early boot) there is no flow task running, so report success.
+bool flowRoundTryLock(void)
+{
+    if (flowRoundMutex == NULL) return true;
+    return xSemaphoreTake(flowRoundMutex, 0) == pdTRUE;
+}
+
+// Blocking lock - used by the flow task itself, which owns the round. Waits up to maxWaitMs for any
+// in-flight editor operation to finish.
+bool flowRoundLock(uint32_t maxWaitMs)
+{
+    if (flowRoundMutex == NULL) return true;
+    return xSemaphoreTake(flowRoundMutex, maxWaitMs / portTICK_PERIOD_MS) == pdTRUE;
+}
+
+void flowRoundUnlock(void)
+{
+    if (flowRoundMutex != NULL) {
+        xSemaphoreGive(flowRoundMutex);
+    }
+}
 
 long auto_interval = 0;
 bool autostartIsEnabled = false;
@@ -1464,12 +1505,12 @@ esp_err_t handler_editflow(httpd_req_t *req)
 
         std::string out2 = out.substr(0, out.length() - 4) + "_org.jpg";
 
-        // Allow the capture whenever a round is not actively executing (flowisrunning), rather than
-        // string-matching the "Flow finished" status. A round that ended early - e.g. alignment
-        // skipped because markers weren't found - leaves a descriptive status, but the camera/PSRAM
-        // are free, so setting up the alignment markers must still work (otherwise the user can't fix
-        // the very condition that caused the skip). PSRAM init below is the real mutex against a round.
-        if ((flowctrl.SetupModeActive || !flowisrunning) && psram_init_shared_memory_for_take_image_step())
+        // Take the round mutex so this reference-image write can never overlap a running round.
+        // (Writing the cut reference while a round uses the same shared PSRAM region is exactly what
+        // truncates the marker JPEGs to a corrupt 45-byte file.) Non-blocking: if a round holds it,
+        // report busy and let the user retry between rounds.
+        bool gotLock = flowRoundTryLock();
+        if (gotLock && psram_init_shared_memory_for_take_image_step())
         {
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Taking image for Alignment Mark Update...");
 
@@ -1494,6 +1535,9 @@ esp_err_t handler_editflow(httpd_req_t *req)
         {
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, std::string("Taking image for Alignment Mark not possible while device") + " is busy with a round (Current State: '" + *flowctrl.getActStatus() + "')!");
             zw = "Device Busy";
+        }
+        if (gotLock) {
+            flowRoundUnlock();
         }
 
         httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -1529,6 +1573,13 @@ esp_err_t handler_editflow(httpd_req_t *req)
                 httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
                 httpd_resp_send(req, _zw.c_str(), _zw.length());
             }
+            else if (!flowRoundTryLock())
+            {
+                // A round is using the camera/PSRAM - don't collide; tell the UI to retry.
+                std::string _zw = "DeviceIsBusy";
+                httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+                httpd_resp_send(req, _zw.c_str(), _zw.length());
+            }
             else
             {
                 // wird aufgerufen, wenn ein neues Referenzbild erstellt oder aktualisiert wurde
@@ -1543,6 +1594,7 @@ esp_err_t handler_editflow(httpd_req_t *req)
 
                 ESP_LOGD(TAG, "test_take - vor TakeImage");
                 std::string image_temp = flowctrl.doSingleStep("[TakeImage]", _host);
+                flowRoundUnlock();
                 httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
                 httpd_resp_send(req, image_temp.c_str(), image_temp.length());
             }
@@ -1557,9 +1609,19 @@ esp_err_t handler_editflow(httpd_req_t *req)
                 _host = std::string(_valuechar);
             }
 
-            std::string zw = flowctrl.doSingleStep("[Alignment]", _host);
-            httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-            httpd_resp_send(req, zw.c_str(), zw.length());
+            if (!flowRoundTryLock())
+            {
+                std::string zw = "DeviceIsBusy";
+                httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+                httpd_resp_send(req, zw.c_str(), zw.length());
+            }
+            else
+            {
+                std::string zw = flowctrl.doSingleStep("[Alignment]", _host);
+                flowRoundUnlock();
+                httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+                httpd_resp_send(req, zw.c_str(), zw.length());
+            }
         }
     }
     else
@@ -1894,8 +1956,16 @@ void task_autodoFlow(void *pvParameter)
 #ifdef DEBUG_DETAIL_ON
             ESP_LOGD(TAG, "Autoflow: doFlow is started");
 #endif
+            // Hold the round mutex for the whole round so a web-editor camera/reference operation
+            // can't run on the camera/PSRAM at the same time. Wait up to 30s for any in-flight
+            // editor action to finish (they are short); proceed regardless so a round is never lost.
+            bool locked = flowRoundLock(30000);
             flowisrunning = true;
             doflow();
+            flowisrunning = false;
+            if (locked) {
+                flowRoundUnlock();
+            }
 #ifdef DEBUG_DETAIL_ON
             ESP_LOGD(TAG, "Remove older log files");
 #endif
@@ -2004,6 +2074,9 @@ void task_autodoFlow(void *pvParameter)
 void InitializeFlowTask(void)
 {
     BaseType_t xReturned;
+
+    // Create the round mutex before the flow task (and the web handlers) can run.
+    initFlowRoundMutex();
 
     ESP_LOGD(TAG, "getESPHeapInfo: %s", getESPHeapInfo().c_str());
 
