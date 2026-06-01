@@ -514,17 +514,24 @@ bool ClassFlowControll::doFlow(string time)
             // raise the MQTT error topic (drives the Home Assistant "problem" binary sensor). The
             // next successful round republishes "no error" and clears it. InfluxDB only stores the
             // numeric reading, so a skipped round is simply a gap in the series (no datapoint).
-            if (FlowControll[i]->name() == "ClassFlowAlignment") {
+            // ClassFlowTakeImage joins this graceful-skip branch for the same reason: its only
+            // soft failure is "the shared PSRAM region was too small to decode this frame" (a wedged
+            // camera already reboots inside CaptureToBasisImage). A reboot cannot grow the region, so
+            // retrying into the 5x-failure reboot below would just boot-loop - skip the round and
+            // retry next time instead.
+            const std::string &failedStep = FlowControll[i]->name();
+            if ((failedStep == "ClassFlowAlignment") || (failedStep == "ClassFlowTakeImage")) {
+                const char *stepLabel = (failedStep == "ClassFlowTakeImage") ? "Take Image" : "Alignment";
                 setProcessingStage(PROC_STAGE_ERROR);
-                aktstatus = "Alignment step could not complete this round";
+                aktstatus = std::string(stepLabel) + " step could not complete this round";
                 aktstatusWithTime = aktstatus + " (" + getCurrentTimeString("%H:%M:%S") + ")";
-                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Alignment step failed - reporting status/error "
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, failedStep + " failed - reporting status/error "
                     "to REST + MQTT and skipping the rest of this round without rebooting; will retry "
                     "on the next round.");
                 #ifdef ENABLE_MQTT
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "status", aktstatus, qos, false);
                     MQTTPublish(mqttServer_getMainTopic() + "/" + "error",
-                                "Alignment step could not complete", qos, false);
+                                std::string(stepLabel) + " step could not complete", qos, false);
                 #endif //ENABLE_MQTT
                 return false;   // skip the post-loop "Flow finished" so the failure status persists
             }

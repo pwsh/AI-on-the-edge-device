@@ -44,7 +44,7 @@ esp_err_t ClassFlowTakeImage::camera_capture(void)
     return ESP_OK;
 }
 
-void ClassFlowTakeImage::takePictureWithFlash(int flash_duration)
+esp_err_t ClassFlowTakeImage::takePictureWithFlash(int flash_duration)
 {
     // in case the image is flipped, it must be reset here //
     rawImage->width = CCstatus.ImageWidth;
@@ -52,15 +52,18 @@ void ClassFlowTakeImage::takePictureWithFlash(int flash_duration)
 
     ESP_LOGD(TAG, "flash_duration: %d", flash_duration);
 
-    Camera.CaptureToBasisImage(rawImage, flash_duration);
+    esp_err_t result = Camera.CaptureToBasisImage(rawImage, flash_duration);
 
     time(&TimeImageTaken);
     localtime(&TimeImageTaken);
 
-    if (CCstatus.SaveAllFiles)
+    // Only persist the raw image when we actually have one (a failed decode leaves rawImage NULL/black).
+    if ((result == ESP_OK) && CCstatus.SaveAllFiles)
     {
         rawImage->SaveToFile(namerawimage);
     }
+
+    return result;
 }
 
 void ClassFlowTakeImage::SetInitialParameter(void)
@@ -577,7 +580,7 @@ bool ClassFlowTakeImage::doFlow(string zwtime)
         CFstatus.changedCameraSettings = false;
     }
 
-    takePictureWithFlash(flash_duration);
+    esp_err_t takeResult = takePictureWithFlash(flash_duration);
 
 #ifdef WIFITURNOFF
     esp_wifi_start();
@@ -586,6 +589,17 @@ bool ClassFlowTakeImage::doFlow(string zwtime)
 #ifdef DEBUG_DETAIL_ON
     LogFile.WriteHeapInfo("ClassFlowTakeImage::doFlow - After takePictureWithFlash");
 #endif
+
+    if (takeResult != ESP_OK)
+    {
+        // No usable image this round (e.g. the decode failed because the shared PSRAM region was too
+        // small for this frame). The specific cause was already logged by CaptureToBasisImage /
+        // LoadFromMemory. Release the shared region and report a failed round so the flow controller
+        // skips the downstream steps and retries next round instead of working on a NULL image.
+        // (A wedged camera, fb == NULL, already triggered a reboot inside CaptureToBasisImage.)
+        psram_deinit_shared_memory_for_take_image_step();
+        return false;
+    }
 
     LogImage(logPath, "raw", NULL, NULL, zwtime, rawImage);
 

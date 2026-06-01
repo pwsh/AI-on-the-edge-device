@@ -446,14 +446,35 @@ void CImageBasis::LoadFromMemory(stbi_uc *_buffer, int len)
     rgb_image = stbi_load_from_memory(_buffer, len, &width, &height, &channels, STBI_rgb);
     bpp = channels;
     ESP_LOGD(TAG, "Image loaded from memory: %d, %d, %d", width, height, channels);
-    
-    if ((width * height * channels) == 0)
-    {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Image with size 0 loaded --> reboot to be done! "
-                "Check that your camera module is working and connected properly.");
-        LogFile.WriteHeapInfo("LoadFromMemory");
 
-        doReboot();
+    if (rgb_image == NULL)
+    {
+        // Decode failed - two distinct causes, handled differently:
+        if ((width * height) > 0)
+        {
+            // The JPEG header parsed (real dimensions are known) but the pixel buffer could not be
+            // allocated -> the shared PSRAM region is too small for this frame (e.g. a higher camera
+            // resolution than the region was sized for at boot). A reboot cannot grow the region, so
+            // rebooting here would just boot-loop (this was the alpha.11 failure). Leave rgb_image
+            // NULL and let the caller skip this round gracefully; zero the dimensions so no
+            // downstream size-based loop runs over the NULL buffer.
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Could not allocate memory to decode the " +
+                    std::to_string(width) + "x" + std::to_string(height) + " camera image - the "
+                    "shared PSRAM region is too small for this image size. Skipping this round "
+                    "(not rebooting; a reboot cannot free more PSRAM).");
+            LogFile.WriteHeapInfo("LoadFromMemory");
+            width = 0; height = 0; channels = 0; bpp = 0;
+        }
+        else
+        {
+            // No decodable image at all (empty/corrupt frame) -> the camera is most likely not
+            // working or not connected. Long-standing reboot-to-recover path.
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Image with size 0 loaded --> reboot to be done! "
+                    "Check that your camera module is working and connected properly.");
+            LogFile.WriteHeapInfo("LoadFromMemory");
+
+            doReboot();
+        }
     }
     RGBImageRelease();
 }

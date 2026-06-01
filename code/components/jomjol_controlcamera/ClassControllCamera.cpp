@@ -723,6 +723,18 @@ esp_err_t CCamera::CaptureToBasisImage(CImageBasis *_Image, int delay)
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, _zw);
 #endif
 
+    // If the decode failed (e.g. the shared PSRAM region was too small for this frame), _zwImage's
+    // buffer is NULL. Copying from/into a NULL buffer would crash - this was the alpha.11 boot loop.
+    // Bail out of this capture cleanly and let the caller skip the round; the specific cause was
+    // already logged by LoadFromMemory.
+    if ((_zwImage->rgb_image == NULL) || (_Image->rgb_image == NULL))
+    {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CaptureToBasisImage: decoded image buffer is NULL "
+                "(see the decode/PSRAM error above) - skipping this capture without copying.");
+        delete _zwImage;
+        return ESP_ERR_NO_MEM;
+    }
+
     // _zwImage (freshly decoded) and _Image have identical dimensions/layout, so copy the whole
     // frame in one contiguous block instead of a per-byte triple loop over ~921 KB.
     memcpy(_Image->rgb_image, _zwImage->rgb_image, (size_t)width * height * channels);
