@@ -858,6 +858,66 @@ void parseCamQueryToCFstatus(char *_query)
 }
 
 
+// --- Async live-stream worker -------------------------------------------------------------------
+// The MJPEG live stream (CaptureToStream) holds its HTTP socket open for the whole stream. Run on the
+// single httpd task that would block every other page until the stream ends. Instead, detach the
+// request (httpd_req_async_handler_begin) and run the stream loop on a transient worker task so the
+// main httpd task returns immediately and keeps serving the UI. The camera is a single resource, so
+// only one stream runs at a time; a second request is rejected with 503. The worker is spawned per
+// stream and self-deletes when the client disconnects, so it costs no memory when not streaming.
+struct StreamAsyncItem { httpd_req_t *req; bool flashlightOn; };
+static portMUX_TYPE s_streamLock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_streamActive = false;
+
+static void streamAsyncTask(void *arg)
+{
+    StreamAsyncItem *item = (StreamAsyncItem *)arg;
+    Camera.CaptureToStream(item->req, item->flashlightOn);   // blocks until the client disconnects
+    httpd_req_async_handler_complete(item->req);             // close the detached request/socket
+    taskENTER_CRITICAL(&s_streamLock);
+    s_streamActive = false;
+    taskEXIT_CRITICAL(&s_streamLock);
+    free(item);
+    vTaskDelete(NULL);
+}
+
+// Take over the (already param-parsed) stream request. Returns true if handled (streaming async, or
+// rejected because one is already running); false means "fall back to a synchronous stream here".
+static bool startAsyncStream(httpd_req_t *req, bool flashlightOn)
+{
+    bool already;
+    taskENTER_CRITICAL(&s_streamLock);
+    already = s_streamActive;
+    if (!already) { s_streamActive = true; }
+    taskEXIT_CRITICAL(&s_streamLock);
+    if (already) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_hdr(req, "Retry-After", "2");
+        httpd_resp_sendstr(req, "A live stream is already active");
+        return true; // handled (rejected)
+    }
+
+    httpd_req_t *async_req = NULL;
+    StreamAsyncItem *item = NULL;
+    if (httpd_req_async_handler_begin(req, &async_req) == ESP_OK && async_req != NULL &&
+        (item = (StreamAsyncItem *)malloc(sizeof(StreamAsyncItem))) != NULL)
+    {
+        item->req = async_req;
+        item->flashlightOn = flashlightOn;
+        if (xTaskCreatePinnedToCore(streamAsyncTask, "streamAsync", 12288, item,
+                                    tskIDLE_PRIORITY + 3, NULL, 1) == pdPASS) {
+            return true; // streaming on the worker; main httpd task is free
+        }
+        free(item);
+        httpd_req_async_handler_complete(async_req);
+    }
+    // async unavailable -> clear the guard and let the caller stream synchronously (old behaviour)
+    taskENTER_CRITICAL(&s_streamLock);
+    s_streamActive = false;
+    taskEXIT_CRITICAL(&s_streamLock);
+    return false;
+}
+
 esp_err_t handler_stream(httpd_req_t *req)
 {
 #ifdef DEBUG_DETAIL_ON
@@ -928,7 +988,11 @@ esp_err_t handler_stream(httpd_req_t *req)
         }
     }
 
-    Camera.CaptureToStream(req, flashlightOn);
+    // Stream on a detached async worker so the single httpd task stays free for the rest of the UI.
+    // Falls back to a synchronous (blocking) stream only if the async handoff is unavailable.
+    if (!startAsyncStream(req, flashlightOn)) {
+        Camera.CaptureToStream(req, flashlightOn);
+    }
 
 #ifdef DEBUG_DETAIL_ON
     LogFile.WriteHeapInfo("handler_stream - Done");
