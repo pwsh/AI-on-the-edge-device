@@ -1,0 +1,17 @@
+# Experimental 120 MHz SPI flash (vs the default 80 MHz) - ESP32-S3 test variant:
+#   AIOTEDGE_VARIANTS=flash120 AIOTEDGE_S3_FLASH=16mb idf.py -B build_f120 build
+#
+# IMPORTANT - NOT usable on the default S3 camera board (octal PSRAM @ 80 MHz): the S3 ties flash and
+# PSRAM to the shared MSPI, and IDF rejects the flash@120 + octal-PSRAM@80 combination at COMPILE time
+# (static assert "FLASH and PSRAM Mode configuration are not supported": MSPI core_clock/psram_clock
+# must be a power of 2; 240/80 = 3). Octal PSRAM cannot be moved to 120 MHz here either. So on this
+# board flash stays at 80 MHz - this is a compile-time block, not a runtime fallback.
+#
+# This variant is therefore only for a QUAD-PSRAM or no-PSRAM ESP32-S3. There:
+#  - SPI_FLASH_HPM_AUTO probes the chip at boot and engages 120 MHz only if it's in IDF's supported
+#    table (the GD25Q128 / JEDEC 0xC84018 used here IS supported); an unsupported chip falls back to
+#    80 MHz automatically. The 2nd-stage bootloader stays at 80 MHz; HPM bumps to 120 at runtime.
+#  - 120 MHz flash is an EXPERIMENTAL IDF feature (temperature-stability caveats) - validate on
+#    hardware, never ship as a default.
+CONFIG_ESPTOOLPY_FLASHFREQ_120M=y
+CONFIG_SPI_FLASH_HPM_AUTO=y

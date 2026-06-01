@@ -144,6 +144,13 @@ static std::string buildHardwareDetailJson()
 
     uint32_t flashSize = 0; esp_flash_get_size(NULL, &flashSize);
     j += hwKV("Flash size", std::to_string(flashSize / 1024 / 1024) + " MB");
+    uint32_t flashId = 0;
+    if (esp_flash_read_id(NULL, &flashId) == ESP_OK) {
+        char idStr[48];
+        snprintf(idStr, sizeof(idStr), "0x%06lX (mfr 0x%02lX, dev 0x%04lX)",
+                 (unsigned long)flashId, (unsigned long)((flashId >> 16) & 0xFF), (unsigned long)(flashId & 0xFFFF));
+        j += hwKV("Flash JEDEC ID", idStr);
+    }
 #if defined(CONFIG_ESPTOOLPY_FLASHMODE_QIO)
     j += hwKV("Flash mode", "QIO");
 #elif defined(CONFIG_ESPTOOLPY_FLASHMODE_QOUT)

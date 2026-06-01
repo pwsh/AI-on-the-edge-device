@@ -967,6 +967,16 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      - **Camera interface abstraction**: see §9.4 — wrap capture behind an interface with a **DVP**
        backend (esp32-camera, today) and a **USB-UVC** backend (S3 USB host). The big code item.
      - Per-board pin verification, S3 build in CI next to esp32, web-installer entry.
+   - **SPI flash 120 MHz — evaluated 2026-06-01, NOT usable on this S3 board (keep 80 MHz).** The flash
+     chip is a GigaDevice **GD25Q128** (JEDEC **0xC84018**, surfaced via the new HardwareDetail) and IS
+     in IDF 6.0.1's HPM/120 MHz table (`spi_flash_hpm_probe_chip_with_dummy`). But the S3 ties flash and
+     PSRAM to a shared MSPI: `CONFIG_ESPTOOLPY_FLASHFREQ_120M` with the board's **octal PSRAM @ 80 MHz**
+     fails at **compile time** (`static assert "FLASH and PSRAM Mode configuration are not supported"` -
+     MSPI `core_clock/psram_clock` must be a power of 2; 240/80 = 3), and octal PSRAM can't be bumped to
+     120 here. So it's a compile-time block, not a runtime fallback - **flash stays at 80 MHz**. The
+     `sdkconfig.defaults.flash120` variant (`AIOTEDGE_VARIANTS=flash120`, HPM_AUTO so unsupported chips
+     fall back to 80) is retained for a future **quad-PSRAM / no-PSRAM** S3, where 120 MHz HPM *is*
+     viable (experimental; validate on hardware).
 
 ### 9.4 🟡 Camera support: more DVP sensors (OV3660 / OV5640) + USB-UVC cameras (ESP32-S3)
 Goal: broaden beyond the OV2640 to the other DVP sensors **and** add USB-connected (UVC) cameras,
