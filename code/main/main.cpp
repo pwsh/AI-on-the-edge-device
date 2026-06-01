@@ -99,6 +99,19 @@ bool setCpuFrequency(void);
 
 static const char *TAG = "MAIN";
 
+// Global hook fired by the heap allocator whenever ANY heap_caps allocation fails - one place to see
+// out-of-memory events (size + which heap) instead of each call site failing silently. Complements the
+// shared-PSRAM-region STBI safety net. Kept lightweight and alloc-free so it can't recurse: plain
+// ESP_LOGE, no LogFile/file I/O.
+static void heapAllocFailedHook(size_t size, uint32_t caps, const char *function_name)
+{
+    ESP_LOGE(TAG, "HEAP ALLOC FAILED: %u bytes, caps 0x%08lx%s%s, in %s",
+             (unsigned)size, (unsigned long)caps,
+             (caps & MALLOC_CAP_SPIRAM) ? " [PSRAM]" : "",
+             (caps & MALLOC_CAP_INTERNAL) ? " [internal]" : "",
+             function_name ? function_name : "?");
+}
+
 #define MOUNT_POINT "/sdcard"
 
 #ifdef USE_FLASH_FS
@@ -426,9 +439,12 @@ extern "C" void app_main(void)
     #endif
 
     // ********************************************
-    // Highlight start of app_main 
+    // Highlight start of app_main
     // ********************************************
     ESP_LOGI(TAG, "\n\n\n\n================ Start app_main =================");
+
+    // Log any failed heap allocation centrally (size + heap) from here on.
+    heap_caps_register_failed_alloc_callback(heapAllocFailedHook);
  
     // Init SD card
     // ********************************************
