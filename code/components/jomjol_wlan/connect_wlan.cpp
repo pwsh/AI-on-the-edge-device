@@ -597,10 +597,13 @@ esp_err_t wifi_init_sta(void)
 			LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Manual interface config -> DNS: " + wlan_config.dns);
 		}
      
-        esp_netif_dns_info_t dns_info;
-        ip4_addr_t ip;
-        ip.addr = esp_ip4addr_aton(wlan_config.dns.c_str());
-        ip_addr_set_ip4_u32(&dns_info.ip, ip.addr);
+        // Set the DNS directly on the esp_netif esp_ip_addr_t union instead of via lwip's
+        // ip_addr_set_ip4_u32 macro: that macro assumes the IPv4-only ip_addr_t layout (.addr) and
+        // fails to compile when LWIP_IPV6 is enabled (the ESP32-S3 default config), where esp_ip_addr_t
+        // is the IPv4/IPv6 union. This form is target/IPv6-independent.
+        esp_netif_dns_info_t dns_info = {};
+        dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+        dns_info.ip.u_addr.ip4.addr = esp_ip4addr_aton(wlan_config.dns.c_str());
 
         retval = esp_netif_set_dns_info(my_sta, ESP_NETIF_DNS_MAIN, &dns_info);
 		if (retval != ESP_OK) {

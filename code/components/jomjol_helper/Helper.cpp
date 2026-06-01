@@ -660,11 +660,33 @@ string toLower(string in)
 }
 
 // CPU Temp
+#if CONFIG_IDF_TARGET_ESP32
+// Classic ESP32: the only on-chip temperature reading is the legacy ROM function (there is no
+// temperature_sensor driver for the original ESP32). Returns a Fahrenheit-scaled raw value.
 extern "C" uint8_t temprature_sens_read();
 float temperatureRead()
 {
 	return (temprature_sens_read() - 32) / 1.8;
 }
+#else
+// ESP32-S3 (and newer): use the temperature_sensor driver - the ESP32-only ROM
+// temprature_sens_read() does not exist here. Installed lazily on first read.
+#include "driver/temperature_sensor.h"
+float temperatureRead()
+{
+	static temperature_sensor_handle_t s_temp_handle = NULL;
+	if (s_temp_handle == NULL) {
+		temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
+		if (temperature_sensor_install(&cfg, &s_temp_handle) != ESP_OK) {
+			return 0.0f;
+		}
+		temperature_sensor_enable(s_temp_handle);
+	}
+	float celsius = 0.0f;
+	temperature_sensor_get_celsius(s_temp_handle, &celsius);
+	return celsius;
+}
+#endif
 
 time_t addDays(time_t startTime, int days)
 {

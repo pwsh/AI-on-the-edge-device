@@ -762,11 +762,23 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
        marked verify-per-board**).
      - ✅ `code/CMakeLists.txt` selects the board by `IDF_TARGET` (esp32 → AiThinker; esp32s3 → S3),
        and the 4 MB ESP32-CAM build stays green (verified, binary unchanged).
-   - **⬜ Remaining (needs a real S3 board + a debugging pass, like the IDF-6 migration):**
-     - Get the S3 build green: `idf.py -B build_s3 -D SDKCONFIG=build_s3/sdkconfig -D IDF_TARGET=esp32s3 build`
-       (separate build dir/sdkconfig so the esp32 build is untouched). Expect S3-specific fixes
-       (camera LCD_CAM init, PSRAM octal, GPIO/SD pins, USB). Prereq: `install.sh esp32s3` (adds the
-       Xtensa-S3 toolchain — not installed yet; the local IDF was provisioned `esp32`-only).
+   - **✅ S3 build is GREEN (this session).** `IDF_TARGET=esp32s3 idf.py -B build_s3 -D
+     SDKCONFIG=build_s3/sdkconfig build` produces a flashable `build_s3/AI-on-the-edge.bin`
+     (**1.71 MB, 46% free** in the 3 MB OTA slot), bootloader + partition table, on octal PSRAM /
+     8 MB flash / 240 MHz. The shared Xtensa toolchain (`xtensa-esp-elf` esp-15.2.0) covers both
+     esp32 and esp32s3 — no separate `install.sh esp32s3` was needed. Separate `build_s3/` dir so the
+     esp32 build is untouched (**re-verified esp32 green, binary behaviour unchanged**). Only **two**
+     target fixes were required (both target-independent, esp32 still builds):
+       1. `connect_wlan.cpp` DNS — set the esp_netif `esp_ip_addr_t` union directly
+          (`.ip.type = ESP_IPADDR_TYPE_V4; .ip.u_addr.ip4.addr = …`) instead of lwip's
+          `ip_addr_set_ip4_u32` macro, which only compiles in IPv4-only mode (S3's default config
+          enables LWIP_IPV6).
+       2. `temperatureRead()` (`Helper.cpp`) — the ESP32-only ROM `temprature_sens_read()` doesn't
+          exist on S3; gated `#if CONFIG_IDF_TARGET_ESP32` (ROM) vs the `temperature_sensor` driver
+          (`esp_driver_tsens`, added to `jomjol_helper` REQUIRES off-esp32).
+   - **⬜ Remaining (needs a real S3 board to validate on hardware):**
+     - On-device bring-up: flash, then verify PSRAM octal init, **camera LCD_CAM** DVP init, SD pins,
+       Wi-Fi/MQTT, and a meter read. Expect per-board pin fixes (`defines.h BOARD_ESP32S3_CAM`).
      - **Camera interface abstraction**: see §9.4 — wrap capture behind an interface with a **DVP**
        backend (esp32-camera, today) and a **USB-UVC** backend (S3 USB host). The big code item.
      - Per-board pin verification, S3 build in CI next to esp32, web-installer entry.
@@ -845,7 +857,8 @@ JPEG-decode path.
    build green and the OV2640 device byte-identical (interface extraction only). *(Doable now, no S3.)*
 2. 🟡 **Per-sensor DVP ranges** (§9.4.1) — firmware clamps done (brightness/contrast/saturation);
    UI min/max + remaining controls (AE-level/denoise/gain-ceiling) still to do. *(Doable now, no S3.)*
-3. ⬜ **S3 build green** (§9.3 item 5) once the S3 toolchain is installed.
+3. ✅ **S3 build green** (§9.3 item 5) — flashable `build_s3/AI-on-the-edge.bin`, two target fixes
+   (DNS/IPv6 + temperature sensor); esp32 build re-verified unchanged. Needs hardware bring-up next.
 4. ⬜ **UVC backend** behind the interface, s3-gated; bring up an MJPEG USB cam, validate a meter read.
 5. ⬜ Optional S3 capture-resolution option + OV5640 autofocus; CI + web-installer entries per board.
 

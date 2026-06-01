@@ -4,6 +4,7 @@
 .code-workspace
 /sd-card/htm./.vscode/
 /code/build
+/code/build_s3
 /code/.helper
 /sd-card/html/debug/
 /firmware/
