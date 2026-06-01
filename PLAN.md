@@ -568,7 +568,11 @@ Two independent reductions:
    - ⬜ Countdown: e.g. blink rate or a fading ramp as the next round approaches (not yet done).
    - ⬜ Follow-up: a configurable mode (off / status-only / countdown+status); on-device colour
      visibility pass.
-- ⬜ **UI cleanup / modernization + responsiveness.** The web UI is legacy (table layouts,
+- 🟡 **UI cleanup / modernization + responsiveness.** Responsiveness largely DONE (app.css has @media
+   breakpoints at 860/760/768px incl. mobile menu collapse + `min-width:0/overflow-x:hidden`; viewport meta
+   present on every real page). Remaining is the broader legacy-cleanup (inline styles, per-page `<style>`,
+   card/typography consistency) - a large ongoing effort. Original note:
+- 💤 **UI cleanup / modernization + responsiveness.** The web UI is legacy (table layouts,
    hardcoded colors, fixed widths, per-page `<style>`). Modernize incrementally:
    - Consolidate styles into shared CSS variables (the dark-mode `theme.css` is a starting
      point) and remove inline `style="color:black"` etc.
