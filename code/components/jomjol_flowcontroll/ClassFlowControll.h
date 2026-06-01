@@ -34,6 +34,7 @@ protected:
 //	ClassFlowDigit* flowdigit;
 	ClassFlowTakeImage* flowtakeimage;
 	ClassFlow* CreateClassFlow(std::string _type);
+	static float parseIntervalToMinutes(const std::vector<std::string>& splitted);
 
 	bool AutoStart;
 	float AutoInterval;
@@ -51,6 +52,7 @@ public:
 	bool SetupModeActive;
 
 	void InitFlow(std::string config);
+	bool ReloadLiveInterval();   // re-apply just the [AutoTimer] Interval from config.ini, no reboot
 	bool doFlow(string time);
 	void doFlowTakeImageOnly(string time);
 	bool getStatusSetupModus(){return SetupModeActive;};

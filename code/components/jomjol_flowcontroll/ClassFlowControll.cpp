@@ -350,6 +350,56 @@ ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
     return cfc;
 }
 
+// Parse an "Interval = <number> [unit]" value to minutes. Unit (seconds/minutes/hours/days or
+// s/m/h/d) is optional; a bare number stays minutes (back-compat). Zero/negative is guarded to 5 min.
+float ClassFlowControll::parseIntervalToMinutes(const std::vector<std::string>& splitted)
+{
+    float _val = std::stof(splitted[1]);
+    float _minutes = _val;   // default unit: minutes
+    if (splitted.size() > 2) {
+        std::string _unit = toUpper(splitted[2]);
+        if (_unit == "S" || _unit == "SEC" || _unit == "SECOND" || _unit == "SECONDS")
+            _minutes = _val / 60.0f;
+        else if (_unit == "H" || _unit == "HR" || _unit == "HOUR" || _unit == "HOURS")
+            _minutes = _val * 60.0f;
+        else if (_unit == "D" || _unit == "DAY" || _unit == "DAYS")
+            _minutes = _val * 1440.0f;
+    }
+    if (_minutes <= 0.0f) _minutes = 5.0f;
+    return _minutes;
+}
+
+// Re-read just the [AutoTimer] Interval from config.ini and apply it live (no reboot). Safe: it is a
+// single scalar used only for the inter-round sleep; the running flow objects/models are untouched.
+// Returns true if a valid interval was found and applied.
+bool ClassFlowControll::ReloadLiveInterval()
+{
+    FILE* pf = fopen(FormatFileName(std::string(CONFIG_FILE)).c_str(), "r");
+    if (!pf) return false;
+    char buf[256];
+    bool inAutoTimer = false;
+    float newInterval = -1.0f;
+    while (fgets(buf, sizeof(buf), pf)) {
+        std::string line = trim(std::string(buf));
+        if (line.size() == 0 || line[0] == ';' || line[0] == '#') continue;
+        if (line[0] == '[') { inAutoTimer = (toUpper(line).find("[AUTOTIMER]") != std::string::npos); continue; }
+        if (inAutoTimer) {
+            std::vector<std::string> sp = ZerlegeZeile(line, " =");
+            if (sp.size() > 1 && toUpper(sp[0]) == "INTERVAL" && isStringNumeric(sp[1])) {
+                newInterval = parseIntervalToMinutes(sp);
+            }
+        }
+    }
+    fclose(pf);
+    if (newInterval > 0.0f) {
+        AutoInterval = newInterval;
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Live config: processing interval set to " +
+                std::to_string(AutoInterval) + " min (applies on the next round, no reboot)");
+        return true;
+    }
+    return false;
+}
+
 void ClassFlowControll::InitFlow(std::string config)
 {
     aktstatus = "Initialization";
@@ -698,25 +748,7 @@ bool ClassFlowControll::ReadParameter(FILE* pfile, string& aktparamgraph)
 
         if ((toUpper(splitted[0]) == "INTERVAL") && (splitted.size() > 1)) {
             if (isStringNumeric(splitted[1])) {
-                // Interval = <number> [unit]. An optional unit (seconds/minutes/hours/days, or
-                // their s/m/h/d abbreviations) is converted to minutes. A bare number stays
-                // minutes (back-compat). AutoInterval is a float, so sub-minute (seconds) works.
-                float _val = std::stof(splitted[1]);
-                float _minutes = _val;   // default unit: minutes
-                if (splitted.size() > 2) {
-                    std::string _unit = toUpper(splitted[2]);
-                    if (_unit == "S" || _unit == "SEC" || _unit == "SECOND" || _unit == "SECONDS")
-                        _minutes = _val / 60.0f;
-                    else if (_unit == "H" || _unit == "HR" || _unit == "HOUR" || _unit == "HOURS")
-                        _minutes = _val * 60.0f;
-                    else if (_unit == "D" || _unit == "DAY" || _unit == "DAYS")
-                        _minutes = _val * 1440.0f;
-                    // minutes / unknown -> already minutes
-                }
-                if (_minutes <= 0.0f) {
-                    _minutes = 5.0f;   // guard against a zero/negative interval
-                }
-                AutoInterval = _minutes;
+                AutoInterval = parseIntervalToMinutes(splitted);
             }
         }
 

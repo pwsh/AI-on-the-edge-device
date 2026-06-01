@@ -581,7 +581,12 @@ Two independent reductions:
    - Modern component styling (cards, spacing, typography), consistent across pages.
    - Keep it dependency-light (served from ESP32/SD, gzipped) — plain CSS/JS, no heavy
      frameworks. Coordinate with the dark-mode variables so both themes stay consistent.
-- ⬜ **Apply configuration changes live (no reboot) where possible.** Today saving config
+- 🟡 **Apply configuration changes live (no reboot) where possible.** DONE for the processing
+   **interval**: `/reload_config` re-reads the [AutoTimer] Interval and the flow loop re-reads it each round
+   (commit *live interval*). Broader live-apply (camera/ROIs/CNN) is deferred - it requires tearing down +
+   rebuilding the flow pipeline (CNN models in the shared PSRAM region), unsafe to do live without
+   meter-validated teardown. Original:
+- 💤 **Apply configuration changes live (no reboot) where possible.** Today saving config
    from the UI requires a restart to take effect (see FeatureRequest #2). Add a path to
    re-apply settings at runtime:
    - On save, re-run the relevant `ReadParameter`/init for the affected flow modules instead

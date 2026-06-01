@@ -1964,6 +1964,10 @@ void task_autodoFlow(void *pvParameter)
 
     while (autostartIsEnabled)
     {
+        // Re-read the interval each round so a live change (via /reload_config) takes effect on the
+        // next round without a reboot.
+        flowctrl.setAutoStartInterval(auto_interval);
+
         // Honor a pause request: wait here without starting a new round. The last
         // status (e.g. "Flow finished") is left untouched so reference image /
         // alignment / ROI setup keeps working while paused.
@@ -2156,6 +2160,20 @@ void InitializeFlowTask(void)
     ESP_LOGD(TAG, "getESPHeapInfo: %s", getESPHeapInfo().c_str());
 }
 
+// Apply config changes live where it is safe to do so without a reboot. Currently re-applies the
+// [AutoTimer] processing interval (takes effect on the next round). Other settings (camera, ROIs,
+// CNN model) still need a reboot because re-applying them means tearing down + rebuilding the flow
+// pipeline (the CNN models live in the shared PSRAM region), which is not safe to do live.
+esp_err_t handler_reload_config(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    bool ok = flowctrl.ReloadLiveInterval();
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, ok ? "Live config reload: interval re-applied (no reboot)"
+                                              : "Live config reload: no interval found to apply");
+    httpd_resp_sendstr(req, ok ? "interval reloaded" : "no change");
+    return ESP_OK;
+}
+
 void register_server_main_flow_task_uri(httpd_handle_t server)
 {
     ESP_LOGI(TAG, "server_main_flow_task - Registering URI handlers");
@@ -2187,6 +2205,11 @@ void register_server_main_flow_task_uri(httpd_handle_t server)
     camuri.uri = "/pause";
     camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_pause);
     camuri.user_ctx = (void *)"Pause";
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.uri = "/reload_config";
+    camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_reload_config);
+    camuri.user_ctx = (void *)"Reload Config";
     httpd_register_uri_handler(server, &camuri);
 
     camuri.uri = "/statusflow.html";
