@@ -24,6 +24,8 @@
 #include "esp_psram.h"
 #include "esp_heap_caps.h"
 #include "esp_flash.h"
+#include "esp_mac.h"        // esp_efuse_mac_get_default (HardwareDetail)
+#include "soc/rtc.h"        // rtc_clk_xtal_freq_get (HardwareDetail)
 #include "ClassControllCamera.h"
 
 #include <stdio.h>
@@ -78,6 +80,108 @@ static std::string buildAnalysisDiagnosticsFields()
 }
 
 /* An HTTP GET handler */
+// Detailed hardware/SoC information for the info page's "Hardware details" section (S3-focused but
+// works on any target). Returns a flat JSON object of "Label":"value" pairs the UI renders as rows.
+static std::string hwKV(const std::string &k, const std::string &v) { return "\"" + k + "\":\"" + v + "\","; }
+
+static std::string buildHardwareDetailJson()
+{
+    esp_chip_info_t ci; esp_chip_info(&ci);
+    std::string j = "{";
+
+#if defined(BOARD_ESP32S3_CAM)
+    j += hwKV("Board", "ESP32-S3 CAM (BOARD_ESP32S3_CAM)");
+#elif defined(BOARD_WROVER_KIT)
+    j += hwKV("Board", "ESP32-WROVER (BOARD_WROVER_KIT)");
+#elif defined(BOARD_ESP32CAM_AITHINKER)
+    j += hwKV("Board", "AI-Thinker ESP32-CAM");
+#else
+    j += hwKV("Board", "unknown");
+#endif
+
+    const char *model = ci.model == CHIP_ESP32 ? "ESP32" : ci.model == CHIP_ESP32S2 ? "ESP32-S2" :
+                        ci.model == CHIP_ESP32S3 ? "ESP32-S3" : ci.model == CHIP_ESP32C3 ? "ESP32-C3" : "unknown";
+    j += hwKV("Chip model", model);
+    j += hwKV("Chip revision", "v" + std::to_string(ci.revision / 100) + "." + std::to_string(ci.revision % 100));
+    j += hwKV("CPU cores", std::to_string(ci.cores));
+
+    std::string feat;
+    if (ci.features & CHIP_FEATURE_WIFI_BGN) feat += "WiFi ";
+    if (ci.features & CHIP_FEATURE_BT)       feat += "BT ";
+    if (ci.features & CHIP_FEATURE_BLE)      feat += "BLE ";
+    if (ci.features & CHIP_FEATURE_EMB_FLASH) feat += "EmbFlash ";
+    if (ci.features & CHIP_FEATURE_EMB_PSRAM) feat += "EmbPSRAM ";
+    j += hwKV("Chip features", feat.empty() ? "-" : feat);
+
+    j += hwKV("CPU frequency", std::to_string(esp_clk_cpu_freq() / 1000000) + " MHz");
+#ifdef CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ
+    j += hwKV("CPU max frequency", std::to_string(CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ) + " MHz");
+#endif
+    j += hwKV("RTC XTAL frequency", std::to_string((int)rtc_clk_xtal_freq_get()) + " MHz");
+
+    uint8_t mac[6] = {0}; esp_efuse_mac_get_default(mac);
+    char macStr[18]; snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    j += hwKV("Base MAC (eFuse)", macStr);
+
+    j += hwKV("Internal SRAM total", std::to_string(heap_caps_get_total_size(MALLOC_CAP_INTERNAL) / 1024) + " KB");
+    j += hwKV("Internal SRAM free",  std::to_string(heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024) + " KB");
+
+    size_t psramSize = esp_psram_is_initialized() ? esp_psram_get_size() : 0;
+    j += hwKV("PSRAM size", std::to_string(psramSize / 1024 / 1024) + " MB (" + std::to_string(psramSize) + " bytes)");
+    j += hwKV("PSRAM free", std::to_string(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + " KB");
+#if defined(CONFIG_SPIRAM_MODE_OCT)
+    j += hwKV("PSRAM mode", "Octal (OPI)");
+#elif defined(CONFIG_SPIRAM_MODE_QUAD)
+    j += hwKV("PSRAM mode", "Quad (QPI)");
+#endif
+#if defined(CONFIG_SPIRAM_SPEED_120M)
+    j += hwKV("PSRAM speed", "120 MHz");
+#elif defined(CONFIG_SPIRAM_SPEED_80M)
+    j += hwKV("PSRAM speed", "80 MHz");
+#elif defined(CONFIG_SPIRAM_SPEED_40M)
+    j += hwKV("PSRAM speed", "40 MHz");
+#endif
+
+    uint32_t flashSize = 0; esp_flash_get_size(NULL, &flashSize);
+    j += hwKV("Flash size", std::to_string(flashSize / 1024 / 1024) + " MB");
+#if defined(CONFIG_ESPTOOLPY_FLASHMODE_QIO)
+    j += hwKV("Flash mode", "QIO");
+#elif defined(CONFIG_ESPTOOLPY_FLASHMODE_QOUT)
+    j += hwKV("Flash mode", "QOUT");
+#elif defined(CONFIG_ESPTOOLPY_FLASHMODE_DIO)
+    j += hwKV("Flash mode", "DIO");
+#elif defined(CONFIG_ESPTOOLPY_FLASHMODE_DOUT)
+    j += hwKV("Flash mode", "DOUT");
+#endif
+#ifdef CONFIG_ESPTOOLPY_FLASHFREQ
+    j += hwKV("Flash speed", std::string(CONFIG_ESPTOOLPY_FLASHFREQ));
+#endif
+#if defined(CONFIG_SPI_FLASH_AUTO_SUSPEND)
+    j += hwKV("Flash auto-suspend", "enabled");
+#else
+    j += hwKV("Flash auto-suspend", "disabled");
+#endif
+
+#ifdef CAM_PIN_XCLK
+    j += hwKV("Cam XCLK / PCLK GPIO", std::to_string((int)CAM_PIN_XCLK) + " / " + std::to_string((int)CAM_PIN_PCLK));
+    j += hwKV("Cam VSYNC / HREF GPIO", std::to_string((int)CAM_PIN_VSYNC) + " / " + std::to_string((int)CAM_PIN_HREF));
+    j += hwKV("Cam SIOD / SIOC GPIO", std::to_string((int)CAM_PIN_SIOD) + " / " + std::to_string((int)CAM_PIN_SIOC));
+    j += hwKV("Cam D0..D7 GPIO", std::to_string((int)CAM_PIN_D0) + "," + std::to_string((int)CAM_PIN_D1) + "," +
+              std::to_string((int)CAM_PIN_D2) + "," + std::to_string((int)CAM_PIN_D3) + "," + std::to_string((int)CAM_PIN_D4) + "," +
+              std::to_string((int)CAM_PIN_D5) + "," + std::to_string((int)CAM_PIN_D6) + "," + std::to_string((int)CAM_PIN_D7));
+#endif
+#ifdef GPIO_SDCARD_CLK
+    j += hwKV("SD CLK / CMD / D0 GPIO", std::to_string((int)GPIO_SDCARD_CLK) + " / " + std::to_string((int)GPIO_SDCARD_CMD) + " / " + std::to_string((int)GPIO_SDCARD_D0));
+#endif
+#ifdef FLASH_GPIO
+    j += hwKV("Flash/RGB LED GPIO", std::to_string((int)FLASH_GPIO));
+#endif
+
+    if (j.back() == ',') j.pop_back();
+    j += "}";
+    return j;
+}
+
 esp_err_t info_get_handler(httpd_req_t *req)
 {
 #ifdef DEBUG_DETAIL_ON      
@@ -109,7 +213,13 @@ esp_err_t info_get_handler(httpd_req_t *req)
     if (_task.compare("GitBranch") == 0)
     {
         httpd_resp_sendstr(req, libfive_git_branch());
-        return ESP_OK;        
+        return ESP_OK;
+    }
+    else if (_task.compare("HardwareDetail") == 0)   // detailed SoC/hardware info (info page "Hardware details")
+    {
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, buildHardwareDetailJson().c_str());
+        return ESP_OK;
     }
     else if (_task.compare("GitTag") == 0)
     {

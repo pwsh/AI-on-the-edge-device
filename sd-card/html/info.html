@@ -294,6 +294,13 @@ table {
 		</tr>
 	</table></div>
 
+	<div class="app-card" id="hwDetailCard" style="display:none">
+		<h3>Hardware Details</h3>
+		<button class="button" type="button" id="hwDetailBtn" onclick="loadHardwareDetail()">Show hardware details</button>
+		<table style="margin-top:10px"><colgroup><col style="width:45%"><col style="width:55%"></colgroup>
+		<tbody id="hwDetailBody"></tbody></table>
+	</div>
+
 
 <h3>Copyright</h3>
 Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edge-device" target=_blank>Jomjol</a> and others.
@@ -604,8 +611,44 @@ Copyright &copy; 2020 - 2024 by <a href="https://github.com/jomjol/AI-on-the-edg
 		xhttp.send();
 	}
 
+	// Reveal the Hardware Details card only on ESP32-S3 (per request). The heavy detail blob is
+	// fetched lazily when the user clicks the button.
+	function loadHardwareDetailGate()
+	{
+		var x = new XMLHttpRequest();
+		x.onreadystatechange = function() {
+			if (x.readyState == 4 && x.status == 200 && /ESP32-S3/i.test(x.responseText)) {
+				document.getElementById('hwDetailCard').style.display = 'block';
+			}
+		};
+		x.open('GET', getDomainname() + '/info?type=ChipModel', true);
+		x.send();
+	}
+
+	function loadHardwareDetail()
+	{
+		var x = new XMLHttpRequest();
+		x.onreadystatechange = function() {
+			if (x.readyState != 4) return;
+			if (x.status == 200) {
+				var rows = '';
+				try {
+					var d = JSON.parse(x.responseText);
+					for (var k in d) {
+						if (d.hasOwnProperty(k)) { rows += '<tr><td>' + k + '</td><td>' + d[k] + '</td></tr>'; }
+					}
+				} catch (e) { rows = '<tr><td colspan="2">Failed to parse hardware details</td></tr>'; }
+				document.getElementById('hwDetailBody').innerHTML = rows;
+				document.getElementById('hwDetailBtn').style.display = 'none';
+			}
+		};
+		x.open('GET', getDomainname() + '/info?type=HardwareDetail', true);
+		x.send();
+	}
+
 	function init()
 	{
+		loadHardwareDetailGate();
 		loadMemoryInfo();
 		loadBytesField('PSRAMSize', 'ExtRAMTotal');
 		loadBytesField('FlashSize', 'FlashSize');
