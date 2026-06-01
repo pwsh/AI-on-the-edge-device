@@ -1916,6 +1916,9 @@ void task_autodoFlow(void *pvParameter)
 
         fr_delta_ms = (esp_timer_get_time() - fr_start) / 1000;
 
+        // Expose this round's processing time as a performance diagnostic (MQTT / HA / InfluxDB / JSON).
+        setFlowProcessingTime((long)fr_delta_ms);
+
         if (auto_interval > fr_delta_ms)
         {
             const TickType_t xDelay = (auto_interval - fr_delta_ms) / portTICK_PERIOD_MS;

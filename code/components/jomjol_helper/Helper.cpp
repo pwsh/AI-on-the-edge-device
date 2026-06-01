@@ -1132,6 +1132,13 @@ time_t getUpTime(void)
 	return (uint32_t)(esp_timer_get_time() / 1000 / 1000); // in seconds
 }
 
+// Last digitization round (loop) processing time in ms - performance diagnostic. Stored here in
+// the shared helper so every output layer (MQTT / Home Assistant / InfluxDB / JSON) can read it
+// without depending on the flow-control component.
+static long s_flowProcessingTimeMs = 0;
+void setFlowProcessingTime(long ms) { s_flowProcessingTimeMs = ms; }
+long getFlowProcessingTime(void) { return s_flowProcessingTimeMs; }
+
 string getResetReason(void)
 {
 	std::string reasonText;

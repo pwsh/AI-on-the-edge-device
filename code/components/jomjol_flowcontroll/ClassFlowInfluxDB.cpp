@@ -173,18 +173,25 @@ bool ClassFlowInfluxDB::doFlow(string zwtime)
                     namenumber = namenumber + "/value";
             }
 
-            if (result.length() > 0)   
-//////////////////////// NEW //////////////////////////            
+            if (result.length() > 0)
+//////////////////////// NEW //////////////////////////
 //                InfluxDBPublish(measurement, namenumber, result, timeutc);
                 influxDB.InfluxDBPublish(measurement, namenumber, result, timeutc);
 //////////////////////// NEW //////////////////////////
 
 
         }
+
+        // Performance diagnostic: last digitization round (loop) processing time in ms, published
+        // under the first number's measurement with field "processingTime".
+        if ((*NUMBERS).size() > 0) {
+            influxDB.InfluxDBPublish((*NUMBERS)[0]->MeasurementV1, "processingTime",
+                std::to_string(getFlowProcessingTime()), (*NUMBERS)[0]->timeStampTimeUTC);
+        }
     }
-   
+
     OldValue = result;
-    
+
     return true;
 }
 

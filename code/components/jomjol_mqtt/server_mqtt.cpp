@@ -6,6 +6,7 @@
 
 #include "esp_log.h"
 #include "ClassLogFile.h"
+#include "Helper.h"   // getFlowProcessingTime()
 #include "connect_wlan.h"
 #include "read_wlanini.h"
 #include "server_mqtt.h"
@@ -185,6 +186,7 @@ bool MQTThomeassistantDiscovery(int qos) {
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "freeMem",         "Free Memory",       "memory",                   "B",   "",                "measurement", "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "wifiRSSI",        "Wi-Fi RSSI",        "wifi",                     "dBm", "signal_strength", "",            "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "CPUtemp",         "CPU Temperature",   "thermometer",              "°C",  "temperature",     "measurement", "diagnostic", qos);
+    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "processingTime",  "Processing Time",   "timer-outline",            "ms",  "duration",        "measurement", "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "interval",        "Interval",          "clock-time-eight-outline", "min",  "",               "measurement", "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "IP",              "IP",                "network-outline",           "",    "",               "",            "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "status",          "Status",            "list-status",               "",    "",               "",            "diagnostic", qos);
@@ -264,6 +266,9 @@ bool publishSystemData(int qos) {
 
     sprintf(tmp_char, "%d", (int)temperatureRead());
     allSendsSuccessed |= MQTTPublish(maintopic + "/" + "CPUtemp", std::string(tmp_char), qos, retainFlag);
+
+    sprintf(tmp_char, "%ld", getFlowProcessingTime());   // last round (loop) processing time in ms
+    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "processingTime", std::string(tmp_char), qos, retainFlag);
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all System MQTT topics");
 

@@ -94,6 +94,11 @@ time_t getUpTime(void);
 string getResetReason(void);
 std::string getFormatedUptime(bool compact);
 
+// Last full digitization round (loop) processing time in milliseconds - a performance diagnostic.
+// Set by the flow task after each round; read by the MQTT / Home Assistant / InfluxDB / JSON layers.
+void setFlowProcessingTime(long ms);
+long getFlowProcessingTime(void);
+
 const char* get404(void);
 
 std::string UrlDecode(const std::string& value);

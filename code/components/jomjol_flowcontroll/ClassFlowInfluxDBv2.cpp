@@ -238,14 +238,21 @@ bool ClassFlowInfluxDBv2::doFlow(string zwtime)
             
             printf("vor sende Influx_DB_V2 - namenumber. %s, result: %s, timestampt: %s", namenumber.c_str(), result.c_str(), resulttimestamp.c_str());
 
-            if (result.length() > 0)   
+            if (result.length() > 0)
                 influxdb.InfluxDBPublish(measurement, namenumber, result, resulttimeutc);
 //                InfluxDB_V2_Publish(measurement, namenumber, result, resulttimeutc);
         }
+
+        // Performance diagnostic: last digitization round (loop) processing time in ms, published
+        // under the first number's measurement with field "processingTime".
+        if ((*NUMBERS).size() > 0) {
+            influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "processingTime",
+                std::to_string(getFlowProcessingTime()), (*NUMBERS)[0]->timeStampTimeUTC);
+        }
     }
-   
+
     OldValue = result;
-    
+
     return true;
 }
 

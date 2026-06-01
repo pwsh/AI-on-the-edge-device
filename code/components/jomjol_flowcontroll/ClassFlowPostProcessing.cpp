@@ -42,7 +42,16 @@ std::string ClassFlowPostProcessing::GetJSON(std::string _lineend) {
             json += "," + _lineend;
         }
     }
-	
+
+    // Performance diagnostics: last digitization round (loop) processing time in milliseconds.
+    if (NUMBERS.size() > 0) {
+        json += "," + _lineend;
+    }
+    json += "\"diagnostics\":" + _lineend;
+    json += "  {" + _lineend;
+    json += "    \"processingTimeMs\": " + std::to_string(getFlowProcessingTime()) + _lineend;
+    json += "  }" + _lineend;
+
     json += "}";
 
     return json;
