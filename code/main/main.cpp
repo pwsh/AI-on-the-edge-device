@@ -129,11 +129,22 @@ static bool mount_flash_fs_as_sdcard()
 
 // A freshly-inserted SD has none of the device's data. "Provisioned" = it already carries a config
 // or the web UI; a blank card has neither.
+// Markers let a crashed/partial copy be redone without overwriting a real pre-provisioned card.
+#define SD_PROV_INPROGRESS "/sdcard/.aiotedge_provisioning"
+#define SD_PROV_DONE       "/sdcard/.aiotedge_provisioned"
+
 static bool sd_is_provisioned()
 {
     struct stat st;
-    return (stat("/sdcard/config/config.ini", &st) == 0) || (stat("/sdcard/html", &st) == 0);
+    if (stat(SD_PROV_DONE, &st) == 0) return true;          // our completed copy
+    if (stat(SD_PROV_INPROGRESS, &st) == 0) return false;   // a previous copy was interrupted -> redo
+    return (stat("/sdcard/config/config.ini", &st) == 0);   // pre-provisioned (ESP32-CAM-style) card
 }
+
+// File-scope copy buffer: kept OFF the small (3.5 KB) main-task stack. The provisioning runs in its
+// own large-stack task (see below), but a stack-resident multi-KB buffer per recursion level would
+// still be wasteful/risky.
+static char s_sdCopyBuf[4096];
 
 // Recursively copy src -> dst (used to populate a blank SD from the in-flash image).
 static bool copy_dir_recursive(const char *src, const char *dst)
@@ -157,10 +168,9 @@ static bool copy_dir_recursive(const char *src, const char *dst)
             if (in == NULL) { ok = false; continue; }
             FILE *out = fopen(dp, "wb");
             if (out == NULL) { fclose(in); ok = false; continue; }
-            char buf[2048];
             size_t n;
-            while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
-                if (fwrite(buf, 1, n, out) != n) { ok = false; break; }
+            while ((n = fread(s_sdCopyBuf, 1, sizeof(s_sdCopyBuf), in)) > 0) {
+                if (fwrite(s_sdCopyBuf, 1, n, out) != n) { ok = false; break; }
             }
             fclose(in);
             fclose(out);
@@ -172,9 +182,9 @@ static bool copy_dir_recursive(const char *src, const char *dst)
 
 // Copy the in-flash image (web UI + best-models + default config) onto a freshly-inserted blank SD,
 // so it becomes a normal provisioned card (the "same data the ESP32-CAM forces") and the device then
-// runs from the SD - more capacity for image/data logging, and no onboard-flash write-wear. Runs
-// once per blank card; the SD is already mounted at /sdcard when this is called.
-static bool provision_sd_from_flash()
+// runs from the SD - more capacity for image/data logging, and no onboard-flash write-wear. The SD
+// is already mounted at /sdcard when this runs.
+static void provision_sd_from_flash()
 {
     esp_vfs_littlefs_conf_t conf = {};
     conf.base_path = "/flashfs";
@@ -183,17 +193,30 @@ static bool provision_sd_from_flash()
     conf.dont_mount = false;
     if (esp_vfs_littlefs_register(&conf) != ESP_OK) {
         ESP_LOGW(TAG, "Auto-provision: no in-flash 'storage' image to copy from - leaving SD blank");
-        return false;
+        return;
     }
     ESP_LOGW(TAG, "Blank SD card detected -> provisioning it from the in-flash image (web UI + models + config)...");
+    FILE *m = fopen(SD_PROV_INPROGRESS, "w");   // redo-on-crash marker; replaced by DONE on success
+    if (m) fclose(m);
     bool ok = copy_dir_recursive("/flashfs", "/sdcard");
     esp_vfs_littlefs_unregister("storage");
     if (ok) {
+        remove(SD_PROV_INPROGRESS);
+        FILE *done = fopen(SD_PROV_DONE, "w");
+        if (done) { fputs("flashfs\n", done); fclose(done); }
         ESP_LOGW(TAG, "Auto-provision: SD card populated from flash; now running from SD");
     } else {
-        ESP_LOGW(TAG, "Auto-provision: copy finished with errors - check the SD card");
+        ESP_LOGW(TAG, "Auto-provision: copy finished with errors - will retry on next boot");
     }
-    return ok;
+}
+
+// The recursive copy needs far more stack than the 3.5 KB main task provides, so run it in a
+// dedicated large-stack task and wait for it. arg points to a 'done' flag the main task polls.
+static void sd_provision_task(void *arg)
+{
+    provision_sd_from_flash();
+    *(volatile bool *)arg = true;
+    vTaskDelete(NULL);
 }
 #endif // USE_FLASH_FS
 
@@ -319,9 +342,15 @@ bool Init_NVS_SDCard()
 #ifdef USE_FLASH_FS
     // Flash-default boards (S3): a usable SD card was found. If it is blank, populate it from the
     // in-flash image so it becomes a normal provisioned card and we run from SD (more capacity, no
-    // flash write-wear). An already-provisioned card is used as-is.
+    // flash write-wear). An already-provisioned card is used as-is. Run the copy in a large-stack
+    // task (the recursion overflows the 3.5 KB main task) and wait for it.
     if (!sd_is_provisioned()) {
-        provision_sd_from_flash();
+        volatile bool provDone = false;
+        if (xTaskCreate(sd_provision_task, "sd_prov", 16384, (void *)&provDone, 5, NULL) == pdPASS) {
+            while (!provDone) {
+                vTaskDelay(50 / portTICK_PERIOD_MS);
+            }
+        }
     }
 #endif
     return true;
