@@ -517,6 +517,15 @@ Two independent reductions:
    - ⬜ Follow-up (optional): expose a server-side "Theme" config so the default can be set
      in `config.ini`; on-device visual pass across every page.
 - ✅ FastRead config options added to the UI (see §1).
+- ⬜ **Highlight changed digits on the overview page.** On each refresh, visually highlight the
+   digit(s) whose value changed since the previous reading on the overview (`overview.html`) — a
+   brief flash / background tint on the changed character(s) of the displayed value. Goal: see at a
+   glance which digits are moving and spot a stuck or jumpy digit. Pairs naturally with the FastRead
+   per-digit change gate (§1), which already knows *which* ROIs changed — expose that per-digit
+   changed-flag set (alongside the value) in the JSON the overview already polls, and have the page
+   diff the rendered value against the prior render as a fallback when FastRead is off. Keep it cheap
+   (CSS transition, no layout shift) and respect dark mode. (Ties in with the §10 confidence vote: a
+   digit that keeps flipping is exactly what the vote should catch.)
 - ⬜ **"Pause processing" menu item.** Add a control in the web UI to pause/resume the flow
    (CNN reading loop). Very useful while setting up reference image, alignment, and ROIs so
    the device doesn't keep capturing/processing mid-setup. Implementation: a flag checked by
@@ -928,3 +937,45 @@ JPEG-decode path.
 > Reminder: every camera change must keep the **OV2640 / ESP32-CAM** path unchanged (it's the
 > validated reference and the overwhelming majority of installs). All new sensors/backends are
 > additive and target/sensor-gated.
+
+---
+
+## 10. ⬜ Reading-value correctness — confidence voting for a stuck-high outlier
+
+### Problem
+The post-processing consistency check (`ClassFlowPostProcessing`) rejects a reading whose value is
+*lower* than the last accepted value ("negative rate"), on the assumption the meter only counts up.
+But the failure mode is **asymmetric**: if a **single bad pass** reads a spuriously **high** value and
+that value is accepted as the new baseline, then every following **correct (lower)** read is rejected
+as a negative rate — the device latches onto the wrong high value and never recovers (until the real
+meter physically catches up). The existing knobs don't solve this: `AllowNegativeRates` /
+`PreValueUse` and the `ErrorMessage` skip either suppress or pass a reading through, they never
+*re-decide* which baseline is correct. So one high glitch can wedge the reading indefinitely.
+
+### Idea: treat persistent disagreement as a confidence vote, not a hard reject
+- Keep the last accepted value **plus** a short ring buffer of the most recent *rejected* (lower)
+  candidate readings.
+- If **N consecutive passes** (configurable, e.g. 3) agree on the same lower value — equal, or
+  mutually monotonic-consistent within a small plausible rate — conclude the *current high baseline*
+  was the outlier and **override** it with the agreed lower value (the confirmed lower value wins the
+  vote).
+- A single isolated low read still loses to the baseline (rejected as today); only a **confirmed**
+  low cluster overrides. This preserves protection against one-off *low* misreads while removing the
+  permanent stuck-high latch caused by a one-off *high* misread.
+
+### Design notes / open questions
+- **Granularity:** vote on the whole post-decimal reading first (simplest); per-digit voting is more
+  robust to a single bad digit but more complex — revisit after the whole-value version works. (The
+  §7 changed-digit highlight surfaces exactly the flapping digit a per-digit vote would target.)
+- **Agreement test:** the confirming reads must be mutually consistent (equal or increasing by a
+  plausible small rate), not merely "all lower than the baseline", so noise doesn't trigger a false
+  override.
+- **Config:** `ConfidenceVotes` (N; `0` = off = today's legacy behaviour) reusing the existing rate
+  bounds. **Default off** until validated on a real meter.
+- **FastRead interaction:** while a vote is in progress, call `TriggerFullEval()` (§1) so the
+  candidate reads are full-confidence (not derived from a possibly-stale per-digit cache).
+- **Telemetry:** emit a clear `WARN` when a vote overrides the baseline ("value corrected from X to Y
+  after N confirming reads") and surface the correction on the overview, so a silent self-correction
+  is still auditable.
+- **Persistence:** decide whether an overridden baseline updates `PreValue` on disk immediately or
+  only after the vote stabilises (avoid writing a transient).
