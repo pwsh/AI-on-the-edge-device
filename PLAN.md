@@ -616,17 +616,25 @@ Two independent reductions:
    (or streams) new log lines and appends them, auto-scrolling to the bottom; unchecking pauses
    the tail. Keep it lightweight (periodic fetch of the log tail; avoid re-rendering the whole
    buffer). *(In progress — see request batch 2026-05-30.)*
-- ⬜ **Improve ROI selection GUI.** The reference/ROI editors (digit & analog) are functional but
+- 🟡 **Improve ROI selection GUI.** Added keyboard nudging (arrows move, Shift+arrows resize) to the digit
+   & analog editors for precise placement (commit *ROI keyboard nudge*). Broader editor modernization remains. Original:
+- 💤 **Improve ROI selection GUI.** The reference/ROI editors (digit & analog) are functional but
    fiddly: improve the drag/resize handles, snapping/alignment aids, zoom & pan, keyboard nudge,
    per-ROI add/duplicate/delete ergonomics, and clearer overlay of current vs. proposed ROIs.
    Make it responsive and touch-friendly. Coordinate with the "Draw from center" analog option
    already added. Goal: setting up a new meter should be fast and forgiving.
-- ⬜ **Better tooltips / inline documentation.** Expand the per-parameter tooltip docs
+- 🟡 **Better tooltips / inline documentation.** Added the missing `ConfidenceVotes` doc (the §10 param) +
+   noted live-interval reload in `Interval.md`; confirmed FastRead/Interval/TriggerMode/Schedule docs exist.
+   A full audit/expansion of every parameter remains an ongoing content pass (pairs with the spelling review). Original:
+- 💤 **Better tooltips / inline documentation.** Expand the per-parameter tooltip docs
    (`param-docs/parameter-pages/*`) to explain what each setting does *and what it affects*
    (interactions, when to change it, typical values, side effects). Add inline help to the
    non-config UIs too (ROI editor, overview, log viewer). Audit for missing/blank tooltips and
    stale text; keep the markdown→tooltip generator as the single source of truth.
-- ⬜ **Improve graphing functionality & performance.** The data/graph view should be faster and
+- 🟡 **Improve graphing functionality & performance.** DONE the core perf wins (commit *graph WebGL*):
+   WebGL `scattergl` traces + split each CSV row once instead of 6x. Further graph *functionality* (ranges,
+   multi-file, downsampling) remains. Original:
+- 💤 **Improve graphing functionality & performance.** The data/graph view should be faster and
    more capable: efficient handling of long history (downsample/window instead of loading all
    points), zoom/pan, selectable time ranges, multiple series (per meter value / rate), and
    clearer styling that respects dark mode. Reduce client-side work and payload size for big
