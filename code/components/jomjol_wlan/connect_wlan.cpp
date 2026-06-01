@@ -448,9 +448,11 @@ std::string* getSSID()
 
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) 
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
 	{
         WIFIConnected = false;
+        // Onboard LED: blink continuously while attempting/failing to connect (turned off on GOT_IP).
+        StatusLED(WLAN_CONN, 1, true);
         esp_wifi_connect();
     }
 	else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) 
@@ -463,25 +465,27 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 		}
 		else {
 			WIFIConnected = false;
+			// Onboard LED: blink continuously while not connected. The blink-code carries the reason
+			// class (1=no AP, 2=auth fail, 3=timeout, 4=other) for diagnosis; it is turned off on GOT_IP.
 			if (disconn->reason == WIFI_REASON_NO_AP_FOUND) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", No AP)");
-				StatusLED(WLAN_CONN, 1, false);
+				StatusLED(WLAN_CONN, 1, true);
 			}
 			else if (disconn->reason == WIFI_REASON_AUTH_EXPIRE ||
-					 disconn->reason == WIFI_REASON_AUTH_FAIL || 
+					 disconn->reason == WIFI_REASON_AUTH_FAIL ||
 					 disconn->reason == WIFI_REASON_NOT_AUTHED ||
-					 disconn->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT || 
+					 disconn->reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT ||
 					 disconn->reason == WIFI_REASON_HANDSHAKE_TIMEOUT) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Auth fail)");
-				StatusLED(WLAN_CONN, 2, false);
+				StatusLED(WLAN_CONN, 2, true);
 			}
 			else if (disconn->reason == WIFI_REASON_BEACON_TIMEOUT) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Timeout)");
-				StatusLED(WLAN_CONN, 3, false);
+				StatusLED(WLAN_CONN, 3, true);
 			}
 			else {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ")");
-				StatusLED(WLAN_CONN, 4, false);
+				StatusLED(WLAN_CONN, 4, true);
 			}
 			WIFIReconnectCnt++;
 
@@ -538,11 +542,12 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 			
 		#endif //WLAN_USE_MESH_ROAMING
 	}	
-	else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) 
+	else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
 	{
         WIFIConnected = true;
 		WIFIReconnectCnt = 0;
 		everConnectedSinceBoot = true;
+		StatusLEDOff();   // connected -> stop the "attempting/failing" onboard-LED blink
 
 		ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         wlan_config.ipaddress = std::string(ip4addr_ntoa((const ip4_addr*) &event->ip_info.ip));
