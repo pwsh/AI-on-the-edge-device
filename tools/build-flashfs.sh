@@ -28,6 +28,9 @@ FWREV="$(sed -n 's/.*GIT_REV="\([^"]*\)".*/\1/p' code/main/version.cpp 2>/dev/nu
   find . -type f -exec sed -i "s/\$COMMIT_HASH/$COMMIT/g" {} \;
   for ext in html css js jpg png svg map; do find . -name "*.$ext" -type f -exec gzip -f {} \; ; done )
 
+# Deployment manifest for the GUI cleanup feature (see build-release.sh / server_cleanup.cpp).
+( cd "$FFS/html" && find . -type f ! -name deployment.lst | sed 's|^\./|html/|' | sort > deployment.lst )
+
 echo "== Best models -> flashfs/config =="
 for m in "${BEST_MODELS[@]}"; do
   cp "sd-card/config/${m}.tflite" "$FFS/config/" && echo "   + ${m}.tflite"

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cleanup unused files</title>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
+    <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
+    <script src="theme.js?v=$COMMIT_HASH"></script>
+    <style>
+        .cl-tools { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:10px 0; }
+        .cl-tools .cl-count { margin-left:auto; opacity:.8; font-size:.95em; }
+        .cl-list { border:1px solid var(--bd,#d0d4d8); border-radius:8px; overflow:hidden; }
+        .cl-row { display:flex; align-items:center; gap:10px; padding:7px 12px; border-top:1px solid var(--bd,#e2e6ea); }
+        .cl-row:first-child { border-top:0; }
+        .cl-row:nth-child(even) { background:rgba(127,127,127,.06); }
+        .cl-row input[type=checkbox] { width:18px; height:18px; flex:0 0 auto; }
+        .cl-path { flex:1 1 auto; font-family:Consolas,monospace; font-size:.92em; word-break:break-all; }
+        .cl-size { flex:0 0 auto; opacity:.7; font-size:.85em; white-space:nowrap; }
+        .cl-empty { padding:20px; text-align:center; opacity:.7; }
+        .btn-danger { background:#c0392b; border-color:#a93226; color:#fff; }
+        .cl-note { font-size:.9em; opacity:.8; margin:6px 0 14px; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <h2>🧹 Cleanup unused files</h2>
+    <p class="cl-note">Lists files on the SD card that are <b>not part of the current deployment</b>
+       (e.g. stale web-UI files left over from older versions). Your <b>configuration, reference
+       images, alignment data, backups, logs and all CNN models</b> are protected and never shown
+       or deleted. Review the selection, then delete.</p>
+
+    <div class="cl-tools">
+        <label><input type="checkbox" id="selAll" onclick="toggleAll(this.checked)"> Select / unselect all</label>
+        <button type="button" class="btn" onclick="loadList()">↻ Refresh</button>
+        <button type="button" class="btn btn-danger" id="delBtn" onclick="deleteChecked()" disabled>🗑 Delete checked</button>
+        <span class="cl-count" id="count">…</span>
+    </div>
+
+    <div class="cl-list" id="list"><div class="cl-empty">Loading…</div></div>
+</div>
+
+<script>
+var domain = location.origin;
+var files = [];
+
+function fmtSize(b){ if(b>=1048576) return (b/1048576).toFixed(1)+' MB'; if(b>=1024) return (b/1024).toFixed(0)+' KB'; return b+' B'; }
+
+function render(){
+    var list = document.getElementById('list');
+    if(files.length === 0){
+        list.innerHTML = '<div class="cl-empty">✅ Nothing to clean up — every file matches the current deployment.</div>';
+    } else {
+        var h='';
+        for(var i=0;i<files.length;i++){
+            h += '<div class="cl-row"><input type="checkbox" class="cb" data-i="'+i+'" onchange="updateCount()">'
+               + '<span class="cl-path">'+files[i].path+'</span>'
+               + '<span class="cl-size">'+fmtSize(files[i].size)+'</span></div>';
+        }
+        list.innerHTML = h;
+    }
+    document.getElementById('selAll').checked = false;
+    updateCount();
+}
+
+function checkedPaths(){
+    var out=[]; var cbs=document.querySelectorAll('.cb');
+    for(var i=0;i<cbs.length;i++){ if(cbs[i].checked) out.push(files[+cbs[i].dataset.i]); }
+    return out;
+}
+
+function updateCount(){
+    var sel = checkedPaths();
+    var bytes = sel.reduce(function(a,f){return a+f.size;},0);
+    document.getElementById('count').textContent = files.length+' file(s); '+sel.length+' selected ('+fmtSize(bytes)+')';
+    document.getElementById('delBtn').disabled = (sel.length===0);
+}
+
+function toggleAll(on){ var cbs=document.querySelectorAll('.cb'); for(var i=0;i<cbs.length;i++) cbs[i].checked=on; updateCount(); }
+
+function loadList(){
+    document.getElementById('list').innerHTML='<div class="cl-empty">Loading…</div>';
+    fetch(domain+'/cleanup?task=list',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+        if(!j.manifest){
+            document.getElementById('list').innerHTML='<div class="cl-empty">⚠️ No deployment manifest found on the device (html/deployment.lst).<br>Update the web UI (OTA <code>update.zip</code>) first, then retry.</div>';
+            document.getElementById('count').textContent=''; return;
+        }
+        files = j.files || [];
+        render();
+    }).catch(function(e){ document.getElementById('list').innerHTML='<div class="cl-empty">Error: '+e+'</div>'; });
+}
+
+function deleteChecked(){
+    var sel = checkedPaths();
+    if(sel.length===0) return;
+    var bytes = sel.reduce(function(a,f){return a+f.size;},0);
+    var msg = 'Delete '+sel.length+' file(s) ('+fmtSize(bytes)+') permanently?\n\nThis cannot be undone.\n\n'
+            + sel.slice(0,15).map(function(f){return '  • '+f.path;}).join('\n')
+            + (sel.length>15 ? '\n  … and '+(sel.length-15)+' more' : '');
+    if(!confirm(msg)) return;
+    var body = sel.map(function(f){return f.path;}).join('\n');
+    document.getElementById('delBtn').disabled=true;
+    fetch(domain+'/cleanup?task=delete',{method:'POST',body:body}).then(function(r){return r.json();}).then(function(j){
+        alert('Deleted '+j.deleted+' file(s)'+(j.skipped? ', skipped '+j.skipped+' (protected/failed)':'')+'.');
+        loadList();
+    }).catch(function(e){ alert('Delete failed: '+e); document.getElementById('delBtn').disabled=false; });
+}
+
+loadList();
+</script>
+</body>
+</html>

@@ -30,6 +30,7 @@
 #include "server_file.h"
 #include "server_ota.h"
 #include "server_backup.h"
+#include "server_cleanup.h"
 #include "time_sntp.h"
 #include "configFile.h"
 #include "server_main.h"
@@ -574,6 +575,7 @@ extern "C" void app_main(void)
     register_server_file_uri(server, "/sdcard");
     register_server_ota_sdcard_uri(server);
     register_server_backup_uri(server);
+    register_server_cleanup_uri(server);
     #ifdef ENABLE_MQTT
         register_server_mqtt_uri(server);
     #endif //ENABLE_MQTT
