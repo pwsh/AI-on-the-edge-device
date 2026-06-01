@@ -712,22 +712,41 @@ The native `idf.py` build does **not** read `platformio.ini build_flags`. Audite
   Note: the **debug** variant is a tight fit on the 4 MB dual-OTA `partitions.csv` (~0% slack); it's a
   dev/profiling build, not for release.
 
-### 9.2 ⬜ IDF 6.0 features worth adopting (evaluate)
-Opportunities the 5.3→6.0 jump opens up for this project (each TBD / measure before adopting):
-- **Power management / light sleep** (`esp_pm` DFS + tickless idle): meaningful idle-power savings
-  for battery/solar meter installs between rounds. Pairs with the flexible-interval work (§7).
-- **Wi-Fi 802.11k/v/r roaming + connection-stability** improvements: the project already has roaming
-  scaffolding (`WLAN_USE_ROAMING_BY_SCANNING`); 6.0's stack is more robust and lower-memory.
-- **Newer toolchain (GCC 15, C++23/26)**: better optimization and `constexpr`/`std::string_view`
-  opportunities in the hot CNN/post-processing paths (ties into the perf items in §5).
-- **mbedTLS 4.x / PSA crypto**: stronger, smaller TLS for MQTTS / HTTPS / webhook endpoints.
-- **Heap allocator (TLSF) + PSRAM refinements**: relevant to the memory-tight CNN workload; could
-  reduce fragmentation/peaks (measure with the new per-step heap diagnostics).
-- **New `esp_driver_*` split drivers** (RMT already used for the WS281x status LED): cleaner APIs,
-  smaller link footprint if legacy drivers are dropped.
-- **Secure Boot v2 / flash encryption** maturity: optional hardening for production deployments.
-- **Larger-flash / ESP32-S3 targets**: 6.0's better S3 support pairs with the "web UI in flash"
-  idea (§8) and more PSRAM/where a bigger CNN or higher-res capture becomes feasible.
+### 9.2 🟡 IDF 6.0 features worth adopting (evaluate)
+Already landed elsewhere: **toolchain** (GCC 15 / `-std=gnu++26`, §9.3 item 1 ✅), **Wi-Fi** roaming +
+backoff (§9.3 item 3 ✅), **TLSF heap** (IDF default ✅), **power management** (verdict: S3-only, §9.3
+item 2), **S3 target** (§9.3 item 5 / §8). Remaining opportunities, **each verified present in the
+installed IDF 6.0.1** and checked against current usage (2026-06-01):
+
+- ⭐ **OTA app rollback — verified gap, near-free win (HIGH).** `server_ota.cpp` already *calls*
+  `esp_ota_mark_app_valid_cancel_rollback()` / `esp_ota_mark_app_invalid_rollback_and_reboot()` from
+  `CheckOTAUpdate()` (run at boot, `main.cpp`), **but `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is unset
+  on every target** → a new OTA app never enters `ESP_OTA_IMG_PENDING_VERIFY`, so that whole branch is
+  **dead code and there is no rollback protection today.** Enabling the Kconfig makes the bootloader
+  boot-count watchdog **auto-roll-back a crash-looping OTA** to the last good app — exactly the
+  alpha.11 / crash-loop failure mode seen this session, recovered automatically. Caveats: only helps
+  the dual-OTA boards (ESP32-CAM + S3; the WROVER single-`factory` slot has nothing to roll back to);
+  confirm `mark_app_valid` is reached on a *healthy* boot so good firmware isn't rolled back; and
+  `diagnostic()` is currently a `return true;` stub — hardening it (PSRAM/camera/SD checks) would also
+  catch "boots but broken" images, not just hard crashes.
+- **TLS certificate bundle (`esp_crt_bundle`) (MEDIUM-HIGH).** MQTTS/HTTPS today only sets
+  `skip_cert_common_name_check` (`interface_mqtt.cpp`) — no CA trust store, so verified TLS to a public
+  broker needs a manually uploaded cert. Baking in the Mozilla CA bundle lets users point MQTTS /
+  HTTPS-webhook / InfluxDB-cloud at public TLS endpoints (HiveMQ Cloud, etc.) with verification and no
+  cert upload. Flash cost ~tens of KB; can be opt-in.
+- **HTTP server async handlers (`httpd_req_async_handler_begin`) (MEDIUM).** Long blocking handlers
+  (OTA extract, a capture) currently tie up the httpd worker so the UI stalls. Async handlers keep the
+  web UI responsive during a round/OTA — ties into the "device busy while running" / single-flight work.
+- **`heap_caps_register_failed_alloc_callback` (LOW-MEDIUM).** One global hook that logs every failed
+  internal/PSRAM allocation (size + caps + caller) — complements the new STBI NULL safety net and would
+  have made the alpha.11 shared-region overflow obvious immediately.
+- **esp_log v2 (`CONFIG_LOG_VERSION_2`) (LOW-MEDIUM).** Currently v1. v2 is smaller/faster and has
+  cleaner runtime per-tag levels (useful for the web "set log level" control). Evaluate against the
+  custom `LogFile` wrapper for compatibility first.
+- **Native camera driver (`esp_driver_cam` / `esp_cam_ctlr`) (MEDIUM, big/future).** IDF 6 ships a
+  first-class DVP/CSI camera controller framework. Long-term candidate to back the §9.4 `ICameraBackend`
+  DVP path (esp32-camera replacement), especially on the S3. Large; not near-term.
+- **Secure Boot v2 / flash encryption** maturity: optional production hardening (unchanged from before).
 
 ### 9.3 🟡 Adoption roadmap — agreed priority order (2026-05-30)
 Work the IDF-6 opportunities in this order, keeping the device stable at each step:
