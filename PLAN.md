@@ -140,10 +140,18 @@ and re-pin in `.gitmodules` / `dependencies.lock`.
 and every managed/registry dependency was freshly resolved by the component manager during
 the IDF 6.0.1 build.
 
-⬜ After the upgrade settles, run a full sweep: for each submodule
+🟡 After the upgrade settles, run a full sweep: for each submodule
    `git fetch --tags && checkout <latest stable>`; for managed deps pin exact versions in
    `dependencies.lock`; rebuild and smoke-test. Keep this list current as the source of truth
    for component versions.
+   - ✅ **Re-verified 2026-06-01:** the git submodule pins all match the table above
+     (esp32-camera **v2.1.6**, esp-tflite-micro **v1.3.5**, esp-nn **v1.2.0**, mdns **mdns-v1.11.1**,
+     stb at master) and `git ls-remote` confirms **no newer upstream release** exists for
+     esp32-camera / esp-tflite-micro / esp-nn — they are at the latest tag. Note: `esp-protocols`
+     shows harmless drift in **unused** nested submodules (`asio` / `libwebsockets`); only `mdns` is
+     compiled, so it's left as-is.
+   - ⬜ Remaining: pin exact managed-dep versions in `dependencies.lock` and a full
+     flash + camera + CNN + MQTT smoke-test on hardware after any future bump.
 
 ### 3.4 Effort estimate
 - Code changes (gpio swap, himem gate, sdkconfig): **~0.5–1 day**.
