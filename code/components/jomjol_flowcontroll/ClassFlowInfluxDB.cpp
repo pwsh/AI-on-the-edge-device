@@ -187,6 +187,11 @@ bool ClassFlowInfluxDB::doFlow(string zwtime)
         if ((*NUMBERS).size() > 0) {
             influxDB.InfluxDBPublish((*NUMBERS)[0]->MeasurementV1, "processingTime",
                 std::to_string(getFlowProcessingTime()), (*NUMBERS)[0]->timeStampTimeUTC);
+            // What the last round did (string field) + how many digits were inferred.
+            influxDB.InfluxDBPublish((*NUMBERS)[0]->MeasurementV1, "analysisType",
+                "\"" + getLastAnalysisType() + "\"", (*NUMBERS)[0]->timeStampTimeUTC);
+            influxDB.InfluxDBPublish((*NUMBERS)[0]->MeasurementV1, "digitsAnalyzed",
+                std::to_string(getLastDigitsAnalyzed()), (*NUMBERS)[0]->timeStampTimeUTC);
         }
     }
 

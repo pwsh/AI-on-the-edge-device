@@ -99,6 +99,30 @@ std::string getFormatedUptime(bool compact);
 void setFlowProcessingTime(long ms);
 long getFlowProcessingTime(void);
 
+// Per-round analysis diagnostics, shared so every output layer (MQTT / Home Assistant / InfluxDB /
+// JSON / web overview) can read them without depending on the flow-control component.
+// The "analysis type" describes what work a round actually did, combining the alignment decision
+// (full marker search vs reuse of the cached transform) with the read decision (full re-read of every
+// digit vs FastRead, where unchanged digits are skipped). Values: "full", "align+full", "fast-read",
+// "align+fast-read".
+void setRoundAlignType(bool fullSearch);                       // ClassFlowAlignment, per round
+void setRoundReadType(bool fastRead, int digitsAnalyzed, int digitsTotal); // ClassFlowCNNGeneral, per round
+std::string getLastAnalysisType(void);                         // e.g. "align+fast-read"
+int getLastDigitsAnalyzed(void);                               // digits actually inferred last round
+int getLastDigitsTotal(void);                                  // total digits last round
+void setLastAnalysisCompleted(time_t epoch);                   // round end
+time_t getLastAnalysisCompletedEpoch(void);                    // 0 if none yet
+// "Next full" scheduling estimates. roundsUntil: 1 == the very next round is a full one.
+// epoch: best-effort wall-clock estimate (0 when unknown, e.g. clock not set).
+void setRoundsUntilNextFullAlignment(int rounds);
+void setRoundsUntilNextFullRead(int rounds);
+int getRoundsUntilNextFullAlignment(void);
+int getRoundsUntilNextFullRead(void);
+void setNextFullAlignmentEpoch(time_t epoch);
+void setNextFullReadEpoch(time_t epoch);
+time_t getNextFullAlignmentEpoch(void);
+time_t getNextFullReadEpoch(void);
+
 const char* get404(void);
 
 std::string UrlDecode(const std::string& value);

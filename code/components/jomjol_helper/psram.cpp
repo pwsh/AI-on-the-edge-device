@@ -71,7 +71,7 @@ bool psram_init_shared_memory_for_take_image_step(void) {
 void psram_deinit_shared_memory_for_take_image_step(void) {
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Deinit shared memory for step 'Take Image' (STBI buffers)");
     // MEM-PROFILE: report the peak shared-region use this capture needed (vs the reserved region).
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "MEM-PROFILE: TakeImage STBI peak " + std::to_string(peakBytesForSTBI) +
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MEM-PROFILE: TakeImage STBI peak " + std::to_string(peakBytesForSTBI) +
             " of reserved " + std::to_string(shared_region_size) + " bytes");
     allocatedBytesForSTBI = 0;
     sharedMemoryInUseFor = "";

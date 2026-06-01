@@ -35,6 +35,43 @@ std::string starttime = "";
 
 static const char *TAG = "MAIN SERVER";
 
+// --- Analysis diagnostics helpers (shared by /info?type=Diagnostics and /sysinfo) ---------------
+// Format a local-time wall clock from an epoch, "-" when unknown (clock not set / not scheduled yet).
+static std::string diagFormatClock(time_t e)
+{
+    if (e <= 0)
+        return "-";
+    struct tm tmv;
+    localtime_r(&e, &tmv);
+    char b[24];
+    strftime(b, sizeof(b), "%Y-%m-%d %H:%M:%S", &tmv);
+    return std::string(b);
+}
+
+// Human description of when the next full alignment / full analysis is due: a wall-clock time when
+// known, otherwise a rounds-until fallback. rounds == 0 means the feature is off (never a full pass).
+static std::string diagFormatNextFull(time_t epoch, int rounds)
+{
+    if (rounds <= 0)
+        return "n/a";
+    std::string roundsTxt = "in " + std::to_string(rounds) + (rounds == 1 ? " round" : " rounds");
+    if (epoch > 0)
+        return diagFormatClock(epoch) + " (" + roundsTxt + ")";
+    return roundsTxt;
+}
+
+// Compact JSON object (no surrounding array) with the per-round analysis diagnostics.
+static std::string buildAnalysisDiagnosticsFields()
+{
+    return std::string("\"analysisType\": \"") + getLastAnalysisType() + "\"," +
+        "\"digitsAnalyzed\": \"" + std::to_string(getLastDigitsAnalyzed()) + "\"," +
+        "\"digitsTotal\": \"" + std::to_string(getLastDigitsTotal()) + "\"," +
+        "\"processingTimeMs\": \"" + std::to_string(getFlowProcessingTime()) + "\"," +
+        "\"lastAnalysisCompleted\": \"" + diagFormatClock(getLastAnalysisCompletedEpoch()) + "\"," +
+        "\"nextFullAlignment\": \"" + diagFormatNextFull(getNextFullAlignmentEpoch(), getRoundsUntilNextFullAlignment()) + "\"," +
+        "\"nextFullAnalysis\": \"" + diagFormatNextFull(getNextFullReadEpoch(), getRoundsUntilNextFullRead()) + "\"";
+}
+
 /* An HTTP GET handler */
 esp_err_t info_get_handler(httpd_req_t *req)
 {
@@ -127,6 +164,14 @@ esp_err_t info_get_handler(httpd_req_t *req)
         char formated[10] = "";
         snprintf(formated, sizeof(formated), "%d", getCountFlowRounds());
         httpd_resp_sendstr(req, formated);
+        return ESP_OK;
+    }
+    else if (_task.compare("Diagnostics") == 0)   // per-round analysis diagnostics (compact JSON)
+    {
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_type(req, "application/json");
+        std::string diag = "{" + buildAnalysisDiagnosticsFields() + "}";
+        httpd_resp_send(req, diag.c_str(), diag.length());
         return ESP_OK;
     }
     else if (_task.compare("Ready") == 0)   // 1 once init is done and the flow is ready to run
@@ -589,7 +634,8 @@ esp_err_t sysinfo_handler(httpd_req_t *req)
         "\"internalHeapTotal\": \"" + std::to_string((unsigned long) intHeapTotal) + "\"," +
         "\"hostname\": \"" + *getHostname() + "\"," +
         "\"IPv4\": \"" + *getIPAddress() + "\"," +
-        "\"freeHeapMem\": \"" + freeheapmem + "\"" +
+        "\"freeHeapMem\": \"" + freeheapmem + "\"," +
+        buildAnalysisDiagnosticsFields() +
         "}]";
 
     httpd_resp_set_type(req, "application/json");

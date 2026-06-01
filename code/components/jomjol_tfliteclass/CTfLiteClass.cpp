@@ -206,7 +206,7 @@ bool CTfLiteClass::MakeAllocate()
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CTfLiteClass::MakeAllocate");
     this->interpreter = new tflite::MicroInterpreter(this->model, resolver, this->tensor_arena, this->kTensorArenaSize);
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Trying to load the model. If it crashes here, it ist most likely due to a corrupted model!");
+    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Trying to load the model. If it crashes here, it is most likely due to a corrupted model!");
 
     if (this->interpreter) 
     {
@@ -218,7 +218,7 @@ bool CTfLiteClass::MakeAllocate()
             return false;
         }
         // MEM-PROFILE: actual tensor-arena bytes this model needs (vs the reserved TENSOR_ARENA_SIZE).
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "MEM-PROFILE: tensor arena used " +
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "MEM-PROFILE: tensor arena used " +
                 std::to_string(this->interpreter->arena_used_bytes()) + " of reserved " +
                 std::to_string(this->kTensorArenaSize) + " bytes");
     }

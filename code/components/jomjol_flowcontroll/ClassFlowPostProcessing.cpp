@@ -49,7 +49,15 @@ std::string ClassFlowPostProcessing::GetJSON(std::string _lineend) {
     }
     json += "\"diagnostics\":" + _lineend;
     json += "  {" + _lineend;
-    json += "    \"processingTimeMs\": " + std::to_string(getFlowProcessingTime()) + _lineend;
+    json += "    \"processingTimeMs\": " + std::to_string(getFlowProcessingTime()) + "," + _lineend;
+    json += "    \"analysisType\": \"" + getLastAnalysisType() + "\"," + _lineend;
+    json += "    \"digitsAnalyzed\": " + std::to_string(getLastDigitsAnalyzed()) + "," + _lineend;
+    json += "    \"digitsTotal\": " + std::to_string(getLastDigitsTotal()) + "," + _lineend;
+    json += "    \"lastCompleted\": " + std::to_string((long)getLastAnalysisCompletedEpoch()) + "," + _lineend;
+    json += "    \"nextFullAlignment\": " + std::to_string((long)getNextFullAlignmentEpoch()) + "," + _lineend;
+    json += "    \"nextFullAnalysis\": " + std::to_string((long)getNextFullReadEpoch()) + "," + _lineend;
+    json += "    \"roundsToNextFullAlignment\": " + std::to_string(getRoundsUntilNextFullAlignment()) + "," + _lineend;
+    json += "    \"roundsToNextFullAnalysis\": " + std::to_string(getRoundsUntilNextFullRead()) + _lineend;
     json += "  }" + _lineend;
 
     json += "}";
@@ -931,7 +939,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     NUMBERS[j]->timeStampLastValue = imagetime;
 
                     string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, _zw);
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, _zw);
                     WriteDataLog(j);
                     // FastRead: a rejected reading may stem from a stale per-digit cache; force a
                     // full re-read of every digit on the next cycle to recover.

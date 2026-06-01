@@ -7,6 +7,7 @@
 #include "esp_log.h"
 
 #include "ClassLogFile.h"
+#include "Helper.h"
 #include "psram.h"
 #include "../../include/defines.h"
 
@@ -366,6 +367,10 @@ bool ClassFlowAlignment::doFlow(string time)
         bool doFullSearch = (!haveCachedTransform) || (alignmentInterval <= 1) ||
                             ((alignmentCounter % alignmentInterval) == 0);
 
+        // Diagnostics: record whether this round ran a full marker search (the "align+" part of the
+        // analysis type) and how many rounds until the next full search is due.
+        setRoundAlignType(doFullSearch);
+
         if (doFullSearch) {
             // Align() returns whether both markers matched ABOVE the similarity threshold. A
             // sub-threshold match is NOT "markers absent" - FindTemplate still locates a best-fit
@@ -384,7 +389,15 @@ bool ClassFlowAlignment::doFlow(string time)
             AlignAndCutImage->AlignByTransform(&References[0], cached_dx, cached_dy, cached_winkel);
         }
         alignmentCounter++;
+
+        int aliMod = (alignmentInterval >= 1) ? (alignmentCounter % alignmentInterval) : 0;
+        setRoundsUntilNextFullAlignment((aliMod == 0) ? 1 : (alignmentInterval - aliMod + 1));
     } // no align
+    else {
+        // Alignment disabled (algo == 3): never a full marker search.
+        setRoundAlignType(false);
+        setRoundsUntilNextFullAlignment(0);
+    }
 
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
     if (AlgROI) {

@@ -9,6 +9,7 @@
 
 #include "CTfLiteClass.h"
 #include "ClassLogFile.h"
+#include "Helper.h"
 #include "esp_log.h"
 #include "../../include/defines.h"
 
@@ -800,7 +801,18 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         if (forceAllThisCycle) {
             LOGD(TAG, "FastRead: full validation pass this cycle");
         }
+        // Diagnostics: rounds until the next scheduled full-validation pass (1 == next round).
+        int frMod = fastReadCycle % FastReadFullInterval;
+        setRoundsUntilNextFullRead((frMod == 0) ? 1 : (FastReadFullInterval - frMod + 1));
     }
+    else if (isDigitalCNN()) {
+        // FastRead off for digits: every round is a full read.
+        setRoundsUntilNextFullRead(1);
+    }
+
+    // Diagnostics: count how many digits were actually inferred this round vs reused from cache.
+    int _digitsAnalyzed = 0;
+    int _digitsTotal = 0;
 
     // For each NUMBER
     for (int n = 0; n < GENERAL.size(); ++n) {
@@ -841,6 +853,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                 case Digit:
                     LOGD(TAG, "CNN Type: Digit");
                     {
+                        _digitsTotal++;
                         // FastRead gate: if this digit's pixels are unchanged vs the last real
                         // inference, reuse the cached class and skip the tflite Invoke entirely.
                         if (FastReadEnabled && !forceAllThisCycle &&
@@ -852,6 +865,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             break;
                         }
 
+                        _digitsAnalyzed++;
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image);
                         ESP_LOGD(TAG, "General result (Digit)%i: %d", roi, GENERAL[n]->ROI[roi]->result_klasse);
@@ -952,6 +966,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         int _num;
                         float _result_save_file;
 
+                        if (CNNType == Digit100) {
+                            _digitsTotal++;
+                        }
                         // FastRead gate: only for the digital variant (Digit100), never for Analogue100.
                         if ((CNNType == Digit100) && FastReadEnabled && !forceAllThisCycle &&
                             GENERAL[n]->ROI[roi]->fastCacheValid &&
@@ -963,6 +980,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             break;
                         }
 
+                        if (CNNType == Digit100) {
+                            _digitsAnalyzed++;
+                        }
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         tflite->Invoke();
 
@@ -1003,6 +1023,13 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                     break;
             }
         }
+    }
+
+    // Diagnostics: record this round's read type + digit count (digital CNN only; the analog step
+    // must not overwrite the digit step's result on a mixed digit+analog meter).
+    if (isDigitalCNN()) {
+        bool readFast = FastReadEnabled && !forceAllThisCycle;
+        setRoundReadType(readFast, _digitsAnalyzed, _digitsTotal);
     }
 
     // Resident model (FastRead) is kept for the next cycle; otherwise free it now.

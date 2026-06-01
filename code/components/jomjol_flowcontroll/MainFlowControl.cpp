@@ -1903,8 +1903,16 @@ void task_autodoFlow(void *pvParameter)
             LogFile.RemoveOldDataLog();
         }
 
-        // Round finished -> Logfile
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Round #" + std::to_string(countRounds) + " completed (" + std::to_string(getUpTime() - roundStartTime) + " seconds)");
+        // Round finished -> Logfile. Append what this round actually did: the analysis type
+        // (alignment search vs cached transform, full read vs FastRead) and how many digits were
+        // inferred vs reused from cache.
+        std::string analysisSummary = getLastAnalysisType();
+        if (getLastDigitsTotal() > 0) {
+            analysisSummary += ", " + std::to_string(getLastDigitsAnalyzed()) + "/" +
+                               std::to_string(getLastDigitsTotal()) + " digits analyzed";
+        }
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Round #" + std::to_string(countRounds) + " completed (" +
+            std::to_string(getUpTime() - roundStartTime) + " seconds) [" + analysisSummary + "]");
 
         // CPU Temp -> Logfile
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "CPU Temperature: " + std::to_string((int)temperatureRead()) + "°C");
@@ -1940,6 +1948,36 @@ void task_autodoFlow(void *pvParameter)
 
         // Expose this round's processing time as a performance diagnostic (MQTT / HA / InfluxDB / JSON).
         setFlowProcessingTime((long)fr_delta_ms);
+
+        // Diagnostics: stamp when this analysis completed and estimate when the next full alignment /
+        // full read is due (best-effort wall-clock; 0 when the clock is not set).
+        setLastAnalysisCompleted(time(NULL));
+        {
+            time_t now = time(NULL);
+            long cadenceSec = (long)(auto_interval / 1000);          // interval-mode cadence
+            long procSec = (long)(fr_delta_ms / 1000);
+            long nextRoundIn;                                        // seconds until next round starts
+            if (flowctrl.isScheduleMode())
+                nextRoundIn = flowctrl.getNextScheduleDelaySec();
+            else
+                nextRoundIn = (cadenceSec > procSec) ? (cadenceSec - procSec) : 0;
+
+            int ra = getRoundsUntilNextFullAlignment();
+            int rr = getRoundsUntilNextFullRead();
+            if (!getTimeIsSet()) {
+                setNextFullAlignmentEpoch(0);
+                setNextFullReadEpoch(0);
+            }
+            else if (flowctrl.isScheduleMode()) {
+                // Only the immediate next scheduled slot is known precisely.
+                setNextFullAlignmentEpoch((ra == 1) ? (now + nextRoundIn) : 0);
+                setNextFullReadEpoch((rr == 1) ? (now + nextRoundIn) : 0);
+            }
+            else {
+                setNextFullAlignmentEpoch((ra > 0) ? (now + nextRoundIn + (long)(ra - 1) * cadenceSec) : 0);
+                setNextFullReadEpoch((rr > 0) ? (now + nextRoundIn + (long)(rr - 1) * cadenceSec) : 0);
+            }
+        }
 
         // Interval mode: sleep the remainder of the interval. Schedule mode does its waiting at the
         // top of the loop (until the next configured time), so no interval delay here.

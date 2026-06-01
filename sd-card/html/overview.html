@@ -34,6 +34,13 @@
 				<div class="app-card"><div class="ov-card-title">Raw Value</div><div id="raw"></div></div>
 				<div class="app-card"><div class="ov-card-title">Value Status</div><div id="error"></div></div>
 				<div class="app-card"><div class="ov-card-title">Process State</div><div id="statusflow"></div></div>
+				<div class="app-card ov-sysinfo"><div class="ov-card-title">Analysis</div>
+					<div id="an_type"></div>
+					<div id="an_proc"></div>
+					<div id="an_done"></div>
+					<div id="an_nalign"></div>
+					<div id="an_nread"></div>
+				</div>
 				<div class="app-card ov-sysinfo"><div class="ov-card-title">System Info</div>
 					<div id="sntp_date"></div>
 					<div id="timestamp"></div>
@@ -72,11 +79,46 @@
 			loadValue("prevalue", "prevalue", "border-collapse: collapse; width: 100%");
 			loadValue("error", "error", "border-collapse: collapse; width: 100%");
 			loadStatus();
+			loadDiagnostics();
 			loadSntpDate();
 			loadCPUTemp();
 			loadRSSI();
 			loadUptime();
 			loadRoundCounter();
+		}
+
+		// Refresh the value/diagnostics/image (not the slower system-info bits) when state changes.
+		function RefreshReadings() {
+			loadValue("value", "value", "border-collapse: collapse; width: 100%");
+			loadValue("raw", "raw", "border-collapse: collapse; width: 100%");
+			loadValue("prevalue", "prevalue", "border-collapse: collapse; width: 100%");
+			loadValue("error", "error", "border-collapse: collapse; width: 100%");
+			loadDiagnostics();
+			loadRoundCounter();
+			LoadROIImage();
+		}
+
+		function loadDiagnostics() {
+			url = domainname + '/info?type=Diagnostics';
+			var xhttp = new XMLHttpRequest();
+			xhttp.onreadystatechange = function() {
+				if (this.readyState == 4 && this.status == 200) {
+					try {
+						var d = JSON.parse(xhttp.responseText);
+						var typ = d.analysisType;
+						if (parseInt(d.digitsTotal, 10) > 0) {
+							typ += " (" + d.digitsAnalyzed + "/" + d.digitsTotal + " digits)";
+						}
+						$('#an_type').html("Last analysis: " + typ);
+						$('#an_proc').html("Time to complete: " + d.processingTimeMs + " ms");
+						$('#an_done').html("Last completed: " + d.lastAnalysisCompleted);
+						$('#an_nalign').html("Next full alignment: " + d.nextFullAlignment);
+						$('#an_nread').html("Next full analysis: " + d.nextFullAnalysis);
+					} catch (e) { }
+				}
+			}
+			xhttp.open("GET", url, true);
+			xhttp.send();
 		}
 
 		function LoadROIImage(){
@@ -89,24 +131,33 @@
 			$('#timestamp').html("Last Page Refresh:" + (h + ":" + m + ":" + s));
 		}
 
+		var lastStatusText = null;
+
 		function Refresh() {
-			setTimeout (function() {
+			// Periodic full refresh every 10s, plus a lightweight status poll every ~2.5s that
+			// refreshes the readings/diagnostics/image immediately whenever the process state changes.
+			setInterval(function() {
 				LoadData();
 				LoadROIImage();
-				Refresh();
-			}, 300000);
+			}, 10000);
+			setInterval(loadStatus, 2500);
 		}
 
 		function loadStatus() {
-			url = domainname + '/statusflow';     
+			url = domainname + '/statusflow';
 			var xhttp = new XMLHttpRequest();
 			xhttp.onreadystatechange = function() {
 				if (this.readyState == 4 && this.status == 200) {
 					var _rsp = xhttp.responseText;
 					$('#statusflow').html(_rsp);
+					if (lastStatusText !== null && _rsp !== lastStatusText) {
+						// Process state changed -> pull fresh readings without waiting for the 10s tick.
+						RefreshReadings();
+					}
+					lastStatusText = _rsp;
 				}
 			}
-			
+
 			xhttp.open("GET", url, true);
 			xhttp.send();
 		}

@@ -1161,6 +1161,44 @@ static long s_flowProcessingTimeMs = 0;
 void setFlowProcessingTime(long ms) { s_flowProcessingTimeMs = ms; }
 long getFlowProcessingTime(void) { return s_flowProcessingTimeMs; }
 
+// Per-round analysis diagnostics (see Helper.h). The align/read flags are written live by the
+// respective flow steps as a round runs, so by the time the value-output steps run (they execute
+// after alignment + CNN) the flags reflect the current round; between rounds they hold the last
+// round's outcome.
+static bool s_roundAlignFull = false;
+static bool s_roundReadFast = false;
+static int s_roundDigitsAnalyzed = 0;
+static int s_roundDigitsTotal = 0;
+static time_t s_lastAnalysisEpoch = 0;
+static int s_roundsToFullAlign = 1;
+static int s_roundsToFullRead = 1;
+static time_t s_nextFullAlignEpoch = 0;
+static time_t s_nextFullReadEpoch = 0;
+
+void setRoundAlignType(bool fullSearch) { s_roundAlignFull = fullSearch; }
+void setRoundReadType(bool fastRead, int digitsAnalyzed, int digitsTotal) {
+    s_roundReadFast = fastRead;
+    s_roundDigitsAnalyzed = digitsAnalyzed;
+    s_roundDigitsTotal = digitsTotal;
+}
+std::string getLastAnalysisType(void) {
+    std::string t = s_roundAlignFull ? "align+" : "";
+    t += s_roundReadFast ? "fast-read" : "full";
+    return t;
+}
+int getLastDigitsAnalyzed(void) { return s_roundDigitsAnalyzed; }
+int getLastDigitsTotal(void) { return s_roundDigitsTotal; }
+void setLastAnalysisCompleted(time_t epoch) { s_lastAnalysisEpoch = epoch; }
+time_t getLastAnalysisCompletedEpoch(void) { return s_lastAnalysisEpoch; }
+void setRoundsUntilNextFullAlignment(int rounds) { s_roundsToFullAlign = rounds; }
+void setRoundsUntilNextFullRead(int rounds) { s_roundsToFullRead = rounds; }
+int getRoundsUntilNextFullAlignment(void) { return s_roundsToFullAlign; }
+int getRoundsUntilNextFullRead(void) { return s_roundsToFullRead; }
+void setNextFullAlignmentEpoch(time_t epoch) { s_nextFullAlignEpoch = epoch; }
+void setNextFullReadEpoch(time_t epoch) { s_nextFullReadEpoch = epoch; }
+time_t getNextFullAlignmentEpoch(void) { return s_nextFullAlignEpoch; }
+time_t getNextFullReadEpoch(void) { return s_nextFullReadEpoch; }
+
 string getResetReason(void)
 {
 	std::string reasonText;

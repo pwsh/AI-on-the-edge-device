@@ -270,6 +270,15 @@ bool publishSystemData(int qos) {
     sprintf(tmp_char, "%ld", getFlowProcessingTime());   // last round (loop) processing time in ms
     allSendsSuccessed |= MQTTPublish(maintopic + "/" + "processingTime", std::string(tmp_char), qos, retainFlag);
 
+    // What the last round actually did, plus how many digits were inferred (vs reused from cache).
+    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "analysisType", getLastAnalysisType(), qos, retainFlag);
+
+    sprintf(tmp_char, "%d", getLastDigitsAnalyzed());
+    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsAnalyzed", std::string(tmp_char), qos, retainFlag);
+
+    sprintf(tmp_char, "%d", getLastDigitsTotal());
+    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsTotal", std::string(tmp_char), qos, retainFlag);
+
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all System MQTT topics");
 
 	int aFreeInternalHeapSizeAfter = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
