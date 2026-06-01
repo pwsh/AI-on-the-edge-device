@@ -37,6 +37,11 @@ for m in "${BEST_MODELS[@]}"; do
   cp "sd-card/config/${m}.tflite" "$FFS/config/" && echo "   + ${m}.tflite"
 done
 
+# Default config.ini so the device boots with a working configuration from flash (no SD needed) and
+# so a blank SD that gets auto-provisioned from flash receives the same starter config.
+echo "== Default config.ini -> flashfs/config =="
+cp sd-card/config/config.ini "$FFS/config/config.ini" && echo "   + config.ini"
+
 # Undo the in-place pollution the tooltip generator leaves in the tracked tree
 git checkout -q -- sd-card/html/edit_reference.html 2>/dev/null || true
 rm -f sd-card/html/edit_config.html

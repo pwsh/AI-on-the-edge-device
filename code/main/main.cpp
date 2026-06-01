@@ -101,6 +101,9 @@ static const char *TAG = "MAIN";
 
 #ifdef USE_FLASH_FS
 #include "esp_littlefs.h"
+#include <dirent.h>
+#include <sys/stat.h>
+#include <string.h>
 // Flash-storage fallback (e.g. ESP32-WROVER single-slot, no SD card): mount the in-flash LittleFS
 // image (partition label "storage") at the SAME /sdcard mount point, so every existing /sdcard/...
 // path transparently reads/writes flash instead. The image is built from code/flashfs (web UI +
@@ -122,6 +125,75 @@ static bool mount_flash_fs_as_sdcard()
     ESP_LOGW(TAG, "No SD card -> mounted in-flash LittleFS at /sdcard (%u of %u KB used)",
              (unsigned)(used / 1024), (unsigned)(total / 1024));
     return true;
+}
+
+// A freshly-inserted SD has none of the device's data. "Provisioned" = it already carries a config
+// or the web UI; a blank card has neither.
+static bool sd_is_provisioned()
+{
+    struct stat st;
+    return (stat("/sdcard/config/config.ini", &st) == 0) || (stat("/sdcard/html", &st) == 0);
+}
+
+// Recursively copy src -> dst (used to populate a blank SD from the in-flash image).
+static bool copy_dir_recursive(const char *src, const char *dst)
+{
+    MakeDir(dst);
+    DIR *d = opendir(src);
+    if (d == NULL) return false;
+    bool ok = true;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+        char sp[320], dp[320];
+        snprintf(sp, sizeof(sp), "%s/%s", src, e->d_name);
+        snprintf(dp, sizeof(dp), "%s/%s", dst, e->d_name);
+        struct stat st;
+        if (stat(sp, &st) != 0) { ok = false; continue; }
+        if (S_ISDIR(st.st_mode)) {
+            if (!copy_dir_recursive(sp, dp)) ok = false;
+        } else {
+            FILE *in = fopen(sp, "rb");
+            if (in == NULL) { ok = false; continue; }
+            FILE *out = fopen(dp, "wb");
+            if (out == NULL) { fclose(in); ok = false; continue; }
+            char buf[2048];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+                if (fwrite(buf, 1, n, out) != n) { ok = false; break; }
+            }
+            fclose(in);
+            fclose(out);
+        }
+    }
+    closedir(d);
+    return ok;
+}
+
+// Copy the in-flash image (web UI + best-models + default config) onto a freshly-inserted blank SD,
+// so it becomes a normal provisioned card (the "same data the ESP32-CAM forces") and the device then
+// runs from the SD - more capacity for image/data logging, and no onboard-flash write-wear. Runs
+// once per blank card; the SD is already mounted at /sdcard when this is called.
+static bool provision_sd_from_flash()
+{
+    esp_vfs_littlefs_conf_t conf = {};
+    conf.base_path = "/flashfs";
+    conf.partition_label = "storage";
+    conf.format_if_mount_failed = false;   // nothing to copy if the in-flash image is blank
+    conf.dont_mount = false;
+    if (esp_vfs_littlefs_register(&conf) != ESP_OK) {
+        ESP_LOGW(TAG, "Auto-provision: no in-flash 'storage' image to copy from - leaving SD blank");
+        return false;
+    }
+    ESP_LOGW(TAG, "Blank SD card detected -> provisioning it from the in-flash image (web UI + models + config)...");
+    bool ok = copy_dir_recursive("/flashfs", "/sdcard");
+    esp_vfs_littlefs_unregister("storage");
+    if (ok) {
+        ESP_LOGW(TAG, "Auto-provision: SD card populated from flash; now running from SD");
+    } else {
+        ESP_LOGW(TAG, "Auto-provision: copy finished with errors - check the SD card");
+    }
+    return ok;
 }
 #endif // USE_FLASH_FS
 
@@ -244,6 +316,14 @@ bool Init_NVS_SDCard()
 
     //sdmmc_card_print_info(stdout, card);  // With activated CONFIG_NEWLIB_NANO_FORMAT --> capacity not printed correctly anymore
     SaveSDCardInfo(card);
+#ifdef USE_FLASH_FS
+    // Flash-default boards (S3): a usable SD card was found. If it is blank, populate it from the
+    // in-flash image so it becomes a normal provisioned card and we run from SD (more capacity, no
+    // flash write-wear). An already-provisioned card is used as-is.
+    if (!sd_is_provisioned()) {
+        provision_sd_from_flash();
+    }
+#endif
     return true;
 }
 
