@@ -139,10 +139,27 @@ function compareVersions() {
     console.log("FW Hash: " + fWGitHash + ", Web UI Hash: " + webUiHash);
     
     if (fWGitHash != webUiHash) {
-        firework.launch("The version of the web interface (" + webUiHash + 
-            ") does not match the firmware version (" + 
-            fWGitHash + ")! It is suggested to keep them on the same version!", 'warning', 30000);
+        // Versions out of sync - typically after a firmware-only flash, or a v16->v17 migration where
+        // the on-SD Web UI is still the old one. Make this the one-click migration step: the warning
+        // carries a link straight to the OTA Update page, where the matching ...__update__*.zip
+        // (firmware + Web UI + models) is applied in one shot.
+        firework.launch("The web interface (" + webUiHash + ") does not match the firmware (" +
+            fWGitHash + "). Apply the matching <b>...__update__*.zip</b> to sync them. " +
+            "<a class=\"button\" style=\"margin-left:8px;padding:2px 10px;white-space:nowrap;\" " +
+            "onclick=\"gotoOtaUpdate()\">Open the update page →</a>",
+            'warning', 60000);
     }
+}
+
+// Navigate the main content area to the OTA Update page. Works whether this runs in the index.html
+// parent frame (loadPage is global there) or inside a content iframe (use the parent's loadPage).
+function gotoOtaUpdate() {
+    var page = "ota_page.html?v=$COMMIT_HASH";
+    try {
+        if (typeof loadPage === "function") { loadPage(page); return; }
+        if (window.parent && typeof window.parent.loadPage === "function") { window.parent.loadPage(page); return; }
+    } catch (e) { /* cross-origin/frame access - fall through to a plain navigation */ }
+    window.location.href = page;
 }
 
 // --- Per-sensor camera capabilities ------------------------------------------
