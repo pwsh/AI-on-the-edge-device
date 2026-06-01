@@ -718,7 +718,13 @@ backoff (§9.3 item 3 ✅), **TLSF heap** (IDF default ✅), **power management*
 item 2), **S3 target** (§9.3 item 5 / §8). Remaining opportunities, **each verified present in the
 installed IDF 6.0.1** and checked against current usage (2026-06-01):
 
-- ⭐ **OTA app rollback — verified gap, near-free win (HIGH).** `server_ota.cpp` already *calls*
+- ✅ **OTA app rollback — DONE** (commit *enable bootloader auto-rollback*). Enabled
+  `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`; split detection (`CheckOTAUpdate`, early boot, logs only)
+  from confirmation (`ConfirmOTAUpdateAfterInit`, at init-complete/web-server-up) so a crash-loop before
+  init never confirms → bootloader rolls back; a healthy device (incl. setup mode, no meter) always
+  confirms. `diagnostic()` also rolls back a build that came up with no usable PSRAM / too little heap.
+  Below was the original finding:
+- ⭐ ~~**OTA app rollback — verified gap, near-free win (HIGH).**~~ `server_ota.cpp` already *calls*
   `esp_ota_mark_app_valid_cancel_rollback()` / `esp_ota_mark_app_invalid_rollback_and_reboot()` from
   `CheckOTAUpdate()` (run at boot, `main.cpp`), **but `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` is unset
   on every target** → a new OTA app never enters `ESP_OTA_IMG_PENDING_VERIFY`, so that whole branch is
@@ -809,6 +815,21 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      helps multi-AP/mesh deployments. Leave opt-in; revisit on the S3 (more internal RAM headroom).
    - 💡 802.11r (FT fast-transition) and lower WiFi static-buffer counts are possible but env-specific
      / RAM-throughput trade-offs — not pursued by default.
+   - **Further improvements not yet adopted (audited 2026-06-01 against `connect_wlan.cpp`):**
+     - ⭐ **Faster reconnect via cached channel/BSSID (HIGH).** Every (re)connect today does a full
+       `WIFI_ALL_CHANNEL_SCAN` (~1.5–2 s). Caching the last-good **channel** (and optionally BSSID) in
+       NVS and seeding `wifi_config.sta.channel`/`bssid_set` makes a reconnect-after-outage near-instant
+       — directly improves the always-on resilience goal. Fall back to a full scan if the targeted
+       connect fails. Biggest practical win.
+     - **WPA3-SAE / PMF-required option (MEDIUM).** Today `pmf_cfg.capable=1` (not required) and WPA3 is
+       accepted only if the AP offers it. Add an opt-in `pmf_cfg.required=1` / explicit WPA3-SAE for
+       security-conscious / WPA3-only networks (IDF `CONFIG_ESP_WIFI_ENABLE_WPA3_SAE`).
+     - **`scan_method` as a config knob (LOW-MEDIUM).** `WIFI_ALL_CHANNEL_SCAN` + `BY_SIGNAL` is right
+       for multi-AP/mesh but slower to connect; a single-AP home reconnects faster with `WIFI_FAST_SCAN`.
+       Expose as a config option (pairs with the cached-channel item).
+     - **TX power / power-save knobs (LOW).** `esp_wifi_set_max_tx_power` (weak-signal installs) and the
+       `WIFI_PS_*` listen-interval/DTIM tuning (today the IDF default `WIFI_PS_MIN_MODEM`) — minor,
+       env-specific.
 4. **Heap allocation** (TLSF allocator + PSRAM tuning). 🟡 Profiled on-device (alpha.9):
    - **Measured:** internal heap ~63 KB free (min 40 KB); **PSRAM ~150 KB free, largest block
      ~144 KB, min-free dipped to ~12 KB**. Per-round churn is small (hundreds of B – ~10 KB). The
