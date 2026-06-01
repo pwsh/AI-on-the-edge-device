@@ -377,10 +377,12 @@
     #define CAM_PIN_HREF     GPIO_NUM_7
     #define CAM_PIN_PCLK     GPIO_NUM_13
 
-    // Status / flash LED
-    #define BLINK_GPIO GPIO_NUM_2          // onboard LED (verify per board)
-    #define FLASH_GPIO GPIO_NUM_48         // flashlight / RGB LED (verify per board)
-    #define USE_PWM_LEDFLASH
+    // Status / flash LED. The onboard LED on this board is an addressable WS2812 RGB on GPIO48, which
+    // needs the RMT (one-wire) protocol - NOT a PWM/LEDC output. So do NOT define USE_PWM_LEDFLASH
+    // here (that would make the camera claim GPIO48 for LEDC and block the WS2812). The WS2812 is
+    // driven via the GPIO handler (config LEDType = WS2812) and driveSystemStatusWs281x() for status.
+    #define BLINK_GPIO GPIO_NUM_2          // simple status LED (if present on the board)
+    #define FLASH_GPIO GPIO_NUM_48         // onboard WS2812 RGB LED
 
 #else
     #error "Board not selected"
