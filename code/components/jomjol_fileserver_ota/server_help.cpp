@@ -178,9 +178,16 @@ const char* get_content_type_from_file(const char *filename)
     else if (IS_FILE_EXT(filename, ".xml"))  return "text/xml";
     else if (IS_FILE_EXT(filename, ".zip"))  return "application/x-zip";
     else if (IS_FILE_EXT(filename, ".gz"))   return "application/x-gzip";
+    else if (IS_FILE_EXT(filename, ".json")) return "application/json";
+    /* Plain-text extensions: keep these viewable inline in the browser (config / logs / data). */
+    else if (IS_FILE_EXT(filename, ".txt"))  return "text/plain";
+    else if (IS_FILE_EXT(filename, ".ini"))  return "text/plain";
+    else if (IS_FILE_EXT(filename, ".log"))  return "text/plain";
+    else if (IS_FILE_EXT(filename, ".csv"))  return "text/csv";
+    else if (IS_FILE_EXT(filename, ".md"))   return "text/plain";
 
-    /* This is a limited set only; for any other type always serve as plain text. */
-    return "text/plain";
+    /* Anything else (e.g. .tflite, .bin, .map) is treated as opaque binary. */
+    return "application/octet-stream";
 }
 
 esp_err_t set_content_type_from_file(httpd_req_t *req, const char *filename)
