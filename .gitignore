@@ -31,3 +31,4 @@ tools/parameter-tooltip-generator/AI-on-the-edge-device-docs
 # Local native idf.py toolchain (PlatformIO core/venv used for IDF 6.0 native builds)
 .pio-core/
 .pio-venv/
+/code/flashfs

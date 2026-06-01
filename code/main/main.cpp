@@ -97,6 +97,32 @@ static const char *TAG = "MAIN";
 
 #define MOUNT_POINT "/sdcard"
 
+#ifdef USE_FLASH_FS
+#include "esp_littlefs.h"
+// Flash-storage fallback (e.g. ESP32-WROVER single-slot, no SD card): mount the in-flash LittleFS
+// image (partition label "storage") at the SAME /sdcard mount point, so every existing /sdcard/...
+// path transparently reads/writes flash instead. The image is built from code/flashfs (web UI +
+// best-models + config) and flashed alongside the app. Returns true if mounted.
+static bool mount_flash_fs_as_sdcard()
+{
+    esp_vfs_littlefs_conf_t conf = {};
+    conf.base_path = MOUNT_POINT;
+    conf.partition_label = "storage";
+    conf.format_if_mount_failed = true;   // first boot / blank partition -> format to an empty FS
+    conf.dont_mount = false;
+    esp_err_t e = esp_vfs_littlefs_register(&conf);
+    if (e != ESP_OK) {
+        ESP_LOGE(TAG, "Flash-FS: LittleFS 'storage' mount at /sdcard failed: %s", esp_err_to_name(e));
+        return false;
+    }
+    size_t total = 0, used = 0;
+    esp_littlefs_info("storage", &total, &used);
+    ESP_LOGW(TAG, "No SD card -> mounted in-flash LittleFS at /sdcard (%u of %u KB used)",
+             (unsigned)(used / 1024), (unsigned)(total / 1024));
+    return true;
+}
+#endif // USE_FLASH_FS
+
 bool Init_NVS_SDCard()
 {
     esp_err_t ret = nvs_flash_init();
@@ -204,6 +230,13 @@ bool Init_NVS_SDCard()
             ESP_LOGE(TAG, "SD card init failed. Check error code or try another card");
             StatusLED(SDCARD_INIT, 3, true);
         }
+#ifdef USE_FLASH_FS
+        // No usable SD card: fall back to the in-flash LittleFS image mounted at /sdcard so the
+        // device still boots and runs (web UI + best-models + config served from flash).
+        if (mount_flash_fs_as_sdcard()) {
+            return true;
+        }
+#endif
         return false;
     }
 

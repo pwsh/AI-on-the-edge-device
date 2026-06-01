@@ -37,6 +37,11 @@ if(NOT DEFINED ENV{PLATFORMIO})
     if(DEFINED ENV{AIOTEDGE_BOARD})
         idf_build_set_property(COMPILE_DEFINITIONS "$ENV{AIOTEDGE_BOARD}" APPEND)
         message(STATUS "-- Board (AIOTEDGE_BOARD override): $ENV{AIOTEDGE_BOARD}")
+        # WROVER single-slot: enable the in-flash LittleFS storage fallback (mounts the `storage`
+        # partition at /sdcard when no SD card is present). Gated so the SD-only ESP32-CAM is untouched.
+        if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT")
+            idf_build_set_property(COMPILE_DEFINITIONS "USE_FLASH_FS" APPEND)
+        endif()
     elseif("$ENV{IDF_TARGET}" STREQUAL "esp32s3")
         idf_build_set_property(COMPILE_DEFINITIONS "BOARD_ESP32S3_CAM" APPEND)
     else()
@@ -65,6 +70,19 @@ if(NOT DEFINED ENV{PLATFORMIO})
 endif()
 
 project(AI-on-the-edge)
+
+# Flash-storage path (WROVER single-slot): build a LittleFS image from code/flashfs (web UI +
+# best-models + default config, assembled by build-flashfs.sh) into the `storage` partition and
+# flash it with the app. Only when USE_FLASH_FS is active (BOARD_WROVER_KIT) and the staging dir
+# exists. littlefs_create_partition_image comes from the joltwallet/littlefs managed component.
+if("$ENV{AIOTEDGE_BOARD}" STREQUAL "BOARD_WROVER_KIT")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/flashfs")
+        littlefs_create_partition_image(storage "${CMAKE_CURRENT_SOURCE_DIR}/flashfs" FLASH_IN_PROJECT)
+        message(STATUS "Flash-FS: building LittleFS 'storage' image from code/flashfs/")
+    else()
+        message(WARNING "Flash-FS: code/flashfs/ not found - run tools/build-flashfs.sh first (storage left blank, formatted at boot)")
+    endif()
+endif()
 
 # Performance: build the perf-critical components (CNN inference + image processing) at -O2 while
 # the rest of the firmware stays at the global -Os (CONFIG_COMPILER_OPTIMIZATION_SIZE). GCC 15

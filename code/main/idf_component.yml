@@ -3,3 +3,7 @@
 dependencies:
   espressif/mqtt: "*"
   espressif/cjson: "*"
+  # Flash-storage path (ESP32-WROVER single-slot): a LittleFS image in the `storage` partition holds
+  # the web UI + best-models + config and is mounted at /sdcard when no SD card is present. Only
+  # linked when USE_FLASH_FS is defined (gc-sections strips it from the SD-only ESP32-CAM build).
+  joltwallet/littlefs: "*"
