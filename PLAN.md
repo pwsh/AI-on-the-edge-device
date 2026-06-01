@@ -305,24 +305,29 @@ SD clock, DMA-RAM, and **card layout — MBR *and* SFD both failed** before the 
 Lesson: don't fixate on the first plausible trigger (camera) — bisect with probes. The 2 s
 delay between the real cause and the visible symptom sent the investigation down a long detour.
 
-### 3.9 ⬜ Interim setup / provisioning process (v16→v17 migration + new installs)
-With v17 working, define a clean way for users to get the SD-card content (config + `/html` +
-`/config/*.tflite`) onto a card without pulling it, since the on-disk layout/Web-UI changes
-between v16 and v17:
-- **Flash firmware first** (USB/esptool or OTA), then **provision the SD over the air or via
-  USB** rather than requiring a card reader.
-- Reuse the existing release artifacts: `update.zip` (OTA: firmware + Web UI + models) and
-  `remote_setup.zip` (firmware + Web UI + full config). The device already exposes an
-  OTA/file-server path (`register_server_ota_sdcard_uri`, `/fileserver`) — wire a guided
-  flow around it.
-- **Migration guard:** the firmware already warns on a Web-UI/firmware version mismatch
-  (`getHTMLcommit()` vs `GIT_REV`) and recommends re-running `update__*.zip` — make this the
-  one-click migration step.
-- **New install / empty card:** SoftAP setup mode (`CheckStartAPMode`) already starts when
-  `wlan.ini`/`config.ini` are missing — ensure it can serve the minimal UI to upload the
-  rest, or document the USB-serial / OTA bootstrap.
+### 3.9 🟡 Interim setup / provisioning process (v16→v17 migration + new installs)
+With v17 working, give users a clean way to get the SD-card content (config + `/html` +
+`/config/*.tflite`) onto a device without pulling the card, since the on-disk layout/Web-UI changed
+between v16 and v17. **Documented + the migration UX wired (commit *§3.9 provisioning*):**
+- ✅ **Documented the end-to-end flow** in [`docs/PROVISIONING.md`](../docs/PROVISIONING.md):
+  new install (SD board → USB/web-installer flash → SoftAP setup → optional `remote-setup.zip`),
+  SD-free / flash-FS boards (S3, WROVER single-slot), migration, and the bootstrap-when-UI-unreachable
+  path. Includes the artifact table (`update` / `remote-setup` / `manual-setup` zips).
+- ✅ **One-click migration step.** The Web-UI/firmware version-mismatch warning (`common.js`
+  `compareVersions()`, fed by `/info?type=FirmwareVersion`+`HTMLVersion`) was a passive toast; it now
+  carries an **"Open the update page →"** button (`gotoOtaUpdate()`) that loads `ota_page.html`
+  directly, where the matching `…__update__*.zip` is applied. (firmware-side log warning unchanged.)
+- ✅ **Flash-firmware-first + OTA/USB provisioning** and the **release artifacts** (`update.zip`,
+  `remote-setup.zip`, `manual-setup.zip`) already exist and build natively (`tools/build-release.sh`);
+  documented as the provisioning path.
+- ✅ **New install / empty card:** confirmed SoftAP setup mode (`CheckStartAPMode`) serves the Wi-Fi
+  form + reboot + a file-upload handler (`upload_post_handlerAP`) when `wlan.ini`/`config.ini` are
+  missing; documented as the bootstrap.
 - Note: any SD card layout works now (MBR or SFD) — the SD bug was `esp_psram_init`, not the
   card, so no special card formatting is required for users.
+- ⬜ Remaining (optional polish): an in-AP-mode "upload remote-setup.zip" button on the setup page
+  itself (today the zip is applied from the normal OTA page once on the network), and an on-hardware
+  dry-run of a real v16→v17 migration.
 
 ---
 
