@@ -13,6 +13,7 @@
 #include <string>
 #include <esp_http_server.h>
 #include "CImageBasis.h"
+#include "ICameraBackend.h"
 #include "../../include/defines.h"
 
 typedef struct
@@ -72,6 +73,10 @@ extern camera_controll_config_temp_t CCstatus;
 class CCamera
 {
 protected:
+    // Raw frame-acquisition backend (DVP / esp32-camera today). All esp_camera_* access goes through
+    // this so a future UVC / esp_cam_ctlr backend can be slotted in without touching CCamera (PLAN 9.4).
+    ICameraBackend *backend = getDefaultCameraBackend();
+
     void ledc_init(void);
     bool loadNextDemoImage(camera_fb_t *fb);
     long GetFileSize(const std::string& filename);

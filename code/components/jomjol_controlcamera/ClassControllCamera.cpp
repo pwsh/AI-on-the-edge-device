@@ -53,6 +53,14 @@ camera_controll_config_temp_t CCstatus;
 
 static const char *TAG = "CAM";
 
+// Default camera backend (DVP / esp32-camera). Function-local static -> constructed on first use, so
+// there is no cross-translation-unit static-init-order dependency with the global Camera instance.
+ICameraBackend *getDefaultCameraBackend()
+{
+    static Esp32CameraDvpBackend dvpBackend;
+    return &dvpBackend;
+}
+
 /* Camera live stream */
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
@@ -130,11 +138,11 @@ esp_err_t CCamera::InitCam(void)
     CCstatus.ImageFrameSize = camera_config.frame_size;
 
     // De-init in case it was already initialized
-    esp_camera_deinit();
+    backend->deinit();
     vTaskDelay(cam_xDelay);
 
     // initialize the camera
-    esp_err_t err = esp_camera_init(&camera_config);
+    esp_err_t err = backend->init(&camera_config);
     vTaskDelay(cam_xDelay);
 
     if (err != ESP_OK)
@@ -146,7 +154,7 @@ esp_err_t CCamera::InitCam(void)
     CCstatus.CameraInitSuccessful = true;
 
     // Get a reference to the sensor
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
@@ -183,7 +191,7 @@ esp_err_t CCamera::InitCam(void)
 bool CCamera::testCamera(void)
 {
     bool success;
-    camera_fb_t *fb = esp_camera_fb_get();
+    camera_fb_t *fb = backend->fbGet();
 
     if (fb)
     {
@@ -194,7 +202,7 @@ bool CCamera::testCamera(void)
         success = false;
     }
 
-    esp_camera_fb_return(fb);
+    backend->fbReturn(fb);
 
     return success;
 }
@@ -244,7 +252,7 @@ bool CCamera::getCameraInitSuccessful(void)
 
 esp_err_t CCamera::setSensorDatenFromCCstatus(void)
 {
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
@@ -300,7 +308,7 @@ esp_err_t CCamera::setSensorDatenFromCCstatus(void)
 
 esp_err_t CCamera::getSensorDatenToCCstatus(void)
 {
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
@@ -375,7 +383,7 @@ int CCamera::SetCamGainceiling(sensor_t *s, gainceiling_t gainceilingLevel)
 
 void CCamera::SetCamSharpness(bool autoSharpnessEnabled, int sharpnessLevel)
 {
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
@@ -501,7 +509,7 @@ void CCamera::SanitizeZoomParams(int imageSize, int frameSizeX, int frameSizeY, 
 
 void CCamera::SetZoomSize(bool zoomEnabled, int zoomOffsetX, int zoomOffsetY, int imageSize, int imageVflip)
 {
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
@@ -570,7 +578,7 @@ void CCamera::SetZoomSize(bool zoomEnabled, int zoomOffsetX, int zoomOffsetY, in
 
 void CCamera::SetQualityZoomSize(int qual, framesize_t resol, bool zoomEnabled, int zoomOffsetX, int zoomOffsetY, int imageSize, int imageVflip)
 {
-    sensor_t *s = esp_camera_sensor_get();
+    sensor_t *s = backend->sensorGet();
 
     // OV2640 has no lower limit on jpeg quality
     if (CCstatus.CamSensor_id == OV5640_PID)
@@ -654,9 +662,9 @@ esp_err_t CCamera::CaptureToBasisImage(CImageBasis *_Image, int delay)
     LogFile.WriteHeapInfo("CaptureToBasisImage - After LightOn");
 #endif
 
-    camera_fb_t *fb = esp_camera_fb_get();
-    esp_camera_fb_return(fb);
-    fb = esp_camera_fb_get();
+    camera_fb_t *fb = backend->fbGet();
+    backend->fbReturn(fb);
+    fb = backend->fbGet();
 
     if (!fb)
     {
@@ -688,7 +696,7 @@ esp_err_t CCamera::CaptureToBasisImage(CImageBasis *_Image, int delay)
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "CaptureToBasisImage: Can't allocate _zwImage");
     }
 
-    esp_camera_fb_return(fb);
+    backend->fbReturn(fb);
 
 #ifdef DEBUG_DETAIL_ON
     LogFile.WriteHeapInfo("CaptureToBasisImage - After fb_get");
@@ -761,9 +769,9 @@ esp_err_t CCamera::CaptureToFile(std::string nm, int delay)
         vTaskDelay(xDelay);
     }
 
-    camera_fb_t *fb = esp_camera_fb_get();
-    esp_camera_fb_return(fb);
-    fb = esp_camera_fb_get();
+    camera_fb_t *fb = backend->fbGet();
+    backend->fbReturn(fb);
+    fb = backend->fbGet();
 
     if (!fb)
     {
@@ -841,7 +849,7 @@ esp_err_t CCamera::CaptureToFile(std::string nm, int delay)
         free(buf);
     }
 
-    esp_camera_fb_return(fb);
+    backend->fbReturn(fb);
 
     if (delay > 0)
     {
@@ -866,9 +874,9 @@ esp_err_t CCamera::CaptureToHTTP(httpd_req_t *req, int delay)
         vTaskDelay(xDelay);
     }
 
-    camera_fb_t *fb = esp_camera_fb_get();
-    esp_camera_fb_return(fb);
-    fb = esp_camera_fb_get();
+    camera_fb_t *fb = backend->fbGet();
+    backend->fbReturn(fb);
+    fb = backend->fbGet();
 
     if (!fb)
     {
@@ -918,7 +926,7 @@ esp_err_t CCamera::CaptureToHTTP(httpd_req_t *req, int delay)
         }
     }
 
-    esp_camera_fb_return(fb);
+    backend->fbReturn(fb);
     int64_t fr_end = esp_timer_get_time();
 
     ESP_LOGI(TAG, "JPG: %dKB %dms", (int)(fb_len / 1024), (int)((fr_end - fr_start) / 1000));
@@ -966,7 +974,7 @@ esp_err_t CCamera::CaptureToStream(httpd_req_t *req, bool FlashlightOn)
         // Single grab per frame: with grab_mode=CAMERA_GRAB_LATEST this already returns the most
         // recent frame, and in a continuous stream each iteration is fresh. (The extra grab+discard
         // used for one-shot capture would halve the stream frame-rate here.)
-        camera_fb_t *fb = esp_camera_fb_get();
+        camera_fb_t *fb = backend->fbGet();
 
         if (!fb)
         {
@@ -992,7 +1000,7 @@ esp_err_t CCamera::CaptureToStream(httpd_req_t *req, bool FlashlightOn)
             res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
         }
 
-        esp_camera_fb_return(fb);
+        backend->fbReturn(fb);
 
         int64_t fr_end = esp_timer_get_time();
         ESP_LOGD(TAG, "JPG: %dKB %dms", (int)(fb_len / 1024), (int)((fr_end - fr_start) / 1000));

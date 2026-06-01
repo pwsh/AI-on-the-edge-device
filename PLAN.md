@@ -1022,8 +1022,11 @@ JPEG-decode path.
   device actually reports (UVC exposes a different, device-dependent control set than the OV sensors).
 
 **Staged tasks (lowest risk first):**
-1. ⬜ **Extract `ICameraBackend` + DVP backend** from `ClassControllCamera.cpp`; keep the esp32
-   build green and the OV2640 device byte-identical (interface extraction only). *(Doable now, no S3.)*
+1. ✅ **Extracted `ICameraBackend` + DVP backend** from `ClassControllCamera.cpp` (commit *camera backend
+   interface*). `ICameraBackend.h` defines the seam (init/deinit/fbGet/fbReturn/sensorGet); `Esp32CameraDvpBackend`
+   forwards to the esp32-camera driver; all 24 `esp_camera_*` call sites in CCamera now go through the backend
+   pointer. Behaviour byte-identical (verified: esp32+S3 build green, S3 capture returns a valid 640x480 JPEG).
+   A future UVC / esp_cam_ctlr backend implements the same interface without touching CCamera.
 2. 🟡 **Per-sensor DVP ranges** (§9.4.1) — firmware clamps done (brightness/contrast/saturation);
    UI min/max + remaining controls (AE-level/denoise/gain-ceiling) still to do. *(Doable now, no S3.)*
 3. ✅ **S3 build green** (§9.3 item 5) — flashable `build_s3/AI-on-the-edge.bin`, two target fixes
