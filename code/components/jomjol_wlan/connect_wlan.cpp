@@ -469,9 +469,12 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 			WIFIConnected = false;
 			// Onboard LED: blink continuously while not connected. The blink-code carries the reason
 			// class (1=no AP, 2=auth fail, 3=timeout, 4=other) for diagnosis; it is turned off on GOT_IP.
+			// RGB: red for a network-not-found or authentication failure (can't connect); orange for a
+			// transient timeout / other drop while it keeps retrying.
 			if (disconn->reason == WIFI_REASON_NO_AP_FOUND) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", No AP)");
 				StatusLED(WLAN_CONN, 1, true);
+				driveSystemStatusWs281x(90, 0, 0);    // red = network not found
 			}
 			else if (disconn->reason == WIFI_REASON_AUTH_EXPIRE ||
 					 disconn->reason == WIFI_REASON_AUTH_FAIL ||
@@ -480,17 +483,19 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 					 disconn->reason == WIFI_REASON_HANDSHAKE_TIMEOUT) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Auth fail)");
 				StatusLED(WLAN_CONN, 2, true);
+				driveSystemStatusWs281x(90, 0, 0);    // red = authentication failure
 			}
 			else if (disconn->reason == WIFI_REASON_BEACON_TIMEOUT) {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Timeout)");
 				StatusLED(WLAN_CONN, 3, true);
+				driveSystemStatusWs281x(60, 20, 0);   // orange = transient drop, retrying
 			}
 			else {
 				LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ")");
 				StatusLED(WLAN_CONN, 4, true);
+				driveSystemStatusWs281x(60, 20, 0);   // orange = retrying
 			}
 			WIFIReconnectCnt++;
-			driveSystemStatusWs281x(60, 20, 0);   // RGB orange = (re)connecting / failing
 
 			// Exponential backoff before retrying: the first few attempts are immediate (covers a
 			// transient blip / single missed beacon), then the delay grows 1,2,4,8,16 s capped at
