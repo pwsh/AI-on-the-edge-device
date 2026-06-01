@@ -1853,6 +1853,28 @@ void task_autodoFlow(void *pvParameter)
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Resumed - continuing processing");
         }
 
+        // Schedule mode: instead of the fixed interval, wait until the next configured daily time
+        // before running a round (multiple slots supported). A manual flow start / resume aborts
+        // this wait early via xTaskAbortDelay, so on-demand rounds still work.
+        if (flowctrl.isScheduleMode())
+        {
+            while (!getTimeIsSet() && autostartIsEnabled && !flowPaused) {
+                flowctrl.setActStatus("Schedule: waiting for time sync");
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Schedule mode active but the clock is not yet set (NTP) - waiting...");
+                vTaskDelay(15000 / portTICK_PERIOD_MS);
+            }
+            if (!autostartIsEnabled) break;
+            if (!flowPaused && getTimeIsSet()) {
+                long waitSec = flowctrl.getNextScheduleDelaySec();
+                std::string nextT = flowctrl.getNextScheduleTimeStr();
+                flowctrl.setActStatus("Waiting for scheduled round at " + nextT);
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Next scheduled round at " + nextT + " (in " + std::to_string(waitSec) + " s)");
+                vTaskDelay((waitSec * 1000) / portTICK_PERIOD_MS);
+                if (!autostartIsEnabled) break;
+                if (flowPaused) continue;   // paused during the wait -> re-evaluate at the loop top
+            }
+        }
+
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "----------------------------------------------------------------"); // Clear separation between runs
         time_t roundStartTime = getUpTime();
 
@@ -1919,7 +1941,9 @@ void task_autodoFlow(void *pvParameter)
         // Expose this round's processing time as a performance diagnostic (MQTT / HA / InfluxDB / JSON).
         setFlowProcessingTime((long)fr_delta_ms);
 
-        if (auto_interval > fr_delta_ms)
+        // Interval mode: sleep the remainder of the interval. Schedule mode does its waiting at the
+        // top of the loop (until the next configured time), so no interval delay here.
+        if (!flowctrl.isScheduleMode() && auto_interval > fr_delta_ms)
         {
             const TickType_t xDelay = (auto_interval - fr_delta_ms) / portTICK_PERIOD_MS;
             ESP_LOGD(TAG, "Autoflow: sleep for: %ldms", (long)xDelay);

@@ -297,6 +297,12 @@ function ParseConfig() {
     ParamAddValue(param, catname, "Interval", 2);
     param[catname]["Interval"]["value1"] = "5";
     param[catname]["Interval"]["value2"] = "minutes";
+    // TriggerMode = interval (use Interval) | schedule (run at the Schedule times). Default interval.
+    ParamAddValue(param, catname, "TriggerMode");
+    param[catname]["TriggerMode"]["value1"] = "interval";
+    // Schedule = comma-separated daily HH:MM times, used when TriggerMode=schedule (multiple slots).
+    ParamAddValue(param, catname, "Schedule");
+    param[catname]["Schedule"]["value1"] = "";
 
     var catname = "DataLogging";
     category[catname] = new Object();
@@ -384,6 +390,18 @@ function ParseConfig() {
         param["System"]["RSSIThreshold"]["found"] = true;
         param["System"]["RSSIThreshold"]["enabled"] = false;
         param["System"]["RSSIThreshold"]["value1"] = "0";
+    }
+
+    // The AutoTimer Schedule value is a comma-separated list of times (e.g. 08:00,12:30,18:00). The
+    // generic line parser splits on commas, so it would only keep the first time - re-read the whole
+    // value straight from the raw config line so every slot survives the round-trip.
+    for (var _i = 0; _i < config_split.length; ++_i) {
+        var _m = config_split[_i].match(/^\s*;?\s*Schedule\s*=\s*(.+?)\s*$/i);
+        if (_m) {
+            param["AutoTimer"]["Schedule"]["value1"] = _m[1];
+            param["AutoTimer"]["Schedule"]["found"] = true;
+            break;
+        }
     }
 }
 

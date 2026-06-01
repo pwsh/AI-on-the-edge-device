@@ -37,7 +37,12 @@ protected:
 
 	bool AutoStart;
 	float AutoInterval;
-	void SetInitialParameter(void);	
+	// Scheduled-capture mode: instead of a fixed interval, run a round at specific daily times.
+	// scheduleMinutes holds each slot as minutes-of-day (sorted, de-duplicated). Multiple slots
+	// are supported. Falls back to interval mode when empty or scheduleMode is off (back-compat).
+	bool scheduleMode = false;
+	std::vector<int> scheduleMinutes;
+	void SetInitialParameter(void);
 	std::string aktstatusWithTime;
 	std::string aktstatus;
 	int aktRunNr;
@@ -72,6 +77,11 @@ public:
 
 	bool getIsAutoStart();
 	void setAutoStartInterval(long &_interval);
+
+	// Scheduled-capture mode helpers (see scheduleMode / scheduleMinutes).
+	bool isScheduleMode() { return scheduleMode && !scheduleMinutes.empty(); }
+	long getNextScheduleDelaySec();      // seconds from now until the next scheduled round
+	std::string getNextScheduleTimeStr(); // "HH:MM" of the next scheduled round (for status/log)
 
 	std::string* getActStatusWithTime();
 	std::string* getActStatus();

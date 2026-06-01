@@ -19,6 +19,10 @@ extern "C" {
 
 #include "ClassLogFile.h"
 #include "time_sntp.h"
+#include <algorithm>   // std::sort / std::unique (schedule slots)
+#include <ctime>       // time / localtime_r (schedule next-time)
+#include <cstdlib>     // atoi
+#include <cstdio>      // snprintf
 #include "Helper.h"
 #include "server_ota.h"
 #include "server_backup.h"
@@ -212,6 +216,8 @@ void ClassFlowControll::SetInitialParameter(void)
     AutoStart = true;
     SetupModeActive = false;
     AutoInterval = 10; // Minutes
+    scheduleMode = false;
+    scheduleMinutes.clear();
     flowdigit = NULL;
     flowanalog = NULL;
     flowpostprocessing = NULL;
@@ -231,6 +237,41 @@ bool ClassFlowControll::getIsAutoStart(void)
 void ClassFlowControll::setAutoStartInterval(long &_interval)
 {
     _interval = AutoInterval * 60 * 1000; // AutoInterval: minutes -> ms
+}
+
+// Seconds from now until the next scheduled daily slot (the soonest slot strictly after "now";
+// wraps to the first slot tomorrow if none remain today). Assumes the clock is set (caller checks).
+long ClassFlowControll::getNextScheduleDelaySec()
+{
+    if (scheduleMinutes.empty()) return 60;   // nothing scheduled -> retry shortly
+    time_t now = time(NULL);
+    struct tm lt;
+    localtime_r(&now, &lt);
+    long nowSecOfDay = (long)lt.tm_hour * 3600 + (long)lt.tm_min * 60 + lt.tm_sec;
+    for (size_t i = 0; i < scheduleMinutes.size(); ++i) {
+        long slotSec = (long)scheduleMinutes[i] * 60;
+        if (slotSec > nowSecOfDay) {
+            return slotSec - nowSecOfDay;
+        }
+    }
+    return (86400 - nowSecOfDay) + (long)scheduleMinutes[0] * 60;   // first slot tomorrow
+}
+
+// "HH:MM" of the next scheduled slot, for status/log display.
+std::string ClassFlowControll::getNextScheduleTimeStr()
+{
+    if (scheduleMinutes.empty()) return "--:--";
+    time_t now = time(NULL);
+    struct tm lt;
+    localtime_r(&now, &lt);
+    long nowSecOfDay = (long)lt.tm_hour * 3600 + (long)lt.tm_min * 60 + lt.tm_sec;
+    int slot = scheduleMinutes[0];   // default: first slot (tomorrow)
+    for (size_t i = 0; i < scheduleMinutes.size(); ++i) {
+        if ((long)scheduleMinutes[i] * 60 > nowSecOfDay) { slot = scheduleMinutes[i]; break; }
+    }
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%02d:%02d", slot / 60, slot % 60);
+    return std::string(buf);
 }
 
 ClassFlow* ClassFlowControll::CreateClassFlow(std::string _type)
@@ -670,6 +711,29 @@ bool ClassFlowControll::ReadParameter(FILE* pfile, string& aktparamgraph)
                 }
                 AutoInterval = _minutes;
             }
+        }
+
+        if ((toUpper(splitted[0]) == "TRIGGERMODE") && (splitted.size() > 1)) {
+            // interval (default) = fixed cadence; schedule = run at the listed daily times.
+            scheduleMode = (toUpper(splitted[1]) == "SCHEDULE");
+        }
+
+        if ((toUpper(splitted[0]) == "SCHEDULE") && (splitted.size() > 1)) {
+            // Schedule = HH:MM,HH:MM,...  Daily times a round runs in schedule mode. Multiple slots.
+            scheduleMinutes.clear();
+            std::vector<std::string> slots = ZerlegeZeile(splitted[1], ",");
+            for (size_t si = 0; si < slots.size(); ++si) {
+                std::string t = trim(slots[si]);
+                size_t c = t.find(':');
+                if (c == std::string::npos) continue;
+                int hh = atoi(t.substr(0, c).c_str());
+                int mm = atoi(t.substr(c + 1).c_str());
+                if (hh >= 0 && hh < 24 && mm >= 0 && mm < 60) {
+                    scheduleMinutes.push_back(hh * 60 + mm);
+                }
+            }
+            std::sort(scheduleMinutes.begin(), scheduleMinutes.end());
+            scheduleMinutes.erase(std::unique(scheduleMinutes.begin(), scheduleMinutes.end()), scheduleMinutes.end());
         }
 
         if ((toUpper(splitted[0]) == "DATALOGACTIVE") && (splitted.size() > 1)) {
