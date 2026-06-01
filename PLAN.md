@@ -100,14 +100,23 @@ Good news: most IDF 6.0 removals don't hit first-party code.
 - ✅ **Legacy I2C (`driver/i2c.h`)** — only used inside the vendored `esp32-camera`
   submodule (`sccb.c`); marked EOL-for-v7.0, still present (deprecated) in 6.0. Resolved by
   the submodule bump below.
-- ⚠️ **`gpio_pad_select_gpio`** (4 first-party sites: `main.cpp`, `connect_wlan.cpp`,
-  `statusled.cpp`, `ClassControllCamera.cpp`) — deprecated; swap to
-  `esp_rom_gpio_pad_select_gpio` (or `gpio_reset_pin`). Low effort.
-- ⚠️ **HIMEM (`esp_himem_*`)** in `himem_memory_check.cpp` / `esp_sys.cpp` — only the
-  `esp32cam-dev-himem` env; disabled in default config (`CONFIG_SPIRAM_BANKSWITCH_ENABLE=n`).
-  Verify the himem API still exists in 6.0; otherwise gate it out. Not blocking default build.
-- ⬜ Re-baseline `sdkconfig.defaults` / `sdkconfig.esp32cam` against IDF 6 (renamed/removed
-  Kconfig keys are the most likely source of build-time noise).
+- ✅ **`gpio_pad_select_gpio`** (4 first-party sites: `main.cpp`, `connect_wlan.cpp`,
+  `statusled.cpp`, `ClassControllCamera.cpp`) — already handled: each site defines
+  `#define gpio_pad_select_gpio esp_rom_gpio_pad_select_gpio` (guarded `ESP_IDF_VERSION >= 4.3.0`),
+  so the call redirects to the ROM function on IDF 6. No deprecation warning. No action needed.
+- ✅ **HIMEM (`esp_himem_*`)** in `himem_memory_check.cpp` / `esp_sys.cpp` — the API **still exists
+  in IDF 6.0** (the default build links `esp_sys.cpp`'s himem calls cleanly). Still gated to the
+  `esp32cam-dev-himem` env / disabled by default. No action needed.
+- ✅ **Re-baselined `sdkconfig.defaults` against IDF 6** (commit *sdkconfig re-baseline*). A clean
+  reconfigure flagged renamed/removed/malformed keys; all were already *ignored* by IDF, so the
+  resolved config is **byte-identical** (verified: empty esp32 diff, full esp32 build green, and
+  esp32s3 8/16 MB + wrover all reconfigure with **0 Kconfig warnings**). Removed: `ESP32_DPORT_WORKAROUND`,
+  `ESPTOOLPY_FLASHSIZE_DETECT`, `SPIRAM_SIZE=-1`, `FMB_TIMER_PORT_ENABLED`, `RMT_SUPPRESS_DEPRECATE_WARN`,
+  `FREERTOS_ASSERT_DISABLE`, `ESP_COREDUMP_DATA_FORMAT_ELF` (now auto-selected), and a malformed
+  prefix-less `ESP_SYSTEM_PANIC_SILENT_REBOOT` line; modernized the task-WDT trio to
+  `CONFIG_ESP_TASK_WDT_INIT=n`. Also split the four **ESP32-only** keys (`ESP32_REV_MIN_0`,
+  `ESP32_SPIRAM_SUPPORT`, `SPIRAM_CACHE_WORKAROUND`, `SPIRAM_BANKSWITCH_ENABLE`) into a new
+  `sdkconfig.defaults.esp32` (auto-merged for ESP32-CAM + WROVER only) so they stop warning on the S3.
 
 ### 3.3 Update ALL components / submodules to their latest release
 Policy: as part of this upgrade, bump **every** git submodule and managed dependency to its
