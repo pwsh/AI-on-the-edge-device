@@ -43,6 +43,8 @@
 #include "Helper.h"
 #include "crash_dump.h"
 #include "statusled.h"
+#include "nvs.h"
+#include "esp_timer.h"
 #include "sdcard_check.h"
 
 #include "../../include/defines.h"
@@ -356,6 +358,55 @@ bool Init_NVS_SDCard()
     return true;
 }
 
+// Clears the rapid-reset counter ~5 s after boot, so only quick *successive* user resets accumulate.
+static void resetCounterClearCb(void *)
+{
+    nvs_handle_t h;
+    if (nvs_open("aiotedge", NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_i32(h, "rst_cnt", 0);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+// Factory Wi-Fi reset by reset button: press the device's reset button 3 times in quick succession
+// (each within ~5 s of the previous) to delete wlan.ini and come up in AP mode for fresh setup.
+// Only user hardware resets (reset button / power-on) are counted - the firmware's own reboots
+// (software/panic, e.g. the AP-fallback retries) are ignored so they can never trigger it.
+static void checkWifiFactoryReset(void)
+{
+    esp_reset_reason_t rr = esp_reset_reason();
+    if (rr != ESP_RST_POWERON && rr != ESP_RST_EXT) {
+        return;
+    }
+    nvs_handle_t h;
+    if (nvs_open("aiotedge", NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+    int32_t cnt = 0;
+    nvs_get_i32(h, "rst_cnt", &cnt);
+    cnt++;
+    if (cnt >= 3) {
+        nvs_set_i32(h, "rst_cnt", 0);
+        nvs_commit(h);
+        nvs_close(h);
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "3 quick resets detected -> Wi-Fi factory reset: removing wlan.ini and starting AP mode");
+        DeleteFile(WLAN_CONFIG_FILE);
+    }
+    else {
+        nvs_set_i32(h, "rst_cnt", cnt);
+        nvs_commit(h);
+        nvs_close(h);
+        esp_timer_create_args_t a = {};
+        a.callback = resetCounterClearCb;
+        a.name = "rstclr";
+        esp_timer_handle_t th;
+        if (esp_timer_create(&a, &th) == ESP_OK) {
+            esp_timer_start_once(th, 5000000);   // 5 s
+        }
+    }
+}
+
 extern "C" void app_main(void)
 {
     //#ifdef CONFIG_HEAP_TRACING_STANDALONE
@@ -547,11 +598,15 @@ extern "C" void app_main(void)
     // ********************************************
     setCpuFrequency();
 
+    // Reset-button Wi-Fi factory reset: 3 quick resets remove wlan.ini -> AP mode (runs before
+    // CheckStartAPMode so the cleared wlan.ini makes it come up in AP mode this boot).
+    checkWifiFactoryReset();
+
     // Start SoftAP for initial remote setup
     // Note: Start AP if no wlan.ini and/or config.ini available, e.g. SD card empty; function does not exit anymore until reboot
     // ********************************************
     #ifdef ENABLE_SOFTAP
-        CheckStartAPMode(); 
+        CheckStartAPMode();
     #endif
 
     // SD card: Check presence of some mandatory folders / files
