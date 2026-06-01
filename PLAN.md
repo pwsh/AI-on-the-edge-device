@@ -1066,7 +1066,16 @@ JPEG-decode path.
 
 ---
 
-## 10. ⬜ Reading-value correctness — confidence voting for a stuck-high outlier
+## 10. 🟡 Reading-value correctness — confidence voting for a stuck-high outlier
+
+**Core logic IMPLEMENTED (commit *confidence vote*), default-off.** `ClassFlowPostProcessing` now counts
+consecutive, mutually-consistent low reads in the negative-rate branch; once `ConfidenceVotes` of them
+agree (within a last-digit tolerance), it logs `"value corrected from X to Y after N confirming reads"`,
+overrides the suspected-high `PreValue`, and accepts the lower value (skipping both the neg-rate and
+rate-too-high rejections that round). Config key `ConfidenceVotes` under `[PostProcessing]` (`0` = off =
+legacy behaviour); per-number vote state (`NegRateCandidate`/`NegRateVoteCount`) resets on any accepted
+read. Builds green esp32 + S3; **needs meter-based validation** (the test S3 has no meter) and a config-UI
+toggle (today it's a raw-config key). Original design notes below.
 
 ### Problem
 The post-processing consistency check (`ClassFlowPostProcessing`) rejects a reading whose value is

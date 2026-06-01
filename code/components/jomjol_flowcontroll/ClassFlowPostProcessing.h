@@ -48,6 +48,8 @@ protected:
 
 public:
     bool PreValueUse;
+    int ConfidenceVotes;        // §10 confidence vote: N consecutive confirming lower reads override a
+                                // suspected-high PreValue. 0 = off (legacy negative-rate rejection only).
     std::vector<NumberPost*> NUMBERS;
 
     ClassFlowPostProcessing(std::vector<ClassFlow*>* lfc, ClassFlowCNNGeneral *_analog, ClassFlowCNNGeneral *_digit);

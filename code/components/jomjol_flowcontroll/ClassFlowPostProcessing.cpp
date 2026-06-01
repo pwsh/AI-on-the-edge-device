@@ -330,6 +330,7 @@ void ClassFlowPostProcessing::SavePreValue() {
 
 ClassFlowPostProcessing::ClassFlowPostProcessing(std::vector<ClassFlow*>* lfc, ClassFlowCNNGeneral *_analog, ClassFlowCNNGeneral *_digit) {
     PreValueUse = false;
+    ConfidenceVotes = 0;   // §10 confidence vote off by default (legacy negative-rate behaviour)
     PreValueAgeStartup = 30;
     ErrorMessage = true;   // "Skip Messages on Error": default true (documented default) -> skip transmission on error
     ListFlowControll = NULL;
@@ -628,6 +629,11 @@ bool ClassFlowPostProcessing::ReadParameter(FILE* pfile, string& aktparamgraph) 
         if ((toUpper(_param) == "ALLOWNEGATIVERATES") && (splitted.size() > 1)) {
             handleAllowNegativeRate(splitted[0], splitted[1]);
         }
+
+        if ((toUpper(_param) == "CONFIDENCEVOTES") && (splitted.size() > 1)) {
+            ConfidenceVotes = std::atoi(splitted[1].c_str());   // 0 = off
+            if (ConfidenceVotes < 0) ConfidenceVotes = 0;
+        }
 			
         if ((toUpper(_param) == "ERRORMESSAGE") && (splitted.size() > 1)) {
             ErrorMessage = alphanumericToBoolean(splitted[1]);
@@ -702,6 +708,8 @@ void ClassFlowPostProcessing::InitNUMBERS() {
         _number->FlowRateAct = 0; // m3 / min
         _number->PreValueOkay = false;
         _number->AllowNegativeRates = false;
+        _number->NegRateCandidate = 0;   // §10 confidence vote state
+        _number->NegRateVoteCount = 0;
         _number->IgnoreLeadingNaN = false;
         _number->MaxRateValue = 0.1;
         _number->MaxRateType = AbsoluteChange;
@@ -791,6 +799,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
     ESP_LOGD(TAG, "Quantity NUMBERS: %d", NUMBERS.size());
 
     for (int j = 0; j < NUMBERS.size(); ++j) {
+        bool confidenceOverride = false;   // §10: set when the confidence vote accepts a lower value
         NUMBERS[j]->ReturnRawValue = "";
         NUMBERS[j]->ReturnRateValue = "";
         NUMBERS[j]->ReturnValue = "";
@@ -922,8 +931,33 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
 
             if ((!NUMBERS[j]->AllowNegativeRates) && (NUMBERS[j]->Value < NUMBERS[j]->PreValue)) {
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "handleAllowNegativeRate for device: " + NUMBERS[j]->name);
-					
-                if ((NUMBERS[j]->Value < NUMBERS[j]->PreValue)) {
+
+                // §10 confidence vote: a single low read is rejected (below), but if the meter has
+                // actually rolled to a lower value, every following correct read would be rejected
+                // forever (a one-off HIGH misread latches PreValue). Count consecutive, mutually-
+                // consistent low reads; once ConfidenceVotes of them agree, treat the high PreValue as
+                // the outlier and accept the lower value. ConfidenceVotes == 0 -> disabled (legacy).
+                if (ConfidenceVotes > 0) {
+                    double _tol = (NUMBERS[j]->Nachkomma > 0) ? (2.0 / pow(10, NUMBERS[j]->Nachkomma)) : 1.0;
+                    if ((NUMBERS[j]->NegRateVoteCount > 0) &&
+                        (fabs(NUMBERS[j]->Value - NUMBERS[j]->NegRateCandidate) <= _tol)) {
+                        NUMBERS[j]->NegRateVoteCount++;       // consistent with the running candidate
+                    } else {
+                        NUMBERS[j]->NegRateVoteCount = 1;     // start a new candidate cluster
+                    }
+                    NUMBERS[j]->NegRateCandidate = NUMBERS[j]->Value;   // track the latest (allows slow advance)
+
+                    if (NUMBERS[j]->NegRateVoteCount >= ConfidenceVotes) {
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": value corrected from " +
+                            RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " to " +
+                            RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " after " +
+                            std::to_string(NUMBERS[j]->NegRateVoteCount) + " confirming reads (suspected high outlier overridden)");
+                        NUMBERS[j]->NegRateVoteCount = 0;
+                        confidenceOverride = true;            // accept the lower value; skip the rejections below
+                    }
+                }
+
+                if (!confidenceOverride && (NUMBERS[j]->Value < NUMBERS[j]->PreValue)) {
                     // more debug if extended resolution is on, see #2447
                     if (NUMBERS[j]->isExtendedResolution) {
                         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Neg: value=" + std::to_string(NUMBERS[j]->Value) 
@@ -957,7 +991,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             NUMBERS[j]->FlowRateAct = (NUMBERS[j]->Value - NUMBERS[j]->PreValue) / LastPreValueTimeDifference;
             NUMBERS[j]->ReturnRateValue =  to_string(NUMBERS[j]->FlowRateAct);
 
-            if ((NUMBERS[j]->useMaxRateValue) && (NUMBERS[j]->Value != NUMBERS[j]->PreValue)) {
+            if ((NUMBERS[j]->useMaxRateValue) && (NUMBERS[j]->Value != NUMBERS[j]->PreValue) && !confidenceOverride) {
                 double _ratedifference;
 					
                 if (NUMBERS[j]->MaxRateType == RateChange) {
@@ -997,6 +1031,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         NUMBERS[j]->ReturnChangeAbsolute = RundeOutput(NUMBERS[j]->Value - NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
         NUMBERS[j]->PreValue = NUMBERS[j]->Value;
         NUMBERS[j]->PreValueOkay = true;
+        NUMBERS[j]->NegRateVoteCount = 0;   // §10: a value was accepted -> reset the confidence-vote streak
 
         NUMBERS[j]->timeStampLastValue = imagetime;    
         NUMBERS[j]->timeStampLastPreValue = imagetime;

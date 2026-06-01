@@ -51,6 +51,8 @@ struct NumberPost {
     int ChangeRateThreshold;  // threshold parameter for negative rate detection
     bool PreValueOkay;          // previousValueValid; indicates that the reading of the previous round has no errors
     bool AllowNegativeRates;    // allowNegativeRate; defines if the consistency checks allow negative rates between consecutive meter readings.
+    double NegRateCandidate;    // §10 confidence vote: the lower value currently being confirmed across rounds
+    int NegRateVoteCount;       // §10 confidence vote: count of consecutive confirming lower reads
     bool IgnoreLeadingNaN;
     bool checkDigitIncreaseConsistency; // extendedConsistencyCheck; performs an additional consistency check to avoid wrong readings
     time_t timeStampLastValue;     // Timestamp for the last read value; is used for the log
