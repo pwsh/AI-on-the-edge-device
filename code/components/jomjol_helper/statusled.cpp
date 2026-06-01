@@ -33,6 +33,8 @@ void task_StatusLED(void *pvParameter)
 
 		for (int i=0; i<2; ) // Default: repeat 2 times
 		{
+			if (!StatusLEDData.bProcessingRequest)   // StatusLEDOff() cleared it -> stop (incl. infinite)
+				break;
 			if (!StatusLEDDataInt.bInfinite)
 				++i;
 
@@ -144,9 +146,12 @@ void StatusLED(StatusLedSource _eSource, int _iCode, bool _bInfinite)
 
 void StatusLEDOff(void)
 {
-	if (xHandle_task_StatusLED)
-		vTaskDelete(xHandle_task_StatusLED); // Delete task for StatusLED to force stop of blinking
-	
+	// Signal the blink task to stop and let it self-delete on its next loop check. Do NOT vTaskDelete
+	// it here: that races with the task's own self-deletion (use-after-free) and crashed during
+	// reboot once the Wi-Fi status used an infinite (long-lived) blink.
+	StatusLEDData.bProcessingRequest = false;
+	StatusLEDData.bInfinite = false;
+
 	gpio_pad_select_gpio(BLINK_GPIO); // Init the GPIO
 	gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT); // Set the GPIO as a push/pull output
 	gpio_set_level(BLINK_GPIO, 1);// LED off
