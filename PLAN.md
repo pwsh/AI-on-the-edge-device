@@ -860,11 +860,27 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      floor tracks `IMAGE_SIZE` so cropping the analysed area (alpha.14 §6) shrinks the region
      automatically. `MAX_MODEL_SIZE` also right-sized to 512 KB (largest shipped 356 KB + margin),
      with oversized models rejected gracefully at load. `MEM-PROFILE` logs retained.
-   - ⬜ **Remaining safety net:** make the STBI NULL path degrade gracefully (failed round + clear
-     log) instead of returning NULL → crash, so a future higher-res/larger-image config can't boot-
-     loop the way alpha.11 did.
+   - ✅ **Safety net DONE** (commit *skip the round (not crash/boot-loop) when an image can't be
+     decoded*): the STBI NULL path now distinguishes "shared region too small" (skip the round, no
+     reboot) from a corrupt/empty frame (camera dead → reboot), so a higher-res/larger-image config
+     can't boot-loop the way alpha.11 did.
    - Other headroom levers: **himem** (upper 4 MB; complex) or the **ESP32-S3** (8 MB+ mapped). TLSF
      is already the IDF default allocator; no change needed there.
+   - ⭐ **ESP32-S3 — resident model in a dedicated PSRAM region (audited 2026-06-01; HIGH value, needs
+     meter validation).** On the ESP32-CAM the model + arena live in the *shared* region that TakeImage
+     reuses for the camera image, which forced the **per-cycle model reload** in `doNeuralNetwork`
+     (`ClassFlowCNNGeneral.cpp` ~749) — keeping it resident clobbered it and crashed (the earlier
+     FastRead-resident bug). The S3 has ~3.5 MB **free** PSRAM (verified via the new HardwareDetail:
+     8 MB octal, ~3525 KB free), so on the S3 the model+arena can get their **own** allocation,
+     independent of the image region, and stay **resident across cycles** → drop the per-round
+     `LoadModel`/`allocate_tensors` cost (the FastRead resident optimisation finally pays off) with no
+     clobber risk. Approach: S3-gated path in `psram.cpp` (a dedicated `reserve_psram_model_region()`;
+     `psram_get_shared_model/tensor_arena_memory()` return into it on S3, into the shared region on
+     ESP32) + skip the per-cycle reload in `ClassFlowCNNGeneral` when resident. **Not implemented this
+     session: it rewrites the core inference memory path and read-accuracy can't be validated without a
+     device pointed at a real meter (the test S3 is in setup mode).** Implement as a focused,
+     meter-validated effort. Also enables a larger CNN / higher-res capture on the S3 (no shared-region
+     ceiling).
 5. **Second target: ESP32-S3 — the one alternative to the ESP32-CAM (once items 1–4 are stable).**
    Scope is deliberately limited to **ESP32 (ESP32-CAM-class, i.e. any ESP32 *with PSRAM*) + ESP32-S3**.
    P4/C6/C3 are **out of scope** (C3/C6 verified non-viable — no PSRAM / no camera / no USB host; P4
