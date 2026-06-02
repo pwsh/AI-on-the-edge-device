@@ -120,7 +120,7 @@
                ( /[a-zRC0-9()_\-.]*(\.tflite$)/i.test(filename))) {
                 firework.launch('Great, the filename matches our expectations. You can now press "Upload and install".', 'success', 5000);
             }
-            /* Following filenames are acceptiod but not prefered:
+            /* Following filenames are accepted but not preferred:
              * - *.bin
              * - *.zip */
             else if (filename.endsWith(".zip") || filename.endsWith(".bin")) { // Warning but still accepted
@@ -172,7 +172,7 @@
                     } else if (xhttp.status == 0) {
                         firework.launch('Server closed the connection abruptly!', 'danger', 30000);
                     } else {
-                        firework.launch('An error occured: ' + xhttp.responseText, 'danger', 30000);
+                        firework.launch('An error occurred: ' + xhttp.responseText, 'danger', 30000);
                     }
                 }
             };
@@ -249,7 +249,7 @@
                     } else if (xhttp.status == 0) {
                         firework.launch('Server closed the connection abruptly!', 'danger', 30000);
                     } else {
-                        firework.launch('An error occured: ' + xhttp.responseText, 'danger', 30000);
+                        firework.launch('An error occurred: ' + xhttp.responseText, 'danger', 30000);
                     }
                 }
             };

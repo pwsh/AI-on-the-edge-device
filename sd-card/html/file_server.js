@@ -59,7 +59,7 @@ function upload() {
           firework.launch('Server closed the connection abruptly!', 'danger', 30000);
           UpdatePage(false);
         } else {
-          firework.launch('An error occured: ' + xhttp.responseText, 'danger', 30000);
+          firework.launch('An error occurred: ' + xhttp.responseText, 'danger', 30000);
           UpdatePage(false);
         }
       }

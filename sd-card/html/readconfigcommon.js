@@ -184,7 +184,7 @@ function FileDeleteOnServer(_filename, _domainname = "") {
 				// location.reload()
             } 
 			else {
-				// firework.launch('An error occured: ' + xhttp.responseText, 'danger', 30000);
+				// firework.launch('An error occurred: ' + xhttp.responseText, 'danger', 30000);
 				// location.reload()
             }
         }
@@ -213,7 +213,7 @@ function FileSendContent(_content, _filename, _domainname = "") {
 				firework.launch('Server closed the connection abruptly!', 'danger', 30000);
             } 
 			else {
-				firework.launch('An error occured: ' + xhttp.responseText, 'danger', 30000);
+				firework.launch('An error occurred: ' + xhttp.responseText, 'danger', 30000);
             }
         }
     };
