@@ -1,314 +1,279 @@
 ## Feature Requests
 
-**There are a lot of ideas for further improvements, but only limited capacity on side of the developer.** Therefore I have created this page as a collection of ideas. 
+**There are a lot of ideas for further improvements, but only limited capacity on the side of the
+developer.** This page collects those ideas so they are not forgotten, and so anyone with the time
+and passion to help can pick one up.
 
-1. Whoever has a new idea can put it here, so that it is not forgotten. 
+1. Whoever has a new idea can add it here.
+2. Whoever has the time, capacity and passion can take any idea and implement it — support and help
+   will be provided wherever possible.
 
-2. Whoever has the time, capacity and passion to support the project can take any of the ideas and implement them. I will provide support and help wherever I can!
-   
-   
+### How each entry is structured
+
+Every request below uses the same layout so the request, its value, and where it can realistically
+run are all clear at a glance:
+
+* **Request** — what is being asked for, in one or two sentences.
+* **Benefit** — why it is worth doing.
+* **Feasibility** — how practical it is on each board family: **ESP32-CAM** (AI-Thinker, 4 MB flash,
+  4 MB PSRAM, SD-based), **ESP32-S3** (8/16 MB flash, in-flash filesystem), and **ESP32 WROVER**.
+  Most features are board-agnostic software; hardware-bound ones (sleep, serial, heavy compute) call
+  out the differences.
+* **Status** — current state, using the legend below.
+
+**Status legend:** ✅ Implemented · 🟡 Partially implemented · 🔬 Analysed (feasibility known, not
+built) · ⬜ Open
 
 ____
 
+#### #40 Trigger with cron-like exact time slot
 
-#### #40 Trigger with cron like exact time slot
+* **Request:** Schedule readings at exact wall-clock times (cron-style), not just at a fixed interval. See [#2470](https://github.com/jomjol/AI-on-the-edge-device/issues/2470).
+* **Benefit:** Align readings with tariff windows or other devices; predictable timestamps.
+* **Feasibility:** All boards — feasible (software only). SNTP time is already available; needs a small scheduler and config UI. The interval is now re-read live without a reboot, which is a useful building block.
+* **Status:** ⬜ Open (interval scheduling exists; exact cron slots not yet).
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/2470
+#### #39 UPnP/SSDP auto-discovery of the device
 
+* **Request:** Announce the device via UPnP/SSDP so it is auto-discovered on the network. See [#2481](https://github.com/jomjol/AI-on-the-edge-device/issues/2481).
+* **Benefit:** Easier first-time discovery without scanning for the IP. mDNS hostname already helps; SSDP would add it to "Network" device lists.
+* **Feasibility:** All boards — feasible (software only); small always-on UDP listener adds a little RAM/CPU overhead.
+* **Status:** ⬜ Open.
 
+#### #38 Energy saving (deep sleep between recognitions)
 
-#### #39 upnp implementation to auto detect the device
+* **Request:** Put the device to sleep between readings to cut power. See [#2486](https://github.com/jomjol/AI-on-the-edge-device/issues/2486).
+* **Benefit:** Lower average power; enables battery or solar operation.
+* **Feasibility (analysed):** **ESP32-CAM — ❌ not feasible** for meaningful savings: the camera XCLK is driven from the APB clock (no XTAL LEDC source on the ESP32), so dynamic-frequency scaling/light-sleep starves the camera, and the OV2640 + Wi-Fi must be fully re-initialised each wake (multi-second, power-hungry). **ESP32-S3 — 🟡 limited:** it has an XTAL LEDC clock source so light-sleep DFS is possible in principle, but the always-on camera and Wi-Fi association dominate the power budget; deep sleep only pays off with long intervals and a full re-init each cycle. See [docs/BOARD-FEATURE-MATRIX.md](docs/BOARD-FEATURE-MATRIX.md). Closely related to **#20**.
+* **Status:** 🔬 Analysed — not worthwhile on ESP32-CAM; limited upside on ESP32-S3.
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/2481
+#### #37 Auto-init / format SD card in firmware
 
-  
+* **Request:** Fully handle the SD card (including formatting an empty/new card) from firmware. See [#2488](https://github.com/jomjol/AI-on-the-edge-device/issues/2488).
+* **Benefit:** Simpler first-time setup; recover from a blank or corrupt card without a PC.
+* **Feasibility:** **ESP32-CAM/WROVER** — feasible and most valuable (SD is mandatory). **ESP32-S3** — less critical: it already runs from an in-flash LittleFS filesystem and needs no SD card at all.
+* **Status:** ⬜ Open (S3 in-flash filesystem sidesteps the need on that board).
 
-#### #38 Energy Saving
+#### #36 Run demo without a camera
 
-* Deep sleep between recognition
-* https://github.com/jomjol/AI-on-the-edge-device/issues/2486
+* **Request:** Allow demo/playground mode on boards with no (or a broken) camera, instead of failing with "Cam bad".
+* **Benefit:** Try the software on any ESP32, or keep using a board whose camera ribbon has failed.
+* **Feasibility:** All boards — feasible (software only); feed the pipeline from stored demo images and bypass the capture step. The v17 capture safety-net (a failed capture now skips the round instead of rebooting) is a useful precursor.
+* **Status:** ⬜ Open.
 
+#### #35 Use the model with an image from a smartphone camera
 
+* **Request:** Accept an occasional photo taken with a phone (e.g. weekly) and run it through the same model, rather than reading every few minutes.
+* **Benefit:** "Apparent accuracy" (DE: *Scheingenauigkeit*) — usage barely varies week to week, so sparse readings interpolate fine while avoiding 24/7 hardware.
+* **Feasibility:** All boards — feasible as an upload endpoint; mostly a UI/flow change (accept an uploaded image, align, infer, publish). Alignment without the fixed mounting is the main challenge.
+* **Status:** ⬜ Open.
 
-#### #37 Auto init SD card
+#### #34 State + ROI for water-leak detection
 
-* Fully implement the SD card handling (including formatting) into the firmware
-* https://github.com/jomjol/AI-on-the-edge-device/issues/2488Demo 
+* **Request:** Add a ROI/state that flags movement between readings; sustained movement within a time window raises a leak alarm. ![example](https://user-images.githubusercontent.com/38385805/207858812-2a6ba41d-1a8c-4fa1-9b6a-53cdd113c106.png)
+* **Benefit:** Publish a leak state over MQTT to trigger actions (e.g. close a valve).
+* **Feasibility:** All boards — feasible (software only); reuse the existing ROI/diff machinery plus a timer and an MQTT state topic.
+* **Status:** ⬜ Open.
 
-#### #36 Run demo without camera
+#### #33 Implement the Matter protocol
 
-Demo mode requires a working camera (if not, one receives a 'Cam bad' error). Would be nice to demo or play around on other ESP32 boards (or on ESP32-CAM boards when you broke the camera cable...).
+* **Request:** Expose the device over Matter. See [#1404](https://github.com/jomjol/AI-on-the-edge-device/issues/1404).
+* **Benefit:** Native integration with major smart-home ecosystems.
+* **Feasibility:** **ESP32-CAM — ❌ impractical:** the Matter SDK (esp-matter) plus this app does not fit in 4 MB flash alongside the camera stack. **ESP32-S3 16 MB — 🟡 possible** in principle, but Matter is a large, RAM-heavy dependency competing with the CNN. High effort.
+* **Status:** 🔬 Analysed — only conceivable on ESP32-S3 16 MB; high cost.
 
-#### #35 Use the same model, but provide the image from a Smartphone Camera
-as reading the Electricity or Water meter every few minutes only delivers apparent accuracy (DE: "Scheingenauigkeit") you could just as well take a picture with your Smartphone every so often (e.g. once a week when you are in the Basement anyway), then with some "semi clever" tricks pass this image to the model developed here, and the values than on to whoever needs them e.g. via MQTT.
-IMO: It is not needed to have that many readings (datapoints) as our behaviour (Use of electricity or water) doesn't vary that much, say, over a weeks time. The interpolation between weekly readings will give sufficient information on the power and/or water usage. 
+#### #32 Correct a misinterpreted value (and collect training data)
 
+* **Request:** Let the user fix a wrongly-read value; save the offending ROIs to a "training data" folder, ideally uploadable with one button.
+* **Benefit:** Easy corrections and a feedback loop to improve the models.
+* **Feasibility:** All boards — feasible (software only); some SD/flash space for saved ROIs. The v17 confidence-vote logic (a single spurious high read can be overridden) reduces some bad reads but is not the manual-correction UI this asks for.
+* **Status:** ⬜ Open (related robustness improved in v17).
 
-#### #34 implement state and Roi for water leak detection
-for example see Roi in the next picture..
-![grafik](https://user-images.githubusercontent.com/38385805/207858812-2a6ba41d-1a8c-4fa1-9b6a-53cdd113c106.png)
-in case of position change between the measurements set this state to true, if there is no change set it back to false.
-In a defined time window this movement can lead into an alarm state / water leak..
-having this state in the mqtt broker can trigger functions like closing the water pipe valve and so on...
+#### #31 InfluxDB v2.x interface
 
+* **Request:** Support InfluxDB v2.x (org/bucket/token), not just v1.x. See [#1160](https://github.com/jomjol/AI-on-the-edge-device/issues/1160).
+* **Benefit:** Works with current InfluxDB deployments and InfluxDB Cloud.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** ✅ Implemented — `jomjol_influxdb` supports the v2 `/api/v2/write` API with bucket, organization and token; HTTPS via the built-in CA bundle.
 
+#### #30 Support meter "clocking over" (rollover at max value)
 
-#### #33 Implement MATTER protocoll
+* **Request:** When a meter reaches its maximum and wraps to 0, accept the new value and compute the difference correctly (see `ClassFlowPostProcessing.cpp`).
+* **Benefit:** No spurious huge negative rate when a mechanical meter rolls over.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially implemented — rate guards exist (`MaxRateValue`/`MaxRateType`, `AllowNegativeRates`) to bound and accept decreases; a dedicated full-scale wrap-around calculation is still worth hardening.
 
-* see [#1404](https://github.com/jomjol/AI-on-the-edge-device/issues/1404)
+#### ~~#29 Add favicon and use the hostname for the website~~
 
-#### #32 Add feature to correct misinterpreted value
+* **Status:** ✅ Implemented (v11.3.1). See [#927](https://github.com/jomjol/AI-on-the-edge-device/issues/927).
 
-* If a value is misinterpreted, the user can manually correct the value.
-* The misinterpreted ROIs would be saved in a "training data" -folder on the SD-card
-* Stretch goal: make sending of saved training data as easy as pushing a button =)
+#### #28 Improved error handling for out-of-image ROIs
 
-#### #31 Implement InfluxDB v2.x interface
+* **Request:** When a ROI lies outside the image, show an error instead of silently using a nonsense crop.
+* **Benefit:** Catch mis-configuration immediately rather than getting bad reads.
+* **Feasibility:** All boards — feasible (software only); validate ROI bounds at config-save and at runtime. The v17 ROI editors add keyboard nudging and clearer guidance, but explicit out-of-bounds errors are still open.
+* **Status:** ⬜ Open.
 
-* Currently only InfluxDB v1.x is supported, extend to v2.x
-* Remark: interface has changed
-* see [#1160](https://github.com/jomjol/AI-on-the-edge-device/issues/1160)
+#### #27 Use the Homie convention for MQTT
 
-#### #30 Support meter clock over
+* **Request:** Publish using the standardized [Homie](https://homieiot.github.io/) MQTT convention.
+* **Benefit:** Auto-discovery in Homie-aware controllers; standard topic structure.
+* **Feasibility:** All boards — feasible (software only); add a Homie topic/àttribute layer over the existing MQTT client (which already supports Home Assistant discovery and inbound subscriptions).
+* **Status:** ⬜ Open.
 
-* In case of meter clocking over, that is, reaching its max. value and starting over from 0,
-  accept the new value and calculate correctly the difference.
-  (see line 739 onwards in ClassFlowPostProcessing.cpp)
+#### #26 Smarter "N" replacement
 
-#### ~~#29 Add favicon and use the hostname for the website~~- implemented v11.3.1
+* **Request:** When the higher digits have already increased by at least 1, set an undetermined ("N") digit to "0" rather than to its last value. See [#792](https://github.com/jomjol/AI-on-the-edge-device/issues/792).
+* **Benefit:** More accurate values right after a carry/rollover of a higher digit.
+* **Feasibility:** All boards — feasible (software only); a post-processing rule change.
+* **Status:** 🟡 Partially addressed — v17 adds confidence-vote logic so a single spurious high read no longer sticks; the specific carry-aware "N→0" rule is not yet implemented.
 
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/927~~
+#### #25 Trigger a measurement via MQTT
 
-#### #28 Improved error handling for ROIs
+* **Request:** Start a reading on demand by publishing to an MQTT topic. See [#727](https://github.com/jomjol/AI-on-the-edge-device/issues/727).
+* **Benefit:** On-demand reads from automations without polling the web API.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** ✅ Implemented — the MQTT client subscribes to inbound topics and dispatches via a callback map (`subscribeFunktionMap`, `MQTT_EVENT_DATA`); a publish to the control topic triggers the flow.
 
-* In case a ROI is out of the image, there is no error message, but a non sense image is used
-* Implement a error message for wrong configuration of ROI
+#### #24 Show MQTT state in the web server
 
-#### #27 Use Homie Spec for Mqtt binding
+* **Request:** Display the MQTT connection state / log on the web page (connected, failed to connect, …).
+* **Benefit:** Diagnose broker/credential problems from the UI.
+* **Feasibility:** All boards — feasible (software only). The overview already surfaces process status, CPU temperature, RSSI and uptime; an MQTT-state line is a small addition.
+* **Status:** ⬜ Open.
 
-* Use the standardized Home Protocol for the Mqtt binding 
-* https://homieiot.github.io/
+#### #23 CPU temperature (web + MQTT)
 
-#### #26 Changes behaviour for "N" replacement
+* **Request:** Show the CPU temperature in the web page and publish it over MQTT.
+* **Benefit:** Spot thermal problems and log enclosure temperature.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** ✅ Implemented — CPU temperature is shown on the overview page and available via the info API.
 
-* in case the higher digits has already increased by minium 1 - don't set the "N" to the last value, but to "0"
-* https://github.com/jomjol/AI-on-the-edge-device/issues/792
+#### ~~#22 Direct links to the neural-network files in the other repositories~~
 
+* **Status:** ✅ Implemented (> v11.3.1). See [#644](https://github.com/jomjol/AI-on-the-edge-device/issues/644).
 
-#### #25 Trigger Measurement via MQTT
+#### #21 Extended "CheckDigitalConsistency" logic
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/727
+* **Request:** Strengthen digit-consistency checking. See [#590](https://github.com/jomjol/AI-on-the-edge-device/issues/590).
+* **Benefit:** Fewer implausible jumps accepted as valid readings.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially improved — v17 adds confidence-vote override for stuck-high reads and changed-digit highlighting on the overview; further consistency rules remain open.
 
+#### #20 Deep sleep + push mode (battery operation)
 
-#### #24 Show Mqtt state directly in Webserver
+* **Request:** Keep the device in deep sleep, wake periodically to read and push via MQTT/HTTP, ideally using ESP-NOW to avoid Wi-Fi association overhead — enabling battery power and/or night-time sleep windows.
+* **Benefit:** Battery/solar operation; much lower average power.
+* **Feasibility (analysed):** Same hardware reality as **#38**. **ESP32-CAM — ❌** the camera and Wi-Fi re-init per wake dominate and the camera clock cannot be scaled; battery operation is not practical. **ESP32-S3 — 🟡** technically possible for long intervals, but each wake still re-inits camera + Wi-Fi. ESP-NOW could cut the network overhead but bypasses the MQTT/HTTP/InfluxDB paths users rely on. See [docs/BOARD-FEATURE-MATRIX.md](docs/BOARD-FEATURE-MATRIX.md).
+* **Status:** 🔬 Analysed — not practical on ESP32-CAM; limited on ESP32-S3.
 
-* Show MQTT log in Web page. E.g. connection established or failed to connect...
+#### #19 Extended log information
 
-  
+* **Request:** Richer logging. See [#580](https://github.com/jomjol/AI-on-the-edge-device/issues/580).
+* **Benefit:** Easier debugging and history.
+* **Feasibility:** All boards — feasible (software only). v17 already moves to `esp_log` v2 and adds heap-failure diagnostics and OTA trial-boot logging; data/event logs and the log viewer exist.
+* **Status:** 🟡 Partially — logging infrastructure improved in v17; specific additions from the issue remain open.
 
+#### ~~#18 Show WLAN signal strength on the web page~~
 
-#### #23 CPU Temp and Mqtt values
-
-* Show the CPU Temp directly in Webpage. Also add the value to MQTT sending
-
-  
-
-#### ~~#22 Direct hint to the different neural network files in the other repositories~~- implemented >v11.3.1
-
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/644~~
-
-  
-
-#### #21 Extended "CheckDigitalConsistency" Logik
-
-* https://github.com/jomjol/AI-on-the-edge-device/issues/590
-
-  
-
-#### #20 Deep sleep and push mode
-
-* Let the device be normally in deep sleep state, and wake it up periodically to collect data and push it via MQTT or HTTP post.
-* Support ESP-NOW to reduce the overhead of connecting to wifi and mqtt 
-* the above should enable battery powered applications
-
-* An other way to set deep sleep would be to enable it in a specific period (at night).
-  
-
-#### #19 Extended log informations
-
-* https://github.com/jomjol/AI-on-the-edge-device/issues/580
-
-  
-
-#### ~~#18 Document WLAN-strength in web page~~
-
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/563~~
-
-
+* **Status:** ✅ Implemented. RSSI is shown on the overview page. See [#563](https://github.com/jomjol/AI-on-the-edge-device/issues/563).
 
 #### ~~#17 Direct InfluxDB connection~~
 
-* ~~Done in v10.6.0~~
+* **Status:** ✅ Implemented (v10.6.0); extended to InfluxDB v2 — see **#31**.
 
+#### #16 Serial (RX/TX) communication
 
-#### #16 Serial Communication
+* **Request:** Send the readout over a serial RX/TX interface with a dedicated tag, as its own flow module with configuration. See [#512](https://github.com/jomjol/AI-on-the-edge-device/issues/512).
+* **Benefit:** Integrate with serial-only hosts/PLCs and isolated networks.
+* **Feasibility:** **ESP32-CAM — 🟡 constrained:** few free GPIOs (most are taken by the camera and SD); UART0 is the console. **ESP32-S3 — ✅** more free pins and multiple UARTs. Software effort is moderate (a new flow module).
+* **Status:** ⬜ Open.
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/512
-* Send the readout value via RX/TX interface with a dedicated TAG
-* Make dedicated communication FlowModule
-* Modification of RX/TX communication
-* Configuration interfache
+#### #15 Calibration for fisheye/lens distortion
 
+* **Request:** Correct fisheye lens distortion before reading. See [#507](https://github.com/jomjol/AI-on-the-edge-device/issues/507). Needs: a correction algorithm using ESP32-friendly libraries, a new flow module, config + HTML extensions, and per-lens tuning.
+* **Benefit:** Use wide-angle/close-mount lenses without warped digits.
+* **Feasibility:** **ESP32-CAM — 🟡 heavy:** per-pixel remap is compute- and RAM-intensive on the ESP32; doable on the full image but adds latency. **ESP32-S3 — ✅ better headroom** (more RAM, vector instructions). High implementation + per-lens tuning effort on all boards.
+* **Status:** ⬜ Open.
 
-#### #15 Calibration for FishEye image
+#### ~~#14 Backup and restore option for configuration~~
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/507
+* **Status:** ✅ Implemented (v11.3.1) and extended in v17 — zip backup/restore in the web UI, plus automatic config snapshots on save (keeps the latest 10) and a shipped-model manifest so backups exclude the bundled models. See [#459](https://github.com/jomjol/AI-on-the-edge-device/issues/459).
 
-1.  The development of such a correction algorithm with the libraries, that are available for the ESP32 environment.
-2. New module for integration of the flow into the image processing flow.
-3. Extension of the configuration (config.ini) and html-pages
-4. Parameter adjustment and testing for every different fish-eye module
-5. Maintenance for further updates / modules, ...
+#### #13 Non-linear gauge handling without CNN retraining
 
+* **Request:** Support non-linear analog meters via a lookup table instead of retraining the network. See [#443](https://github.com/jomjol/AI-on-the-edge-device/issues/443).
+* **Benefit:** Handle non-linear dials without ML expertise.
+* **Feasibility:** All boards — feasible (software only); a configurable LUT applied in post-processing.
+* **Status:** ⬜ Open.
 
+#### ~~#12 Fewer reboots due to memory leakage~~
 
-#### ~~#14 Backup and restore option for configuration~~- implemented v11.3.1
+* **Status:** ✅ Implemented — ongoing memory hardening; v17 adds a heap-failed-allocation callback and an image-decode safety net (skip the round instead of rebooting/boot-looping). See [#414](https://github.com/jomjol/AI-on-the-edge-device/issues/414), [#425](https://github.com/jomjol/AI-on-the-edge-device/issues/425), [#430](https://github.com/jomjol/AI-on-the-edge-device/issues/430).
 
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/459~~
+#### #11 MQTT — configurable payload
 
-* ~~Implement a zip file compression for store and restore~~
+* **Request:** Let the user define the MQTT payload format. See [#344](https://github.com/jomjol/AI-on-the-edge-device/issues/344).
+* **Benefit:** Match downstream consumers (custom JSON, units, field names) without code changes.
+* **Feasibility:** All boards — feasible (software only); a template/format string in config.
+* **Status:** ⬜ Open.
 
-* ~~Update the html to handle it~~
+#### #10 Improve and fix image-logging
 
-  
+* **Request:** Fix and improve logging of images. See [#307](https://github.com/jomjol/AI-on-the-edge-device/issues/307).
+* **Benefit:** Reliable image history for debugging bad reads.
+* **Feasibility:** **ESP32-CAM/WROVER** — feasible (SD storage). **ESP32-S3** — feasible but mind in-flash filesystem space/wear; an SD card is optional for bulk image logs.
+* **Status:** ⬜ Open.
 
-#### #13 Manage non linear gauge without CNN re-training
+#### #9 Basic authentication for the UI
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/443
+* **Request:** Protect the web UI with authentication. See [#283](https://github.com/jomjol/AI-on-the-edge-device/issues/283).
+* **Benefit:** Keep the device's controls off-limits on shared networks.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** ✅ Implemented — HTTP Basic Auth (`jomjol_wlan/basic_auth.h`) applied across the file, OTA, camera, GPIO and MQTT endpoints via an auth filter.
 
-* Implement a look up table for non linear analog meters
+#### #8 MQTT-configurable readout interval
 
-  
+* **Request:** Change the readout interval at runtime via MQTT. See the inbound-MQTT work under **#2/#25**.
+* **Benefit:** Adjust cadence from automations without a reboot.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially — the MQTT client now receives commands, and the interval is re-read live (no reboot); a dedicated "set interval" command/topic should be wired to that path.
 
-#### ~~#12 Less reboots due to memory leakage~~
+#### #7 Extended error handling (surfaced on the web page)
 
-* ~~Issue: #414 & #425  #430~~
+* **Request:** Detect important error types (e.g. missing tflite) and show them on the web page. Needs a list of important errors, a checking routine, and firmware + HTML support.
+* **Benefit:** Users see actionable errors instead of silent failures.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially — the overview surfaces process status/diagnostics and v17 adds capture/decode safety nets; a structured error catalog shown in the UI is still open.
 
-  
+#### ~~#6 Check for duplicate ROI names~~
 
-#### #11 MQTT - configurable payload
+* **Status:** ✅ Implemented (v8.0.0) — ROI names are checked for uniqueness in the editor before saving.
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/344
+#### #5 Configurable decimal separator (point or comma)
 
-  
+* **Request:** Make the decimal separator configurable for different locales.
+* **Benefit:** Output values in the format downstream systems expect.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially — post-processing is decimal-separator-aware when parsing and supports decimal shifting (`DecimalShift`); an explicit user-facing point/comma output setting is still worth adding.
 
-#### #10 Improve and bug fix logging of images
+#### ~~#4 Initial shifting and rotation~~
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/307
+* **Status:** ✅ Implemented (v7.0.0) — initial rotation and shifting of the raw camera image, with configuration and HTML support. See [#123](https://github.com/jomjol/AI-on-the-edge-device/issues/123).
 
-  
+#### ~~#3 Group digits into multiple reading values~~
 
-#### #9 Basic auth for the UI
+* **Status:** ✅ Implemented (v8.0.0) — multiple independent readouts in one setup. See [#123](https://github.com/jomjol/AI-on-the-edge-device/issues/123).
 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/283
+#### #2 MQTT control with callback (online config updates)
 
-* Implementation of an authentication mechanism.
-
-#### #8 MQTT configurable readout intervall
-
-Make the readout intervall configurable via MQTT.
-
-* Change the mqtt part to receive and process input and not only sending
-
-#### #7 Extended Error Handling
-
-Check different types of error (e.g. tflite not availabe) and generate an error on the html page.
-
-To do:
-
-* Make a list of "important" errors
-* Implement a checking algo
-* Extend the firmware and html page for the error handling
-
-#### ~~#6 Check for double ROI names~~ - implemented v8.0.0
-
-~~Check during configuration, that ROI names are unique.~~
-
-~~To do:~~
-
-* ~~Implementation of ROI name checking in html code before saving analog or digital ROIs~~
-
-  
-
-#### #5 Configurable decimal separator (point or comma) 
-
-Decimal separator configurable for different systems
-
-To do:
-
-* Implementation of decimal point into postprocessing module
-* Extension of configuration
-* Adaption of the html configuration to implement shifting
-
-
-
-#### ~~#4 Initial Shifting and Rotation~~ - implemented v7.0.0
-
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/123~~
-
-~~Implementation of a shifting additional to the initial rotation of the raw camera input~~
-
-~~To do:~~
-
-* ~~Implementation of shifting~~
-* ~~Extension of configuration~~
-* ~~Adaption of the html configuration to implement shifting~~
-
-
-
-#### ~~#3 Allow grouping of digits to multiple reading values~~ - implemented v8.0.0
-
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/123~~
-
-~~Implementation of two different independent readouts in one setup~~
-
-~~To do:~~
-
-* ~~Extend the configuration, setting and processing flow for two independend readouts~~
-
-
-
-
+* **Request:** Extend the MQTT client to accept callbacks that override `config.ini` settings, handling updates online (currently most changes need a restart). See [#105](https://github.com/jomjol/AI-on-the-edge-device/issues/105).
+* **Benefit:** Reconfigure the device remotely without rebooting.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** 🟡 Partially — inbound MQTT callbacks exist (`subscribeFunktionMap`), and v17 adds live config apply / interval reload without a reboot; a full "set any config key over MQTT" mapping is still open.
 
 ____
 
-#### #2 MQTT-controll with callback 
-* https://github.com/jomjol/AI-on-the-edge-device/issues/105
+#### ~~#1 Optional GPIO for external flash/lighting~~
 
-Extend the MQTT client to also enable callbacks for configuration setting
-
-To do:
-
-* implement callback for receiving information and override `config.ini` settings
-
-* change configuration management to handle online updates (currently changes need a restart)
-
-* think about the startup, as there the default config is loaded 
-
-  
-
-____
-
-#### ~~#1 Optional GPIO for external flash/lighting~~ - implemented (v8.0.0)
-
-* ~~https://github.com/jomjol/AI-on-the-edge-device/issues/133~~
-
-~~Implementation of an an extrnal flash / lightning through GPIOs.~~
-
-* ~~available GPIOs: 12 & 13 (currently in use for html switching)~~
-
-~~To do:~~
-
-* ~~Implementation of a software module for external light source (e.g. WS8132 LED controller, ...)~~
-* ~~Update of the camera module to use the external light instead of the internal flash light~~
-* ~~Adopt the configuration algorithm with a configurable light source~~
+* **Status:** ✅ Implemented (v8.0.0) — configurable external light source over GPIO (in addition to the on-board flash LED). See [#133](https://github.com/jomjol/AI-on-the-edge-device/issues/133).
