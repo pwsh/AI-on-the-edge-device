@@ -81,7 +81,7 @@ bool CFindTemplate::FindTemplate(RefInfo *_ref)
     if (isSimilar)
     {
 #ifdef DEBUG_DETAIL_ON  
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Use FastAlignment sucessfull");
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Use FastAlignment successful");
 #endif
         _ref->found_x = _ref->fastalg_x;
         _ref->found_y = _ref->fastalg_y;

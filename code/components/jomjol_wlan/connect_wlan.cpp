@@ -464,7 +464,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 		wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
 		if (disconn->reason == WIFI_REASON_ROAMING) {
 			LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Disconnected (" + std::to_string(disconn->reason) + ", Roaming 802.11kv)");
-			// --> no reconnect neccessary, it should automatically reconnect to new AP
+			// --> no reconnect necessary, it should automatically reconnect to new AP
 		}
 		else {
 			WIFIConnected = false;

@@ -467,8 +467,8 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
     }
 
     if (!getNetworkParameter()) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "An error occured on setting up the Network -> Disabling it!");
-        disabled = true; // An error occured, disable this CNN!
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "An error occurred on setting up the Network -> Disabling it!");
+        disabled = true; // An error occurred, disable this CNN!
         return false;
     }
 

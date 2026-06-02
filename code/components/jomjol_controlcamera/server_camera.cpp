@@ -31,7 +31,7 @@ void PowerResetCamera(int downMs)
     conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&conf);
 
-    // carefull, logic is inverted compared to reset pin
+    // careful, logic is inverted compared to reset pin
     gpio_set_level(CAM_PIN_PWDN, 1);
     vTaskDelay(downMs / portTICK_PERIOD_MS);
     gpio_set_level(CAM_PIN_PWDN, 0);

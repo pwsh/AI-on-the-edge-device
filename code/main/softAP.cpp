@@ -142,7 +142,7 @@ void SendHTTPResponse(httpd_req_t *req)
         message += "This is normal after the first flashing of the firmware and an empty sd-card. Please upload \"remote_setup.zip\", which contains a full inital configuration.<p>";
         message += "<input id=\"newfile\" type=\"file\"><br>";
         message += "<button class=\"button\" style=\"width:300px\" id=\"doUpdate\" type=\"button\" onclick=\"upload()\">Upload File</button><p>";
-        message += "The upload might take up to 60s. After a succesfull upload the page will be updated.";
+        message += "The upload might take up to 60s. After a successful upload the page will be updated.";
         httpd_resp_send_chunk(req, message.c_str(), strlen(message.c_str()));
 
         message = "<script language=\"JavaScript\">";
@@ -367,7 +367,7 @@ esp_err_t config_ini_handler(httpd_req_t *req)
     text += "; Network assisted roaming protocol is activated by default\n";
     text += "; AP / mesh system needs to support roaming protocol 802.11k/v\n";
     text += ";\n";
-    text += "; Optional feature (usually not neccessary):\n";
+    text += "; Optional feature (usually not necessary):\n";
     text += "; RSSI Threshold for client requested roaming query (RSSI < RSSIThreshold)\n";
     text += "; Note: This parameter can be configured via WebUI configuration\n";
     text += "; Default: 0 = Disable client requested roaming query\n\n";

@@ -365,7 +365,7 @@ bool ChangeRSSIThreshold(std::string fn, int _newrssithreshold)
         line += "; Network assisted roaming protocol is activated by default\n";
         line += "; AP / mesh system needs to support roaming protocol 802.11k/v\n";
         line += ";\n";
-        line += "; Optional feature (usually not neccessary):\n";
+        line += "; Optional feature (usually not necessary):\n";
         line += "; RSSI Threshold for client requested roaming query (RSSI < RSSIThreshold)\n";
         line += "; Note: This parameter can be configured via WebUI configuration\n";
         line += "; Default: 0 = Disable client requested roaming query\n\n";
