@@ -252,12 +252,13 @@
 			xhttp.send();
 		}
 
-		var _prevValueText = {};   // _div -> previously rendered single-value string (for change highlight)
+		var _prevValueText = {};   // key -> previously rendered value string (for change highlight)
 
 		// Wrap each digit that changed since the previous render in a flashing span. Never flashes on
-		// the first render. Plain text is HTML-escaped.
-		function highlightChangedDigits(_div, txt) {
-			var prev = _prevValueText[_div];
+		// the first render. Plain text is HTML-escaped. The key identifies the cell (card + number name)
+		// so every meter/number tracks its own digits independently.
+		function highlightChangedDigits(_key, txt) {
+			var prev = _prevValueText[_key];
 			var html = "";
 			for (var i = 0; i < txt.length; i++) {
 				var c = txt[i];
@@ -265,7 +266,7 @@
 				var changed = (prev !== undefined) && (i >= prev.length || prev[i] !== c) && /[0-9]/.test(c);
 				html += changed ? ("<span class=\"digit-changed\">" + esc + "</span>") : esc;
 			}
-			_prevValueText[_div] = txt;
+			_prevValueText[_key] = txt;
 			return html;
 		}
 
@@ -303,8 +304,9 @@
 								_zer[0] + "</td><td style=\"padding: 3px 5px; text-align: left; vertical-align:middle; border: 1px solid lightgrey\"> </td></tr>"; 
 							}
 							else {
-								out = out + "<tr><td style=\"width: 22%; padding: 3px 5px; text-align: left; vertical-align:middle; border: 1px solid lightgrey\">" + 
-								_zer[0] + "</td><td style=\"padding: 3px 5px; text-align: left; vertical-align:middle; border: 1px solid lightgrey\" >" + _zer[1] + "</td></tr>";
+								var _valCell = highlightChangedDigits(_div + "|" + _zer[0].replace(/\s/g, ""), _zer[1]);
+								out = out + "<tr><td style=\"width: 22%; padding: 3px 5px; text-align: left; vertical-align:middle; border: 1px solid lightgrey\">" +
+								_zer[0] + "</td><td style=\"padding: 3px 5px; text-align: left; vertical-align:middle; border: 1px solid lightgrey\" >" + _valCell + "</td></tr>";
 							}
 						}
 						out = out + "</table>"

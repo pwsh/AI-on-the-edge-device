@@ -47,7 +47,7 @@ cp sd-card/config/config.ini "$FFS/config/config.ini" && echo "   + config.ini"
 # hardcoded list. Regenerate it here from the actual shipped models so it can never go stale, then
 # ship it in the flash-FS image.
 echo "== default_models.txt (shipped-model manifest) =="
-ls sd-card/config/*.tflite sd-card/config/*.tfl 2>/dev/null | xargs -n1 basename 2>/dev/null | sort > sd-card/config/default_models.txt
+{ ls sd-card/config/*.tflite sd-card/config/*.tfl 2>/dev/null || true; } | xargs -n1 basename 2>/dev/null | sort > sd-card/config/default_models.txt
 cp sd-card/config/default_models.txt "$FFS/config/default_models.txt" && echo "   + default_models.txt ($(wc -l < sd-card/config/default_models.txt) models)"
 
 # Undo the in-place pollution the tooltip generator leaves in the tracked tree
