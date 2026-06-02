@@ -9,4 +9,4 @@ Unit: Degrees
 !!! Note
     After changing this parameter you need to update your reference image and alignment markers!
 
-Initial rotation of image before alignment in degree (`-360` .. `+360`)
+Initial rotation of image before alignment in degrees (`-360` .. `+360`)

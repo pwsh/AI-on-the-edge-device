@@ -8,6 +8,11 @@ Example: `/config/certs/RootCA.crt`.
 
 Path to the CA certificate file.
 
+This is **optional**: if it is left empty while server-certificate validation is enabled
+([ValidateServerCert](https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters/#parameter-validateservercert)),
+the firmware falls back to its built-in Mozilla CA bundle. So for a public broker with a publicly-trusted
+certificate you usually do not need to set this; provide your own CA only for a private/self-signed broker.
+
 This is part of the configuration to enable TLS 1.2 for MQTT.<br>
 
 The CA Certificate is used by the client to validate the broker is who it claims to be.
