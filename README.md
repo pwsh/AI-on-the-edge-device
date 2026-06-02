@@ -9,6 +9,8 @@
   - [AI-on-the-edge-device on a Water Meter 💧](#ai-on-the-edge-device-on-a-water-meter-)
   - [Web Interface (Water Meter) 💻](#web-interface-water-meter-)
   - [AI-on-the-edge-device on an Electrical Power Meter ⚡](#ai-on-the-edge-device-on-an-electrical-power-meter-)
+  - [Modern Web Interface (v17) 🌓](#modern-web-interface-v17-)
+- [What's New in v17 🆕](#whats-new-in-v17-)
 - [Setup 🛠️](#setup-%EF%B8%8F)
 - [Download 🔽](#download-)
 - [Flashing the ESP32 💾](#flashing-the-esp32-)
@@ -62,8 +64,14 @@ All you need is an [ESP32 board with a supported camera](https://jomjol.github.i
 - 🔄 OTA interface for updating directly via the web interface.
 - 🏠 Full integration with Home Assistant.
 - 📊 Support for **Influx DB 1** and **2**.
-- 📡 **MQTT protocol** support.
+- 📡 **MQTT protocol** support, now including **verified MQTTS/HTTPS out of the box**.
 - 📥 **REST API** available for data access.
+- 🧩 **ESP32-S3** support (8 / 16 MB) in addition to the classic ESP32-CAM — runs **with or without an SD card**.
+- ⏱️ **Flexible scheduling** – fixed interval *or* specific daily times, plus **FastRead** incremental recognition for 5–10 s updates.
+- 🌓 **Modern, responsive web UI** with **dark mode**, configuration **backups/restore**, and live updates.
+- 🔁 **OTA rollback** and automatic crash recovery for safe, reliable updates.
+
+> 🆕 **Upgrading from v16?** See [What's New in v17](#whats-new-in-v17-) below for the full list of changes.
 
 <br>
 
@@ -101,6 +109,61 @@ There are several options for what to do with that value:
   <p align="center">
     <img src="images/powermeter.jpg" width="600"> 
   </p>
+
++ ### Modern Web Interface (v17) 🌓
+  The redesigned, responsive web UI with a built-in dark mode. Live on a real water meter below:
+
+  <p align="center">
+    <img src="images/webui/overview.png" width="420" alt="Overview – live reading, ROI overlay and per-round diagnostics">
+    <img src="images/webui/configuration.png" width="420" alt="Configuration – card layout, FastRead and config backup/restore">
+  </p>
+  <p align="center">
+    <em>Overview (live reading + ROI overlay + per-round diagnostics) &nbsp;·&nbsp; Configuration (FastRead, expert parameters, Backup&nbsp;on&nbsp;save / Restore)</em>
+  </p>
+
+  <p align="center">
+    <img src="images/webui/system-info.png" width="420" alt="System info – firmware/web-UI version, chip, camera and host details">
+    <img src="images/webui/overview-mobile.png" width="200" alt="Overview on a phone – the layout stacks responsively">
+  </p>
+  <p align="center">
+    <em>System info &nbsp;·&nbsp; Mobile-friendly responsive layout</em>
+  </p>
+
+---
+
+<br>
+
+## What's New in v17 🆕
+A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
+
+### 🧩 Hardware & platform
+- Rebuilt on **ESP-IDF 6.0.1** (modern GCC&nbsp;15 / C++ toolchain).
+- **New: ESP32-S3 support** (8&nbsp;MB and 16&nbsp;MB variants) alongside the classic **ESP32-CAM**. ESP32-S3 boards run **with or without an SD card** — the web UI, CNN models and configuration can live in on-board flash. The **ESP32-WROVER** is also supported.
+- Camera sensors supported: **OV2640, OV3660 and OV5640**.
+- A maintained [Board Feature Matrix](docs/BOARD-FEATURE-MATRIX.md) tracks the differences between boards.
+
+### ⚡ Recognition & accuracy
+- **Scheduling** – run at a fixed interval *or* at specific daily times (multiple time slots).
+- **FastRead (incremental)** – re-runs the neural network only on the digits whose image actually changed, enabling **5–10&nbsp;s** update intervals.
+- **Confidence vote** – automatically recovers when a single misread latches the value too high.
+- Per-round **diagnostics** (analysis type, digits analysed, time-to-next full read) shown on the overview and exposed via MQTT / JSON / InfluxDB.
+
+### 🌓 Modern web interface
+- **Dark mode** and a **responsive, mobile-friendly** layout built from content cards.
+- **Configuration backups** – every save snapshots the configuration; **one-click Restore** keeps the latest 10 (bundled models are excluded to keep backups small).
+- **Changed-digit highlighting** on the overview, a **Pause processing** control, and an auto-tailing live log viewer.
+- **Keyboard nudging** in the ROI editors and faster **WebGL** data graphs.
+- **Apply the interval live** (no reboot) and a **one-click migration** prompt when the firmware and web-UI versions differ.
+
+### 🔁 Reliability
+- **OTA rollback** – a crash-looping update is automatically rolled back to the last working firmware.
+- **Crash dumps are saved to the SD card** for later retrieval.
+- **Wi-Fi resilience** – exponential-backoff reconnect, automatic fall-back to the setup access point after repeated failures, fast wrong-password detection, and a 3×-reset Wi-Fi factory reset.
+- RGB status LED (ESP32-S3) reflects the Wi-Fi / processing state.
+
+### 🔒 Connectivity & security
+- **Verified MQTTS / HTTPS out of the box** via a built-in Mozilla CA bundle — connect to public TLS brokers (e.g. HiveMQ Cloud) and InfluxDB Cloud **without uploading a certificate**.
+- Default hostname `edgeai-<mac>` so multiple devices don't clash on the network.
 
 ---
 
