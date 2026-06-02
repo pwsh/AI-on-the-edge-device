@@ -88,13 +88,28 @@ function startBackup() {
     }
     
     const list = content.querySelectorAll("a");
-    
+
+    // Fetch the list of models that SHIP with the program so they can be excluded from the backup -
+    // a fresh install / restore already has them; only user data + custom (renamed) models need
+    // backing up. This keeps backups small and matches the server-side /backup behaviour.
+    var defaultModels = {};
+    try {
+        var dmx = new XMLHttpRequest();
+        dmx.open("GET", getDomainname() + "/defaultmodels", false);
+        dmx.send();
+        dmx.responseText.split("\n").forEach(function (m) { m = m.trim(); if (m) defaultModels[m] = true; });
+    } catch (err) { /* on failure, fall back to backing up everything */ }
+
     var urls = [];
-    
+    var skipped = 0;
+
     for (a of list) {
         url = a.getAttribute("href");
+        var base = url.split("/").pop().split("?")[0];
+        if (defaultModels[base]) { skipped++; continue; }   // shipped model -> excluded
         urls.push(getDomainname() + url);
     }
+    if (skipped) setStatus("&nbsp;(excluding " + skipped + " bundled model file(s))<br>");
     
     // Pack as zip and download
     try {

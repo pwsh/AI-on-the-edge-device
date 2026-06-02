@@ -24,16 +24,66 @@ static const char *TAG = "backup";
 
 // Models shipped with a fresh install: excluded from the backup (a custom model has a
 // different filename and IS included, so a restore stays complete on a fresh card).
+// Models shipped with a fresh install are excluded from backups (server-side AND the client-side
+// backup.html via /defaultmodels) - a restore onto a fresh card already has them; a custom-trained
+// model has a different filename and IS backed up.
+//
+// The authoritative list is the manifest /sdcard/config/default_models.txt, which is generated from
+// the shipped sd-card/config/*.tflite at build time and ships with the firmware (so it can never go
+// stale). The hardcoded list below is only a fallback for an older card that lacks the manifest.
+#define DEFAULT_MODELS_MANIFEST "/sdcard/config/default_models.txt"
+
+static const std::set<std::string> g_defaultModelsFallback = {
+    "ana-cont_1300_s2.tflite", "ana-cont_1400_s2_q.tflite", "ana-cont_1500_s2_q.tflite",
+    "dig-class100-0173-s2-q.tflite", "dig-class100-0180-s2-q.tflite", "dig-class100-0182-s2_q.tflite",
+    "dig-class11_1701_s2.tflite", "dig-class11_1900_s2_q.tflite", "dig-class11_1910_s2_q.tflite",
+    "dig-cont_0700_s3_q.tflite", "dig-cont_0712_s3_q.tflite", "dig-cont_0800_s3_q.tflite",
+    "dig-cont_0810_s3_q.tflite", "dig-cont_0900_s3_q.tflite"
+};
+
+// Lazy-loaded once: read the shipped manifest; fall back to the compiled-in list if it is missing.
+static const std::set<std::string>& getDefaultModels()
+{
+    static std::set<std::string> models;
+    static bool loaded = false;
+    if (!loaded) {
+        loaded = true;
+        FILE *f = fopen(DEFAULT_MODELS_MANIFEST, "r");
+        if (f) {
+            char line[128];
+            while (fgets(line, sizeof(line), f)) {
+                std::string n = line;
+                while (!n.empty() && (n.back() == '\n' || n.back() == '\r' || n.back() == ' ' || n.back() == '\t')) n.pop_back();
+                size_t s = n.find_first_not_of(" \t");
+                if (s != std::string::npos) n = n.substr(s); else n.clear();
+                if (!n.empty() && n[0] != '#') models.insert(n);
+            }
+            fclose(f);
+        }
+        if (models.empty()) {
+            models = g_defaultModelsFallback;
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "default_models.txt missing/empty - using the built-in fallback model list");
+        } else {
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Loaded " + std::to_string(models.size()) + " shipped models from default_models.txt");
+        }
+    }
+    return models;
+}
+
 static bool isDefaultModel(const std::string &name)
 {
-    static const std::set<std::string> defaults = {
-        "ana-cont_1300_s2.tflite", "ana-cont_1400_s2_q.tflite", "ana-cont_1500_s2_q.tflite",
-        "dig-class100-0173-s2-q.tflite", "dig-class100-0180-s2-q.tflite", "dig-class100-0182-s2_q.tflite",
-        "dig-class11_1701_s2.tflite", "dig-class11_1900_s2_q.tflite", "dig-class11_1910_s2_q.tflite",
-        "dig-cont_0700_s3_q.tflite", "dig-cont_0712_s3_q.tflite", "dig-cont_0800_s3_q.tflite",
-        "dig-cont_0810_s3_q.tflite", "dig-cont_0900_s3_q.tflite"
-    };
-    return defaults.count(name) > 0;
+    return getDefaultModels().count(name) > 0;
+}
+
+// GET /defaultmodels -> newline-separated list of the shipped model filenames, so the client-side
+// backup (backup.html) can exclude exactly the same models the server-side backup does.
+static esp_err_t handler_default_models(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    std::string out;
+    for (const auto &m : getDefaultModels()) out += m + "\n";
+    httpd_resp_sendstr(req, out.c_str());
+    return ESP_OK;
 }
 
 static bool hasSuffix(const std::string &s, const std::string &suf)
@@ -159,6 +209,13 @@ void register_server_backup_uri(httpd_handle_t server)
     u.handler  = APPLY_BASIC_AUTH_FILTER(handler_backup);
     u.user_ctx = (void *) "Backup";
     httpd_register_uri_handler(server, &u);
+
+    httpd_uri_t dm = { };
+    dm.uri      = "/defaultmodels";
+    dm.method   = HTTP_GET;
+    dm.handler  = APPLY_BASIC_AUTH_FILTER(handler_default_models);
+    dm.user_ctx = (void *) "DefaultModels";
+    httpd_register_uri_handler(server, &dm);
 }
 
 // ---- Scheduled backup to the SD card ---------------------------------------

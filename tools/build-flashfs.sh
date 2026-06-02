@@ -42,6 +42,14 @@ done
 echo "== Default config.ini -> flashfs/config =="
 cp sd-card/config/config.ini "$FFS/config/config.ini" && echo "   + config.ini"
 
+# Manifest of the models that ship with the program. The backup feature (server + backup.html) reads
+# /sdcard/config/default_models.txt at runtime to exclude exactly these from a backup, instead of a
+# hardcoded list. Regenerate it here from the actual shipped models so it can never go stale, then
+# ship it in the flash-FS image.
+echo "== default_models.txt (shipped-model manifest) =="
+ls sd-card/config/*.tflite sd-card/config/*.tfl 2>/dev/null | xargs -n1 basename 2>/dev/null | sort > sd-card/config/default_models.txt
+cp sd-card/config/default_models.txt "$FFS/config/default_models.txt" && echo "   + default_models.txt ($(wc -l < sd-card/config/default_models.txt) models)"
+
 # Undo the in-place pollution the tooltip generator leaves in the tracked tree
 git checkout -q -- sd-card/html/edit_reference.html 2>/dev/null || true
 rm -f sd-card/html/edit_config.html

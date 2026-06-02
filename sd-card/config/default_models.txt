@@ -1,0 +1,14 @@
+ana-cont_1300_s2.tflite
+ana-cont_1400_s2_q.tflite
+ana-cont_1500_s2_q.tflite
+dig-class100-0173-s2-q.tflite
+dig-class100-0180-s2-q.tflite
+dig-class100-0182-s2_q.tflite
+dig-class11_1701_s2.tflite
+dig-class11_1900_s2_q.tflite
+dig-class11_1910_s2_q.tflite
+dig-cont_0700_s3_q.tflite
+dig-cont_0712_s3_q.tflite
+dig-cont_0800_s3_q.tflite
+dig-cont_0810_s3_q.tflite
+dig-cont_0900_s3_q.tflite
