@@ -360,8 +360,9 @@ void wifiRoamingQuery(void)
 #ifdef WLAN_USE_ROAMING_BY_SCANNING
 std::string getAuthModeName(const wifi_auth_mode_t auth_mode)
 {
-	std::string AuthModeNames[] = {"OPEN", "WEP", "WPA PSK", "WPA2 PSK", "WPA WPA2 PSK", "WPA2 ENTERPRISE",
-                                   "WPA3 PSK", "WPA2 WPA3 PSK", "WAPI_PSK", "MAX"};
+	// static + const char*: built once in rodata instead of constructing 10 std::strings on each call.
+	static const char *const AuthModeNames[] = {"OPEN", "WEP", "WPA PSK", "WPA2 PSK", "WPA WPA2 PSK",
+	                                            "WPA2 ENTERPRISE", "WPA3 PSK", "WPA2 WPA3 PSK", "WAPI_PSK", "MAX"};
     return AuthModeNames[auth_mode];
 }
 

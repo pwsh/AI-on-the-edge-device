@@ -782,7 +782,17 @@ Work the IDF-6 opportunities in this order, keeping the device stable at each st
      `jomjol_tfliteclass`) now build at **`-O2`** (vs global `-Os`), applied post-`project()` so the
      vendored submodules need no edits. **Measured: CNN digitize ~5520 ms → ~5330 ms (~3.4% faster/
      round), +11 KB flash, numerics unchanged** (esp-nn conv kernels are already asm).
-   - ⬜ Follow-up: modern-C++ hot-path idioms (`std::string_view`/`const&`, `constexpr`) per §5.
+   - ✅ Follow-up: modern-C++ hot-path idioms (`std::string_view`/`const&`, `constexpr`) per §5 — **assessed,
+     essentially complete (2026-06-02).** The meaningful win (read-only `const&`) was already done (alpha.14).
+     Audit of the per-round path found **no remaining string-allocation waste**: the `doFlow`/`doAlignAndCut`/
+     `doNeuralNetwork(string time)` params are short "HH:MM:SS" strings covered by small-string optimization
+     (no heap alloc); `trim`/`toUpper`/`toLower`/`ShiftDecimal`/`ErsetzteN` are mutate-and-return transforms
+     (by-value is the correct, move-friendly idiom); `getHTMLSingleStep(host)` is a per-step web-editor virtual
+     (not per-round, and `string_view` there would force changing the base + every override for no round-time
+     gain). `string_view` doesn't help where callers pass named `std::string`s and the code needs `.c_str()`
+     (fopen/C APIs — not null-terminated from a view). Only concrete fix found: `getAuthModeName()`'s
+     per-call 10-element `std::string[]` → `static const char* const` (rodata). Net: round time is I/O
+     (TakeImage ~9.8 s) + asm-CNN (~5.3 s) bound, so string idioms can't move it — item closed.
    - 💡 The real round-time lever is TakeImage (~9.8 s, dominated by `WaitBeforePicture` config, not
      CPU) — separate from the toolchain.
 2. **Power management** (`esp_pm` DFS + tickless idle / light sleep). **Feasibility verdict (2026-06-01,
