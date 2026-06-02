@@ -1,0 +1,333 @@
+Command: ninja all
+[1/130] Linking C static library esp-idf/jomjol_tfliteclass/libjomjol_tfliteclass.a
+[2/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_compat.c.obj
+[3/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_utils_cache.c.obj
+[4/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_utils_freertos.c.obj
+[5/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_utils_memory.c.obj
+[6/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_port_esp32.c.obj
+[7/130] Building C object esp-idf/esp_hal_cam/CMakeFiles/__idf_esp_hal_cam.dir/esp32s3/cam_periph.c.obj
+[8/130] Building C object esp-idf/esp_hal_cam/CMakeFiles/__idf_esp_hal_cam.dir/cam_hal.c.obj
+[9/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/port/esp/unity_utils_memory_esp.c.obj
+[10/130] Building C object esp-idf/esp_hal_pcnt/CMakeFiles/__idf_esp_hal_pcnt.dir/pcnt_hal.c.obj
+[11/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity_runner.c.obj
+[12/130] Building C object esp-idf/esp_hal_mcpwm/CMakeFiles/__idf_esp_hal_mcpwm.dir/esp32s3/mcpwm_periph.c.obj
+[13/130] Building C object esp-idf/esp_hal_pcnt/CMakeFiles/__idf_esp_hal_pcnt.dir/esp32s3/pcnt_periph.c.obj
+[14/130] Building C object esp-idf/esp_hal_mcpwm/CMakeFiles/__idf_esp_hal_mcpwm.dir/mcpwm_hal.c.obj
+[15/130] Linking C static library esp-idf/protobuf-c/libprotobuf-c.a
+[16/130] Building C object esp-idf/esp_hal_lcd/CMakeFiles/__idf_esp_hal_lcd.dir/lcd_hal.c.obj
+[17/130] Building C object esp-idf/esp_hal_lcd/CMakeFiles/__idf_esp_hal_lcd.dir/esp32s3/lcd_periph.c.obj
+[18/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/proto-c/constants.pb-c.c.obj
+[19/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/proto-c/sec0.pb-c.c.obj
+[20/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/proto-c/sec1.pb-c.c.obj
+[21/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/proto-c/session.pb-c.c.obj
+[22/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/proto-c/sec2.pb-c.c.obj
+[23/130] Building C object esp-idf/esp_https_server/CMakeFiles/__idf_esp_https_server.dir/src/https_server.c.obj
+[24/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/common/protocomm.c.obj
+[25/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/transports/protocomm_console.c.obj
+[26/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/transports/protocomm_httpd.c.obj
+[27/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/crypto/srp6a/esp_srp_mpi.c.obj
+[28/130] Building C object esp-idf/unity/CMakeFiles/__idf_unity.dir/unity/src/unity.c.obj
+[29/130] Building CXX object esp-idf/jomjol_controlGPIO/CMakeFiles/__idf_jomjol_controlGPIO.dir/RmtDriver4.cpp.obj
+[30/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/security/security2.c.obj
+[31/130] Building C object esp-idf/protocomm/CMakeFiles/__idf_protocomm.dir/src/crypto/srp6a/esp_srp.c.obj
+[32/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/littlefs/lfs_util.c.obj
+[33/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/littlefs_esp_part.c.obj
+[34/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/lfs_config.c.obj
+[35/130] Building CXX object esp-idf/jomjol_controlGPIO/CMakeFiles/__idf_jomjol_controlGPIO.dir/Color.cpp.obj
+[36/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/littlefs_bdl.c.obj
+[37/130] Building C object esp-idf/esp_driver_gptimer/CMakeFiles/__idf_esp_driver_gptimer.dir/src/gptimer.c.obj
+[38/130] Building C object esp-idf/esp_driver_gptimer/CMakeFiles/__idf_esp_driver_gptimer.dir/src/gptimer_common.c.obj
+[39/130] Linking C static library esp-idf/unity/libunity.a
+[40/130] Building CXX object esp-idf/jomjol_controlGPIO/CMakeFiles/__idf_jomjol_controlGPIO.dir/RmtDriver5.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/RmtDriver5.cpp:32:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[41/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/esp_littlefs.c.obj
+[42/130] Building C object esp-idf/cmock/CMakeFiles/__idf_cmock.dir/CMock/src/cmock.c.obj
+[43/130] Building C object esp-idf/esp_blockdev_util/CMakeFiles/__idf_esp_blockdev_util.dir/generic_partition.c.obj
+[44/130] Linking C static library esp-idf/esp_hal_cam/libesp_hal_cam.a
+[45/130] Building C object esp-idf/esp_driver_cam/CMakeFiles/__idf_esp_driver_cam.dir/esp_cam_ctlr.c.obj
+[46/130] Building C object esp-idf/esp_blockdev_util/CMakeFiles/__idf_esp_blockdev_util.dir/memory.c.obj
+[47/130] Linking C static library esp-idf/esp_hal_mcpwm/libesp_hal_mcpwm.a
+[48/130] Building CXX object esp-idf/jomjol_controlGPIO/CMakeFiles/__idf_jomjol_controlGPIO.dir/SmartLeds.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.cpp:27:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[49/130] Building C object esp-idf/esp_driver_cam/CMakeFiles/__idf_esp_driver_cam.dir/dvp_share_ctrl.c.obj
+[50/130] Building C object esp-idf/esp_driver_cam/CMakeFiles/__idf_esp_driver_cam.dir/dvp/src/esp_cam_ctlr_dvp_gdma.c.obj
+[51/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_cmpr.c.obj
+[52/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_com.c.obj
+[53/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_cap.c.obj
+[54/130] Building C object esp-idf/joltwallet__littlefs/CMakeFiles/__idf_joltwallet__littlefs.dir/src/littlefs/lfs.c.obj
+/home/eric/Documents/repos/AI-on-the-edge-device/code/managed_components/joltwallet__littlefs/src/littlefs/lfs.c:508:13: warning: 'lfs_mlist_isopen' defined but not used [-Wunused-function]
+  508 | static bool lfs_mlist_isopen(struct lfs_mlist *head,
+      |             ^~~~~~~~~~~~~~~~
+[55/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_fault.c.obj
+[56/130] Linking C static library esp-idf/esp_hal_pcnt/libesp_hal_pcnt.a
+[57/130] Building C object esp-idf/esp_driver_cam/CMakeFiles/__idf_esp_driver_cam.dir/dvp/src/esp_cam_ctlr_dvp_cam.c.obj
+[58/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_gen.c.obj
+[59/130] Building C object esp-idf/esp_driver_sdm/CMakeFiles/__idf_esp_driver_sdm.dir/src/sdm.c.obj
+[60/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_oper.c.obj
+[61/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_sync.c.obj
+[62/130] Building C object esp-idf/esp_driver_mcpwm/CMakeFiles/__idf_esp_driver_mcpwm.dir/src/mcpwm_timer.c.obj
+[63/130] Linking C static library esp-idf/esp_hal_lcd/libesp_hal_lcd.a
+[64/130] Building C object esp-idf/esp_driver_twai/CMakeFiles/__idf_esp_driver_twai.dir/esp_twai.c.obj
+[65/130] Building C object esp-idf/esp_driver_pcnt/CMakeFiles/__idf_esp_driver_pcnt.dir/src/pulse_cnt.c.obj
+[66/130] Building C object esp-idf/esp_hid/CMakeFiles/__idf_esp_hid.dir/src/esp_hidd.c.obj
+[67/130] Linking C static library esp-idf/esp_https_server/libesp_https_server.a
+[68/130] Building C object esp-idf/esp_driver_touch_sens/CMakeFiles/__idf_esp_driver_touch_sens.dir/common/touch_sens_common.c.obj
+[69/130] Building CXX object esp-idf/jomjol_wlan/CMakeFiles/__idf_jomjol_wlan.dir/read_wlanini.cpp.obj
+[70/130] Building C object esp-idf/esp_hid/CMakeFiles/__idf_esp_hid.dir/src/esp_hidh.c.obj
+[71/130] Building C object esp-idf/esp_driver_touch_sens/CMakeFiles/__idf_esp_driver_touch_sens.dir/hw_ver2/touch_version_specific.c.obj
+[72/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/src/esp_lcd_panel_io.c.obj
+[73/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/src/esp_lcd_common.c.obj
+[74/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/src/esp_lcd_panel_ssd1306.c.obj
+[75/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/src/esp_lcd_panel_ops.c.obj
+[76/130] Building C object esp-idf/esp_hid/CMakeFiles/__idf_esp_hid.dir/src/esp_hid_common.c.obj
+[77/130] Building C object esp-idf/esp_driver_twai/CMakeFiles/__idf_esp_driver_twai.dir/esp_twai_onchip.c.obj
+[78/130] Linking C static library esp-idf/protocomm/libprotocomm.a
+[79/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/i2c/esp_lcd_panel_io_i2c.c.obj
+[80/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/src/esp_lcd_panel_st7789.c.obj
+[81/130] Building C object esp-idf/esp_local_ctrl/CMakeFiles/__idf_esp_local_ctrl.dir/src/esp_local_ctrl_transport_httpd.c.obj
+[82/130] Building C object esp-idf/perfmon/CMakeFiles/__idf_perfmon.dir/xtensa_perfmon_access.c.obj
+[83/130] Building C object esp-idf/esp_local_ctrl/CMakeFiles/__idf_esp_local_ctrl.dir/src/esp_local_ctrl_handler.c.obj
+[84/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/spi/esp_lcd_panel_io_spi.c.obj
+[85/130] Building C object esp-idf/esp_local_ctrl/CMakeFiles/__idf_esp_local_ctrl.dir/src/esp_local_ctrl.c.obj
+[86/130] Building C object esp-idf/esp_local_ctrl/CMakeFiles/__idf_esp_local_ctrl.dir/proto-c/esp_local_ctrl.pb-c.c.obj
+[87/130] Building C object esp-idf/perfmon/CMakeFiles/__idf_perfmon.dir/xtensa_perfmon_masks.c.obj
+[88/130] Building C object esp-idf/perfmon/CMakeFiles/__idf_perfmon.dir/xtensa_perfmon_apis.c.obj
+[89/130] Linking C static library esp-idf/joltwallet__littlefs/libjoltwallet__littlefs.a
+[90/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/i80/esp_lcd_panel_io_i80.c.obj
+[91/130] Building C object esp-idf/rt/CMakeFiles/__idf_rt.dir/FreeRTOS_POSIX_utils.c.obj
+[92/130] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/version.cpp.obj
+[93/130] Building CXX object esp-idf/jomjol_wlan/CMakeFiles/__idf_jomjol_wlan.dir/connect_wlan.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_wlan/connect_wlan.cpp:42:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[94/130] Linking C static library esp-idf/esp_driver_gptimer/libesp_driver_gptimer.a
+[95/130] Linking C static library esp-idf/cmock/libcmock.a
+[96/130] Linking C static library esp-idf/esp_blockdev_util/libesp_blockdev_util.a
+[97/130] Linking C static library esp-idf/esp_driver_cam/libesp_driver_cam.a
+[98/130] Linking C static library esp-idf/esp_driver_mcpwm/libesp_driver_mcpwm.a
+[99/130] Linking C static library esp-idf/esp_driver_pcnt/libesp_driver_pcnt.a
+[100/130] Linking C static library esp-idf/esp_driver_sdm/libesp_driver_sdm.a
+[101/130] Linking C static library esp-idf/esp_driver_touch_sens/libesp_driver_touch_sens.a
+[102/130] Building C object esp-idf/rt/CMakeFiles/__idf_rt.dir/FreeRTOS_POSIX_mqueue.c.obj
+[103/130] Linking C static library esp-idf/esp_driver_twai/libesp_driver_twai.a
+[104/130] Linking C static library esp-idf/esp_hid/libesp_hid.a
+[105/130] Linking C static library esp-idf/esp_local_ctrl/libesp_local_ctrl.a
+[106/130] Linking C static library esp-idf/perfmon/libperfmon.a
+[107/130] Linking C static library esp-idf/rt/librt.a
+[108/130] Performing build step for 'bootloader'
+[1/1] cd /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/bootloader && /home/eric/.espressif/python_env/idf6.0_py3.12_env/bin/python /home/eric/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x0 /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/bootloader/bootloader.bin
+Bootloader binary size 0x47a0 bytes. 0x3860 bytes (44%) free.
+[109/130] No install step for 'bootloader'
+[110/130] Completed 'bootloader'
+[111/130] cd /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb && /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/littlefs_py_venv/bin/littlefs-python create /home/eric/Documents/repos/AI-on-the-edge-device/code/flashfs /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/storage.bin -v --fs-size=0x980000 --name-max=64 --block-size=4096
+LittleFS Configuration:
+  Block Size:       4096  /  0x1000
+  Image Size:    9961472  /  0x980000
+  Block Count:      2432
+  Name Max:           64
+  Image:       /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/storage.bin
+Adding Directory: html
+Adding Directory: config
+Adding File:      html/flow_overview.jpg.gz
+Adding File:      html/jszip.min.js.gz
+Adding File:      html/explain_5.html.gz
+Adding File:      html/ChangeRateThreshold.png.gz
+Adding File:      html/wlan_config.html.gz
+Adding Directory: html/img
+Adding File:      html/log.html.gz
+Adding File:      html/ipInput.min.css.gz
+Adding File:      html/style.css.gz
+Adding File:      html/timezones.js.gz
+Adding File:      html/deployment.lst
+Adding File:      html/prevalue_set.html.gz
+Adding File:      html/graph.html.gz
+Adding File:      html/Flowstate_initialization_delayed.jpg.gz
+Adding File:      html/firework.js.gz
+Adding File:      html/model_capabilities.html.gz
+Adding File:      html/md5.min.js.gz
+Adding File:      html/firework.css.gz
+Adding File:      html/explain_3.html.gz
+Adding File:      html/livestream.html.gz
+Adding File:      html/edit_reference.html.gz
+Adding File:      html/file_server.css.gz
+Adding File:      html/Flowstate_initialization.jpg.gz
+Adding File:      html/flipImageSize.png.gz
+Adding File:      html/explain_2.html.gz
+Adding File:      html/explain_7.html.gz
+Adding File:      html/edit_explain_7.html.gz
+Adding File:      html/backup.html.gz
+Adding File:      html/app.css.gz
+Adding File:      html/overview.html.gz
+Adding File:      html/edit_style.css.gz
+Adding File:      html/favicon.ico
+Adding File:      html/ota_page.html.gz
+Adding File:      html/edit_alignment.html.gz
+Adding File:      html/theme.css.gz
+Adding File:      html/reboot_page.html.gz
+Adding File:      html/edit_digits.html.gz
+Adding File:      html/close.png.gz
+Adding File:      html/common.js.gz
+Adding File:      html/cleanup.html.gz
+Adding File:      html/mkdocs_theme.css.gz
+Adding File:      html/cnn_images.jpg.gz
+Adding File:      html/plotly-basic-2.18.2.min.js.gz
+Adding File:      html/explain_4.html.gz
+Adding File:      html/edit_config_raw.html.gz
+Adding File:      html/index.html.gz
+Adding File:      html/info.html.gz
+Adding File:      html/explain_1.html.gz
+Adding File:      html/jquery-3.6.0.min.js.gz
+Adding File:      html/livestream_setup.html.gz
+Adding File:      html/ipInput.min.js.gz
+Adding File:      html/setup.html.gz
+Adding File:      html/explain_6.html.gz
+Adding File:      html/edit_analog.html.gz
+Adding File:      html/file_server.js.gz
+Adding File:      html/FileSaver.min.js.gz
+Adding File:      html/mkdocs_theme_extra.css.gz
+Adding File:      html/readconfigcommon.js.gz
+Adding File:      html/edit_explain_7_abort.html.gz
+Adding File:      html/app.js.gz
+Adding File:      html/version.txt
+Adding File:      html/data.html.gz
+Adding File:      html/watermeter.svg.gz
+Adding File:      html/readconfigparam.js.gz
+Adding File:      html/edit_config.html.gz
+Adding File:      html/github.min.css.gz
+Adding File:      html/edit_explain_0.html.gz
+Adding File:      html/theme.js.gz
+Adding File:      html/camera_capabilities.html.gz
+Adding File:      html/Flowstate_take_image.jpg.gz
+Adding File:      html/data_export.html.gz
+Adding File:      html/help.png.gz
+Adding File:      config/ana-cont_1500_s2_q.tflite
+Adding File:      config/dig-class11_1910_s2_q.tflite
+Adding File:      config/dig-cont_0900_s3_q.tflite
+Adding File:      config/config.ini
+Adding File:      config/dig-class100-0182-s2_q.tflite
+Adding File:      html/img/ChangeRateThreshold.png.gz
+[112/130] Building C object esp-idf/esp_lcd/CMakeFiles/__idf_esp_lcd.dir/rgb/esp_lcd_panel_rgb.c.obj
+[113/130] Linking C static library esp-idf/esp_lcd/libesp_lcd.a
+[114/130] Building CXX object esp-idf/jomjol_controlGPIO/CMakeFiles/__idf_jomjol_controlGPIO.dir/server_GPIO.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.cpp:17:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[115/130] Building CXX object esp-idf/jomjol_flowcontroll/CMakeFiles/__idf_jomjol_flowcontroll.dir/MainFlowControl.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_flowcontroll/MainFlowControl.cpp:25:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[116/130] Linking C static library esp-idf/jomjol_flowcontroll/libjomjol_flowcontroll.a
+[117/130] Linking C static library esp-idf/openmetrics/libopenmetrics.a
+[118/130] Linking C static library esp-idf/jomjol_webhook/libjomjol_webhook.a
+[119/130] Linking C static library esp-idf/jomjol_mqtt/libjomjol_mqtt.a
+[120/130] Linking C static library esp-idf/jomjol_wlan/libjomjol_wlan.a
+[121/130] Linking C static library esp-idf/jomjol_controlGPIO/libjomjol_controlGPIO.a
+[122/130] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/crash_dump.cpp.obj
+[123/130] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/softAP.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/main/softAP.cpp:34:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/softAP.cpp: In function 'void wifi_event_handler(void*, esp_event_base_t, int32_t, void*)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/softAP.cpp:61:9: warning: '++' expression of 'volatile'-qualified type is deprecated [-Wvolatile]
+   61 |         s_apClientCount++;
+      |         ^~~~~~~~~~~~~~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/softAP.cpp:66:34: warning: '--' expression of 'volatile'-qualified type is deprecated [-Wvolatile]
+   66 |         if (s_apClientCount > 0) s_apClientCount--;
+      |                                  ^~~~~~~~~~~~~~~
+[124/130] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/server_main.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/main/server_main.h:13,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/main/server_main.cpp:1:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+[125/130] Building CXX object esp-idf/main/CMakeFiles/__idf_main.dir/main.cpp.obj
+In file included from /home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/server_GPIO.h:12,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/main/server_main.h:13,
+                 from /home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:28:
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'Apa102::Apa102(int, int, int, BufferType, int)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:280:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  280 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h: In constructor 'LDP8806::LDP8806(int, int, int, BufferType, uint32_t)':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/components/jomjol_controlGPIO/SmartLeds.h:408:14: warning: variable 'ret' set but not used [-Wunused-but-set-variable]
+  408 |         auto ret = spi_bus_initialize(_SMARTLEDS_SPI_HOST, &buscfg, _SMARTLEDS_SPI_DMA_CHAN);
+      |              ^~~
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp: In function 'bool Init_NVS_SDCard()':
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::clk' [-Wmissing-field-initializers]
+  262 |     };
+      |     ^
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::cmd' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d0' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d1' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d2' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d3' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d4' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d5' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d6' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::d7' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::width' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:262:5: warning: missing initializer for member 'sdmmc_slot_config_t::flags' [-Wmissing-field-initializers]
+/home/eric/Documents/repos/AI-on-the-edge-device/code/main/main.cpp:304:5: warning: missing initializer for member 'esp_vfs_fat_mount_config_t::use_one_fat' [-Wmissing-field-initializers]
+  304 |     };
+      |     ^
+[126/130] Linking C static library esp-idf/main/libmain.a
+[127/130] Generating esp-idf/esp_system/ld/sections.ld
+[128/130] Linking CXX executable AI-on-the-edge.elf
+[129/130] Generating binary image from built executable
+esptool v5.3.dev3
+Creating ESP32-S3 image...
+Merged 3 ELF sections.
+Successfully created ESP32-S3 image.
+Generated /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/AI-on-the-edge.bin
+[130/130] cd /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb && /home/eric/.espressif/python_env/idf6.0_py3.12_env/bin/python /home/eric/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/partition_table/partition-table.bin /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/AI-on-the-edge.bin
+AI-on-the-edge.bin binary size 0x1a6ff0 bytes. Smallest app partition is 0x300000 bytes. 0x159010 bytes (45%) free.

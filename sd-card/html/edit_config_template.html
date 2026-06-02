@@ -3001,7 +3001,7 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "StatusLEDError", false);
     syncStatusColorsFromValues();   // update the colour pickers from the loaded RGB values
 	
-    // Folgende Zeilen sind für Abwärtskompatibität < v9.0.0 notwendig (manchmal parameter auskommentiert)
+    // The following lines are needed for backward compatibility < v9.0.0 (parameters are sometimes commented out)
     param["GPIO"]["LEDType"]["enabled"] = true;
     param["GPIO"]["LEDNumbers"]["enabled"] = true;
     param["GPIO"]["LEDColor"]["enabled"] = true;
@@ -3075,7 +3075,7 @@ function UpdateExpertModus() {
         // document.getElementById(expert[i].id).style = _style;
     }
 
-    // Enable / Disable die Optionen in den Menues für die Auswahl. Falls kein Expertenmodus soll nur ein Wert (built-in-led oder externan-flash-ws281x) möglich sein
+    // Enable / disable the options in the selection menus. If not in expert mode, only one value (built-in-led or external-flash-ws281x) should be possible
     Array.from(document.querySelector("#GPIO_IO4_value1").options).forEach(function(option_element) {
         if (option_element.value != "built-in-led") {
             option_element.hidden = _hidden;
@@ -3769,7 +3769,7 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
         }	
     }
 
-    ///////////////// am Ende, falls Kategorie als gesamtes nicht ausgewählt --> deaktivieren
+    ///////////////// at the end, if the whole category is not selected --> deactivate
     if (_category[_cat]["enabled"] == false) {
         if (_optional) {
             document.getElementById(_cat+"_"+_name+"_enabled").disabled = true;

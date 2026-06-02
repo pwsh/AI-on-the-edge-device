@@ -1608,7 +1608,7 @@ esp_err_t handler_editflow(httpd_req_t *req)
         httpd_resp_send(req, zw.c_str(), zw.length());
     }
 
-    // wird beim Erstellen eines neuen Referenzbildes aufgerufen
+    // called when creating a new reference image
     std::string *sys_status = flowctrl.getActStatus();
 
     if ((sys_status->c_str() != std::string("Take Image")) && (sys_status->c_str() != std::string("Aligning")))
@@ -1617,7 +1617,7 @@ esp_err_t handler_editflow(httpd_req_t *req)
         {
             std::string _host = "";
 
-            // laden der aktuellen Kameraeinstellungen(CCstatus) in den Zwischenspeicher(CFstatus)
+            // load the current camera settings (CCstatus) into the buffer (CFstatus)
             if (httpd_query_key_value(_query, "host", _valuechar, 30) == ESP_OK)
             {
                 _host = std::string(_valuechar);
@@ -1626,10 +1626,10 @@ esp_err_t handler_editflow(httpd_req_t *req)
             parseCamQueryToCFstatus(_query); // CCstatus >>> CFstatus + apply all query params
             if (_task.compare("cam_settings") == 0)
             {
-                // wird aufgerufen, wenn das Referenzbild + Kameraeinstellungen gespeichert wurden
+                // called when the reference image + camera settings have been saved
                 setCFstatusToCCstatus(); // CFstatus >>> CCstatus
 
-                // Kameraeinstellungen wurden verädert
+                // camera settings were changed
                 CFstatus.changedCameraSettings = true;
 
                 ESP_LOGD(TAG, "Cam Settings set");
@@ -1646,14 +1646,14 @@ esp_err_t handler_editflow(httpd_req_t *req)
             }
             else
             {
-                // wird aufgerufen, wenn ein neues Referenzbild erstellt oder aktualisiert wurde
+                // called when a new reference image is created or updated
                 // CFstatus >>> Kamera
                 setCFstatusToCam();
 
                 Camera.SetQualityZoomSize(CFstatus.ImageQuality, CFstatus.ImageFrameSize, CFstatus.ImageZoomEnabled, CFstatus.ImageZoomOffsetX, CFstatus.ImageZoomOffsetY, CFstatus.ImageZoomSize, CFstatus.ImageVflip);
                 // Camera.SetZoomSize(CFstatus.ImageZoomEnabled, CFstatus.ImageZoomOffsetX, CFstatus.ImageZoomOffsetY, CFstatus.ImageZoomSize, CFstatus.ImageVflip);
 
-                // Kameraeinstellungen wurden verädert
+                // camera settings were changed
                 CFstatus.changedCameraSettings = true;
 
                 ESP_LOGD(TAG, "test_take - vor TakeImage");

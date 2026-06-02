@@ -1094,7 +1094,7 @@ void ClassFlowPostProcessing::UpdateNachkommaDecimalShift() {
         }
 
         if (!NUMBERS[j]->digit_roi && NUMBERS[j]->analog_roi) {
-            // ESP_LOGD(TAG, "Nur analog");
+            // ESP_LOGD(TAG, "Only analog");
             NUMBERS[j]->DecimalShift = NUMBERS[j]->DecimalShiftInitial;
 		
             if (NUMBERS[j]->isExtendedResolution && flowAnalog->isExtendedResolution()) {
@@ -1106,7 +1106,7 @@ void ClassFlowPostProcessing::UpdateNachkommaDecimalShift() {
 
         // digit + analog
         if (NUMBERS[j]->digit_roi && NUMBERS[j]->analog_roi) {
-            // ESP_LOGD(TAG, "Nur digit + analog");
+            // ESP_LOGD(TAG, "Only digit + analog");
 
             NUMBERS[j]->DecimalShift = NUMBERS[j]->DecimalShiftInitial;
             NUMBERS[j]->Nachkomma = NUMBERS[j]->analog_roi->ROI.size() - NUMBERS[j]->DecimalShift;

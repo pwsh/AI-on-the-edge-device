@@ -46,25 +46,25 @@
             processed, disable analog pointer counter processing by deselecting <b>"Analog ROI Processing"</b>.
         </p>
         <p>
-            By default one number sequence (a number sequence contains of 1-x digit ROIs + 1-x analog counter ROIs which are processed together) is 
-            predefined and already selected in the drop down <b>"Number Sequence"</b>. If you need more than one number sequence additional
-            one's can be added with the buttons next to the drop down. Each number sequence will be processed separately.
+            By default, one number sequence is predefined and already selected in the drop-down <b>"Number Sequence"</b>. (A number
+            sequence consists of one or more digit ROIs plus one or more analog counter ROIs that are processed together.) If you need
+            more than one number sequence, add additional ones with the buttons next to the drop-down. Each number sequence is processed separately.
         </p>
         <p>
-            Using drag and drop by mouse of by manually entering the parameters into the given fields the analog ROIs can be positioned to the analog pointer
-            counters on the reference image. To have proper ROI definition please check the documentation: 
+            Position the analog ROIs over the analog pointer counters on the reference image, either by dragging them with the mouse or by
+            entering the parameters in the fields below. To define ROIs properly, please check the documentation:
             <a href=https://jomjol.github.io/AI-on-the-edge-device-docs/ROI-Configuration/ target=_blank>ROI Configuration</a>. It's very important to be
             really precise to have reliable processing. With the drop down <b>"ROI"</b> you can change between the different ROIs in the selected
             number sequence. To create new ROIs use <b>"New ROI"</b>.
         </p>
         <p>
-            The order of the ROIs defines the position (and therefore the multiplication factor) within the reading sequence. The position
-            in the number sequence can be changed with the buttons <b>"Move ROI Lower"</b> and <b>"Move ROI Higher"</b>. The multiplication factor which is
-            shown below the ROI drop down is the multiplication factor of pure position/order in number sequence and the factor right-hand side to this is 
-            the additionally corrected by decimal shift setting (configuration, expert parameter, default: 0). 
+            The order of the ROIs defines their position (and therefore the multiplication factor) within the reading sequence. Use the
+            <b>"Move ROI Lower"</b> and <b>"Move ROI Higher"</b> buttons to change a ROI's position in the number sequence. The two multipliers
+            shown below the ROI drop-down are: the factor from the position/order alone, and (on the right) that factor after the
+            <b>Decimal Shift</b> setting is applied (an expert parameter on the configuration page, default: 0).
         </p>
         <p>
-            After definition of digit ROIs is completed don't forget to save with the <b>"Save Config"</b> button!<br>
+            After defining the analog ROIs, don't forget to save with the <b>"Save Config"</b> button!<br>
             <b>NOTE:</b> There is no need to perform a reboot after every saving or step. It's sufficient to reboot after all configuration steps 
             (reference image, alignment, ROI configuration) are completed to activate new configuration.
         </p>

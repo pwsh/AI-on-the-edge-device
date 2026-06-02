@@ -501,7 +501,7 @@ function ParamExtractValueAll(_param, _linesplit, _catname, _aktline, _iscom) {
                 }
 				
                 if (abc["name"] == "default") {
-                    for (_num in NUMBERS) {        // wert mit Default belegen
+                    for (_num in NUMBERS) {        // set value to default
                         if (NUMBERS[_num][_catname][paramname]["found"] == false) {
                             NUMBERS[_num][_catname][paramname]["found"] = true;
                             NUMBERS[_num][_catname][paramname]["enabled"] = !_iscom;
@@ -861,7 +861,7 @@ function isCommented(input) {
 }    
 
 function SaveConfigToServer(_domainname){
-    // leere Zeilen am Ende löschen
+    // remove empty lines at the end
     var zw = config_split.length - 1;
 	 
     while (config_split[zw] == "") {
@@ -933,7 +933,7 @@ function getNUMBERS(_name, _type, _create = true) {
         }
     }
 
-    if (!_create) {         // nicht gefunden und soll auch nicht erzeugt werden, ggf. geht eine NULL zurück
+    if (!_create) {         // not found and should not be created either; may return NULL
           return _ret;
     }
 
@@ -961,7 +961,7 @@ function getNUMBERS(_name, _type, _create = true) {
         NUMBERS.push(_ret);
     }
 
-    if (typeof _type == 'undefined') {            // muss schon existieren !!! - also erst nach Digits / Analog aufrufen
+    if (typeof _type == 'undefined') {            // must already exist !!! - so call only after Digits / Analog
         return _ret;
     }
 

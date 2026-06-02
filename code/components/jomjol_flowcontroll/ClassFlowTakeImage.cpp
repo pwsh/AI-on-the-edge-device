@@ -74,8 +74,8 @@ void ClassFlowTakeImage::SetInitialParameter(void)
     namerawimage = "/sdcard/img_tmp/raw.jpg";
 }
 
-// auslesen der Kameraeinstellungen aus der config.ini
-// wird beim Start aufgerufen
+// read the camera settings from config.ini
+// called at startup
 bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
 {
     Camera.getSensorDatenToCCstatus(); // Kamera >>> CCstatus
@@ -554,7 +554,7 @@ string ClassFlowTakeImage::getHTMLSingleStep(string host)
     return result;
 }
 
-// wird bei jeder Auswertrunde aufgerufen
+// called on every evaluation round
 bool ClassFlowTakeImage::doFlow(string zwtime)
 {
     psram_init_shared_memory_for_take_image_step();
@@ -571,7 +571,7 @@ bool ClassFlowTakeImage::doFlow(string zwtime)
     esp_wifi_stop(); // to save power usage and
 #endif
 
-    // wenn die Kameraeinstellungen durch Erstellen eines neuen Referenzbildes verändert wurden, müssen sie neu gesetzt werden
+    // if the camera settings were changed by creating a new reference image, they must be set again
     if (CFstatus.changedCameraSettings)
     {
         Camera.setSensorDatenFromCCstatus(); // CCstatus >>> Kamera

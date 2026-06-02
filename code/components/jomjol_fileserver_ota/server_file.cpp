@@ -254,7 +254,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
 
     // Iterate over all files / folders and fetch their names and sizes
     while ((entry = readdir(pdir)) != NULL) {
-        // wlan.ini soll nicht angezeigt werden!
+        // wlan.ini should not be displayed!
         if (strcmp("wlan.ini", entry->d_name) != 0) {
             entrytype = (entry->d_type == DT_DIR ? "directory" : "file");
 
@@ -552,7 +552,7 @@ static esp_err_t download_get_handler(httpd_req_t *req)
 
     std::string testwlan = toUpper(std::string(filename));
 
-    if ((stat(filepath, &file_stat) == -1) || (testwlan.compare("/WLAN.INI") == 0 )) {  // wlan.ini soll nicht angezeigt werden!
+    if ((stat(filepath, &file_stat) == -1) || (testwlan.compare("/WLAN.INI") == 0 )) {  // wlan.ini should not be displayed!
 
         /* If file not present on SPIFFS check if URI
          * corresponds to one of the hardcoded paths */
@@ -956,7 +956,7 @@ void delete_all_in_directory(const std::string& _directory)
     /* Iterate over all files / folders and fetch their names and sizes */
     while ((entry = readdir(dir)) != NULL) {
         if (!(entry->d_type == DT_DIR)){
-            if (strcmp("wlan.ini", entry->d_name) != 0){                    // auf wlan.ini soll nicht zugegriffen werden !!!
+            if (strcmp("wlan.ini", entry->d_name) != 0){                    // wlan.ini should not be accessed !!!
                 filename = _directory + "/" + std::string(entry->d_name);
                 LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Deleting file: " + filename);
                 /* Delete file */

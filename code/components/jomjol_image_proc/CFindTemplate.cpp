@@ -65,7 +65,7 @@ bool CFindTemplate::FindTemplate(RefInfo *_ref)
 
 //    ESP_LOGD(TAG, "FindTemplate 02");
 
-    if ((_ref->alignment_algo == 2) && (_ref->fastalg_x > -1) && (_ref->fastalg_y > -1))     // für Testzwecke immer Berechnen
+    if ((_ref->alignment_algo == 2) && (_ref->fastalg_x > -1) && (_ref->fastalg_y > -1))     // always calculate, for testing purposes
     {
         isSimilar = CalculateSimularities(rgb_template, _ref->fastalg_x, _ref->fastalg_y, ow, oh, min, avg, max, SAD, _ref->fastalg_SAD, _ref->fastalg_SAD_criteria);
 /*#ifdef DEBUG_DETAIL_ON
@@ -102,7 +102,7 @@ bool CFindTemplate::FindTemplate(RefInfo *_ref)
 //    ESP_LOGD(TAG, "FindTemplate 05");
     int xouter, youter, tpl_x, tpl_y, _ch;
     int _anzchannels = channels;
-    if (_ref->alignment_algo == 0)  // 0 = "Default" (nur R-Kanal)
+    if (_ref->alignment_algo == 0)  // 0 = "Default" (R channel only)
         _anzchannels = 1;
 
     for (xouter = ow_start; xouter <= ow_stop; xouter++)

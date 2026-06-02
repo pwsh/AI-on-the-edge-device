@@ -107,7 +107,7 @@ void GpioPin::init()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
 
-//    if (_interruptType != GPIO_INTR_DISABLE) {                // ohne GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X, wenn das genutzt wird, dann soll auch der Handler hier nicht initialisiert werden, da das dann über SmartLED erfolgt.
+//    if (_interruptType != GPIO_INTR_DISABLE) {                // without GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X; when that is used, the handler here should not be initialized either, since it is then handled via SmartLED.
     // Note: GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X is a gpio_pin_mode_t value compared numerically
     // against the gpio_int_type_t interrupt type; cast to int to keep the original behavior
     // (GCC 15 rejects the cross-enum comparison under -Werror=enum-compare).
@@ -552,7 +552,7 @@ esp_err_t GpioHandler::handleHttpRequest(httpd_req_t *req)
 
     int gpionum = stoi(gpio);
 
-    // frei: 16; 12-15; 2; 4  // nur 12 und 13 funktionieren 2: reboot, 4: BlitzLED, 15: PSRAM, 14/15: DMA für SDKarte ???
+    // free: 16; 12-15; 2; 4  // only 12 and 13 work. 2: reboot, 4: flash LED, 15: PSRAM, 14/15: DMA for SD card ???
     gpio_num_t gpio_num = resolvePinNr(gpionum);
     if (gpio_num == GPIO_NUM_NC)
     {

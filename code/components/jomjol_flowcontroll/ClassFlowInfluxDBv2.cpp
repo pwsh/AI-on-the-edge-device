@@ -131,7 +131,7 @@ bool ClassFlowInfluxDBv2::ReadParameter(FILE* pfile, string& aktparamgraph)
         influxdb.InfluxDBInitV2(uri, bucket, dborg, dbtoken);
 ////////////////////////////////////////// NEW ////////////////////////////////////////////
 
-//        printf("nach V2 Init\n");
+//        printf("after V2 init\n");
         InfluxDBenable = true;
     } else {
         LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "InfluxDBv2 (Verion2 !!!) init skipped as we are missing some parameters");

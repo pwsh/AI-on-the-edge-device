@@ -299,11 +299,11 @@ bool Init_NVS_SDCard()
     // connected on the bus. This is for debug / example purpose only.
     slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
-    // Der PullUp des GPIO13 wird durch slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
-    // nicht gesetzt, da er eigentlich nicht benötigt wird, 
+    // The pull-up of GPIO13 is, via slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP,
+    // not set, since it is actually not needed,
     // dies führt jedoch bei schlechten Kopien des AI_THINKER Boards
     // zu Problemen mit der SD Initialisierung und eventuell sogar zur reboot-loops.
-    // Um diese Probleme zu kompensieren, wird der PullUp manuel gesetzt.
+    // To compensate for these problems, the pull-up is set manually.
     gpio_set_pull_mode(GPIO_SDCARD_D3, GPIO_PULLUP_ONLY); // HS2_D3	
 
     // Options for mounting the filesystem.

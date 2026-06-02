@@ -345,7 +345,7 @@ esp_err_t CCamera::getSensorDatenToCCstatus(void)
         CCstatus.ImageRawGma = s->status.raw_gma;
         CCstatus.ImageLenc = s->status.lenc;
 
-        // CCstatus.ImageSharpness = s->status.sharpness; // gibt -1 zurück, da es nicht unterstützt wird
+        // CCstatus.ImageSharpness = s->status.sharpness; // returns -1 because it is not supported
         CCstatus.ImageDenoiseLevel = s->status.denoise;
 
         return ESP_OK;
@@ -946,7 +946,7 @@ esp_err_t CCamera::CaptureToStream(httpd_req_t *req, bool FlashlightOn)
     int64_t fr_start;
     char *part_buf[64];
 
-    // wenn die Kameraeinstellungen durch Erstellen eines neuen Referenzbildes verändert wurden, müssen sie neu gesetzt werden
+    // if the camera settings were changed by creating a new reference image, they must be set again
     if (CFstatus.changedCameraSettings)
     {
         Camera.setSensorDatenFromCCstatus(); // CCstatus >>> Kamera

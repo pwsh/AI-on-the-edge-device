@@ -497,7 +497,7 @@ bool CopyFile(string input, string output)
 	char cTemp;
 	FILE *fpSourceFile = fopen(input.c_str(), "rb");
 
-	// Sourcefile existiert nicht sonst gibt es einen Fehler beim Kopierversuch!
+	// Source file does not exist, otherwise the copy attempt would error!
 	if (!fpSourceFile)
 	{
 		ESP_LOGD(TAG, "File %s existiert nicht!", input.c_str());
@@ -803,7 +803,7 @@ std::vector<string> ZerlegeZeile(std::string input, std::string delimiter)
 	else
 	{
 		// Legacy Mode
-		input = trim(input, delimiter); // sonst werden delimiter am Ende (z.B. == im Token) gelöscht)
+		input = trim(input, delimiter); // otherwise delimiters at the end (e.g. == in the token) get deleted)
 		size_t pos = findDelimiterPos(input, delimiter);
 		std::string token;
 

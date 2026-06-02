@@ -1,5 +1,5 @@
 function SaveConfigToServer(_domainname){
-     // leere Zeilen am Ende löschen
+     // remove empty lines at the end
      var zw = config_split.length - 1;
 	 
      while (config_split[zw] == "") {

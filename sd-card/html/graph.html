@@ -46,7 +46,7 @@
         datefile = document.getElementById("datafiles").value;
         numbername = document.getElementById("numbers").value;
         showRrelativeValues = document.getElementById("showRrelativeValues").checked;
-        //alert("Auslesen: " + datefile + " " + numbername);
+        //alert("Reading: " + datefile + " " + numbername);
 
         _domainname = getDomainname();
         fetch(_domainname + '/fileserver/log/data/' + datefile)

@@ -1,0 +1,77 @@
+Command: ninja all
+Loading defaults file /home/eric/Documents/repos/AI-on-the-edge-device/code/sdkconfig.defaults...
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:17 CONFIG_COMPILER_OPTIMIZATION_DEFAULT was replaced with CONFIG_COMPILER_OPTIMIZATION_DEBUG
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:37 CONFIG_OPTIMIZATION_ASSERTIONS_DISABLED was replaced with CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:38 CONFIG_OPTIMIZATION_ASSERTION_LEVEL was replaced with CONFIG_COMPILER_OPTIMIZATION_ASSERTION_LEVEL
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:58 CONFIG_ADC_CAL_EFUSE_TP_ENABLE was replaced with CONFIG_ADC_CALI_EFUSE_TP_ENABLE
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:59 CONFIG_ADC_CAL_EFUSE_VREF_ENABLE was replaced with CONFIG_ADC_CALI_EFUSE_VREF_ENABLE
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:60 CONFIG_ADC_CAL_LUT_ENABLE was replaced with CONFIG_ADC_CALI_LUT_ENABLE
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:66 CONFIG_NEWLIB_NANO_FORMAT was replaced with CONFIG_LIBC_NEWLIB_NANO_FORMAT
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:121 CONFIG_ESP32_WIFI_DYNAMIC_RX_BUFFER_NUM was replaced with CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:122 CONFIG_ESP32_WIFI_CACHE_TX_BUFFER_NUM was replaced with CONFIG_ESP_WIFI_CACHE_TX_BUFFER_NUM
+info: /tmp/claude-1000/kconfgen_tmptxzmrlon:175 CONFIG_SYSTEM_EVENT_TASK_STACK_SIZE was replaced with CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE
+Loading defaults file /home/eric/Documents/repos/AI-on-the-edge-device/code/sdkconfig.defaults.esp32s3...
+Configuration Report                                                            
+ ────────────────────────────────────────────────────────────────────────────── 
+   Parser Version: 1                                                            
+   Verbosity: default                                                           
+   Defaults policy: sdkconfig                                                   
+   Status: Finished with notifications                                          
+                                                                                
+  Miscellaneous                                                                 
+   ──────────────────────────────────────────────────────────────────────────   
+    * Choice COMPILER_OPTIMIZATION_ASSERTION_LEVEL has multiple active          
+    selections. The last one will be used:                                      
+    COMPILER_OPTIMIZATION_ASSERTIONS_DISABLE.                                   
+   ──────────────────────────────────────────────────────────────────────────   
+  Multiple Assignments                                                          
+   ────────────────────────────────────────────────                             
+    Symbol COMPILER_OPTIMIZATION_ASSERTION_LEVEL:                               
+        2 (user-set value)                                                      
+        0 (user-set value)                                                      
+        -> using 0                                                              
+    Symbol ESP_ERR_TO_NAME_LOOKUP:                                              
+        n (user-set value)                                                      
+        n (user-set value)                                                      
+        -> using n                                                              
+   ────────────────────────────────────────────────                             
+  Disabled Symbols/Choices With User-Set Value                                  
+   ──────────────────────────────────────────────────────────────────────────   
+    * ADC_CALI_EFUSE_TP_ENABLE (defined at                                      
+    /home/eric/esp/esp-idf/components/esp_adc/Kconfig:22) with user-set         
+    value n from /tmp/claude-1000/kconfgen_tmptxzmrlon                          
+    * ADC_CALI_EFUSE_VREF_ENABLE (defined at                                    
+    /home/eric/esp/esp-idf/components/esp_adc/Kconfig:30) with user-set         
+    value n from /tmp/claude-1000/kconfgen_tmptxzmrlon                          
+    * ADC_CALI_LUT_ENABLE (defined at                                           
+    /home/eric/esp/esp-idf/components/esp_adc/Kconfig:38) with user-set         
+    value n from /tmp/claude-1000/kconfgen_tmptxzmrlon                          
+    * LIBC_NEWLIB_NANO_FORMAT (defined at                                       
+    /home/eric/esp/esp-idf/components/esp_libc/Kconfig:106) with user-set       
+    value y from /tmp/claude-1000/kconfgen_tmptxzmrlon                          
+    * SPIRAM_IGNORE_NOTFOUND (defined at                                        
+    /home/eric/esp/esp-idf/components/esp_psram/Kconfig.spiram.common:48)       
+    with user-set value y from /tmp/claude-1000/kconfgen_tmptxzmrlon            
+    * LWIP_ESP_LWIP_ASSERT (defined at                                          
+    /home/eric/esp/esp-idf/components/lwip/Kconfig:1262) with user-set value    
+    n from /tmp/claude-1000/kconfgen_tmptxzmrlon                                
+   ──────────────────────────────────────────────────────────────────────────   
+ ────────────────────────────────────────────────────────────────────────────── 
+CMake Deprecation Warning at components/esp-nn/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+CMake Deprecation Warning at components/esp-tflite-micro/CMakeLists.txt:3 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
