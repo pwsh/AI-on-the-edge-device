@@ -196,11 +196,51 @@ This step turns raw per‑ROI readings into the **trustworthy meter value** and 
 
 * **Decimal shift** and analog↔digit transition handling assemble the digits in the right places.
 * **"N" (undetermined) replacement** fills digits the network couldn't read.
-* **`checkDigitConsistency`** rejects implausible jumps.
+* **Digit‑increase consistency check** (`CheckDigitIncreaseConsistency`) — reconstructs misread higher
+  digits from the previous reading using the meter's carry rule (see below).
 * **Rate guards** (`MaxRateValue`/`MaxRateType`, `AllowNegativeRates`) bound the per‑interval change
   and decide whether a decrease is acceptable.
 * **Confidence vote** — a single spurious *high* read no longer sticks: enough subsequent rounds
   agreeing on a lower value override it.
+
+#### Digit‑increase consistency check
+
+`CheckDigitIncreaseConsistency` is a per‑number `[PostProcessing]` option (default `false`, Expert
+parameter). When enabled, [`checkDigitConsistency()`](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L1170)
+runs at [ClassFlowPostProcessing.cpp:903](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L903)
+and **repairs the higher digits** of the new reading using the physical rule a rolling meter always
+obeys: *a digit wheel only advances when the wheel below it rolls past 9 → 0 (a carry).*
+
+Walking from the lowest "rollable" digit upward, for each position it compares the new raw value
+against the stored `PreValue` and checks whether the digit **below** wrapped (a zero crossing /
+*Nulldurchgang*) since the last round:
+
+| Did the wheel below wrap? | Expected for this digit | Correction if the CNN disagrees |
+|---|---|---|
+| **No** | unchanged | force it back to the previous reading's digit ([:1206](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L1206)) |
+| **Yes** | incremented by exactly 1 | add 1 ([:1212](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L1212)) |
+
+If the number has **no analog dials**, the scan starts one digit higher (`pot++`), because without an
+analog wheel the lowest digit's sub‑position can't be trusted to judge a transition
+([:1180](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L1180)).
+
+**Example** — previous `1299`, meter rolling over to `1300`, with the tens wheel caught mid‑roll and
+misread as `9`:
+
+| Wheel | PreValue | Raw CNN read | Wrap below? | Corrected |
+|-------|----------|--------------|-------------|-----------|
+| ones | 9 | 0 | — | 0 |
+| tens | 9 | 9 *(mid‑roll misread)* | yes | **0** (carry up) |
+| hundreds | 2 | 2 | yes | **3** |
+| thousands | 1 | 1 | no | 1 |
+
+→ a raw `1299`/`1290` is corrected to `1300` instead of being accepted as a wrong/backwards value.
+
+> **Caveat:** this *trusts `PreValue` as ground truth* and assumes the meter only counts up — a stale
+> or wrong `PreValue` (or a meter that legitimately decreased) can propagate an error, which is why it
+> is off by default and pairs with the `AllowNegativeRates` / `MaxRate*` guards that run just after it.
+> It is distinct from the confidence‑vote logic, which overrides a stuck spurious *high* read across
+> several rounds rather than reconstructing digits within one round.
 
 **Data‑log CSV columns** ([`WriteDataLog`](../code/components/jomjol_flowcontroll/ClassFlowPostProcessing.cpp#L1054) → `LogFile.WriteToData`):
 
