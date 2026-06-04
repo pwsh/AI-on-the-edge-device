@@ -188,6 +188,12 @@ function ParseConfig() {
     // ParamAddValue(param, catname, "IgnoreAllNaN", 1, true, "false");
     ParamAddValue(param, catname, "ErrorMessage");
     ParamAddValue(param, catname, "CheckDigitIncreaseConsistency", 1, true, "false");
+    // Meter type + physics (auto-populates Maximum Rate Value). Utility is a normal setting; the
+    // pipe/service capacities are expert overrides of the residential assumptions.
+    ParamAddValue(param, catname, "Utility", 1, true, "");
+    ParamAddValue(param, catname, "WaterPipeDiameterMm", 1, true, "25.4");
+    ParamAddValue(param, catname, "GasPipeDiameterMm", 1, true, "38.1");
+    ParamAddValue(param, catname, "ServiceAmps", 1, true, "200");
 
     var catname = "MQTT";
     category[catname] = new Object();

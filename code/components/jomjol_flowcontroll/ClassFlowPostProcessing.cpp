@@ -549,11 +549,14 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
         }
         else if (isStringNumeric(_val)) {
             double d = std::stod(_val);
-            if      (_key == "PIPEDIAMETERMM")    { L.waterPipeDiameterMm = d; L.gasPipeDiameterMm = d; }
-            else if (_key == "SUPPLYPRESSUREKPA") { L.waterPressureKPa = d; L.gasPressureKPa = d; }
-            else if (_key == "SERVICEAMPS")       { L.elecServiceAmps = d; }
-            else if (_key == "SERVICEVOLTS")      { L.elecServiceVolts = d; }
-            else if (_key == "UNITSPERVALUE")     { if (d > 0) L.unitsPerValue = d; }
+            if      (_key == "WATERPIPEDIAMETERMM") { L.waterPipeDiameterMm = d; }
+            else if (_key == "GASPIPEDIAMETERMM")   { L.gasPipeDiameterMm = d; }
+            else if (_key == "PIPEDIAMETERMM")      { L.waterPipeDiameterMm = d; L.gasPipeDiameterMm = d; } // legacy alias
+            else if (_key == "SUPPLYPRESSUREKPA")   { L.waterPressureKPa = d; }
+            else if (_key == "GASPRESSUREKPA")      { L.gasPressureKPa = d; }
+            else if (_key == "SERVICEAMPS")         { L.elecServiceAmps = d; }
+            else if (_key == "SERVICEVOLTS")        { L.elecServiceVolts = d; }
+            else if (_key == "UNITSPERVALUE")       { if (d > 0) L.unitsPerValue = d; }
         }
     }
 }
@@ -755,7 +758,8 @@ bool ClassFlowPostProcessing::ReadParameter(FILE* pfile, string& aktparamgraph) 
         {
             std::string _pkey = toUpper(_param);
             if ((splitted.size() > 1) &&
-                (_pkey == "UTILITY" || _pkey == "PIPEDIAMETERMM" || _pkey == "SUPPLYPRESSUREKPA" ||
+                (_pkey == "UTILITY" || _pkey == "WATERPIPEDIAMETERMM" || _pkey == "GASPIPEDIAMETERMM" ||
+                 _pkey == "PIPEDIAMETERMM" || _pkey == "SUPPLYPRESSUREKPA" || _pkey == "GASPRESSUREKPA" ||
                  _pkey == "SERVICEAMPS" || _pkey == "SERVICEVOLTS" || _pkey == "UNITSPERVALUE")) {
                 handlePredictiveLimit(_pkey, splitted[0], splitted[1]);
             }

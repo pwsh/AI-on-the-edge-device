@@ -40,8 +40,8 @@ enum class Utility { Generic, Water, Electricity, Gas };
 struct PhysicalLimits {
     Utility utility = Utility::Generic;
 
-    // --- Water (residential cold-supply defaults: 3/4" pipe, ~60 psi) ---
-    double waterPipeDiameterMm = 19.05;   // 3/4" nominal
+    // --- Water (residential supply defaults: 1" pipe, ~60 psi) ---
+    double waterPipeDiameterMm = 25.4;    // 1" nominal (covers most households)
     double waterPressureKPa    = 410.0;   // ~60 psi
     double waterExpectedVelMs  = 3.0;     // practical erosion/noise velocity cap (for prediction)
 
@@ -49,8 +49,8 @@ struct PhysicalLimits {
     double elecServiceAmps  = 200.0;
     double elecServiceVolts = 240.0;
 
-    // --- Gas (3/4" pipe, ~7" w.c. delivery, natural-gas density) ---
-    double gasPipeDiameterMm = 19.05;
+    // --- Gas (1.5" pipe, ~7" w.c. delivery, natural-gas density) ---
+    double gasPipeDiameterMm = 38.1;      // 1.5" nominal (covers most households)
     double gasPressureKPa    = 1.74;      // ~7 inches water column
     double gasExpectedVelMs  = 20.0;      // practical residential branch velocity cap
 

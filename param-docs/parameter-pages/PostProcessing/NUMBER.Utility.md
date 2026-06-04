@@ -1,27 +1,25 @@
 # Parameter `Utility`
-Default Value: `` (empty — feature off)
+Default Value: `` (not set)
 
-!!! Warning
-    This is an **Expert Parameter**! Only change it if you understand what it does!
+Selects the **meter type** so the firmware knows the maximum rate the meter can physically advance.
+Accepted values: `water`, `electricity`, `gas` (or *not set* = generic, feature off).
 
-Selects a physics model for this number sequence so the firmware can work out the **maximum rate the
-meter could physically advance** between two readings. Accepted values: `water`, `electricity`, `gas`
-(empty = generic, the feature is off and behaviour is unchanged).
+When you pick a type, the **Maximum Rate Value** is auto-populated from typical residential assumptions
+(you can override it). These cover the majority of households:
 
-When set, an automatically-derived **physical ceiling** rejects readings that jump faster than the
-supply could possibly deliver — so you no longer need to hand-tune
-[MaxRateValue](https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters/#parameter-maxratevalue)
-just to catch gross misreads. `MaxRateValue`, if set, still applies as a tighter manual override.
+| Type | Assumption | Resulting maximum rate |
+|------|-----------|------------------------|
+| **Water** | 1″ supply pipe at ~60 psi, ~8 ft/s design velocity | ≈ **20 gallons/min** |
+| **Gas** | 1.5″ pipe at residential delivery pressure (~7″ w.c. / 0.25 psi), ~20 ft/s | ≈ **15 ft³/min** (~880 ft³/hr) |
+| **Electricity** | 200 A service at 240 V (48 kW) | ≈ **0.8 kWh/min** |
 
-The supply model defaults to typical **residential** values and can be fine-tuned with the companion
-keys `PipeDiameterMm`, `SupplyPressureKPa`, `ServiceAmps`, `ServiceVolts` and `UnitsPerValue`. The last
-one tells the firmware how many SI units (litres for water, kWh for electricity, m³ for gas) equal
-`1.0` of the displayed value.
-
-See [docs/PREDICTIVE-READING.md](https://github.com/jomjol/AI-on-the-edge-device/blob/master/docs/PREDICTIVE-READING.md)
-for the full logic.
+The pipe diameters and electrical service capacity behind these numbers can be changed in the **expert**
+options (Water Pipe Diameter, Gas Pipe Diameter, Electrical Service). The auto-populated value is a
+*generous ceiling* — its job is to reject readings that are physically impossible (a misread), never to
+reject a real household reading. If your meter reads in different units (e.g. m³, CCF), edit
+[Maximum Rate Value](https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters/#parameter-maxratevalue)
+to match.
 
 !!! Note
-    If you edit the config file manually, you must prefix this parameter with `<NUMBER>` followed by a
-    dot (e.g. `main.Utility`). The reason is that this parameter is specific for each `<NUMBER>`
-    (`<NUMBER>` is the name of the number sequence defined in the ROI's).
+    If you edit the config file manually, prefix this parameter with `<NUMBER>` and a dot (e.g.
+    `main.Utility`); it is specific to each number sequence defined in the ROIs.

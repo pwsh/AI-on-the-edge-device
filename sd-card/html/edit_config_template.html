@@ -1084,6 +1084,21 @@
 
         <tr>
             <td class="indent2">
+                <label><class id="PostProcessing_Utility_text" style="color:black;">Meter Type</class></label>
+            </td>
+            <td>
+                <select id="PostProcessing_Utility_value1" onchange="populateMaxRateFromUtility()">
+                    <option value="" selected>(not set)</option>
+                    <option value="water">Water</option>
+                    <option value="electricity">Electricity</option>
+                    <option value="gas">Gas</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.Utility</td>
+        </tr>
+
+        <tr>
+            <td class="indent2">
                 <input type="checkbox" id="PostProcessing_MaxRateValue_enabled" value="1"  onclick = 'InvertEnableItem("PostProcessing", "MaxRateValue")' unchecked >
                 <label for=PostProcessing_MaxRateValue_enabled><class id="PostProcessing_MaxRateValue_text" style="color:black;">Maximum Rate Value</class></label>
             </td>
@@ -1106,6 +1121,39 @@
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.MaxRateType</td>
+        </tr>
+
+        <tr class="expert">
+            <td class="indent2">
+                <input type="checkbox" id="PostProcessing_WaterPipeDiameterMm_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "WaterPipeDiameterMm")' unchecked >
+                <label for=PostProcessing_WaterPipeDiameterMm_enabled><class id="PostProcessing_WaterPipeDiameterMm_text" style="color:black;">Water Pipe Diameter (mm)</class></label>
+            </td>
+            <td>
+                <input type="number" id="PostProcessing_WaterPipeDiameterMm_value1" size="13" min="1" step="any" value="25.4" onchange="populateMaxRateFromUtility()">
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.WaterPipeDiameterMm</td>
+        </tr>
+
+        <tr class="expert">
+            <td class="indent2">
+                <input type="checkbox" id="PostProcessing_GasPipeDiameterMm_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "GasPipeDiameterMm")' unchecked >
+                <label for=PostProcessing_GasPipeDiameterMm_enabled><class id="PostProcessing_GasPipeDiameterMm_text" style="color:black;">Gas Pipe Diameter (mm)</class></label>
+            </td>
+            <td>
+                <input type="number" id="PostProcessing_GasPipeDiameterMm_value1" size="13" min="1" step="any" value="38.1" onchange="populateMaxRateFromUtility()">
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.GasPipeDiameterMm</td>
+        </tr>
+
+        <tr class="expert">
+            <td class="indent2">
+                <input type="checkbox" id="PostProcessing_ServiceAmps_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "ServiceAmps")' unchecked >
+                <label for=PostProcessing_ServiceAmps_enabled><class id="PostProcessing_ServiceAmps_text" style="color:black;">Electrical Service (A)</class></label>
+            </td>
+            <td>
+                <input type="number" id="PostProcessing_ServiceAmps_value1" size="13" min="1" step="any" value="200" onchange="populateMaxRateFromUtility()">
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.ServiceAmps</td>
         </tr>
 
         <tr>
@@ -3376,6 +3424,40 @@ function editConfigRaw() {
         window.location.assign(stringota);
         window.location.replace(stringota);
     }	
+}
+
+// Auto-populate "Maximum Rate Value" from the selected Meter Type and residential physics assumptions.
+//   Water:       pipe diameter @ ~8 ft/s design velocity       -> gallons / minute
+//   Gas:         pipe diameter @ ~20 ft/s residential velocity  -> cubic feet / minute
+//   Electricity: service amps @ 240 V                           -> kWh / minute
+// These are generous residential ceilings (meant never to reject a real household reading); override
+// by editing Maximum Rate Value directly. Operates on the currently-selected number.
+function populateMaxRateFromUtility() {
+    var uEl = document.getElementById("PostProcessing_Utility_value1");
+    if (!uEl) return;
+    var u = uEl.value;
+    var rate = null;
+    if (u === "water") {
+        var dwin = (parseFloat(document.getElementById("PostProcessing_WaterPipeDiameterMm_value1").value) || 25.4) / 25.4;
+        rate = 2.448 * dwin * dwin * 8.0;                 // gpm = 2.448*d_in^2*v_fps, v = 8 ft/s
+    } else if (u === "gas") {
+        var dgft = ((parseFloat(document.getElementById("PostProcessing_GasPipeDiameterMm_value1").value) || 38.1) / 25.4) / 12.0;
+        rate = (Math.PI / 4.0) * dgft * dgft * 1200.0;    // ft^3/min = area_ft2 * 1200 fpm (20 ft/s)
+    } else if (u === "electricity") {
+        var amps = parseFloat(document.getElementById("PostProcessing_ServiceAmps_value1").value) || 200;
+        rate = amps * 240.0 / 60000.0;                    // kWh/min at 240 V
+    }
+    if (rate === null) return;                            // "(not set)" -> leave Maximum Rate untouched
+    rate = Math.round(rate * 100) / 100;
+
+    var mr = document.getElementById("PostProcessing_MaxRateValue_value1");
+    if (mr) mr.value = rate;
+    var en = document.getElementById("PostProcessing_MaxRateValue_enabled");      // tick its checkbox
+    if (en && !en.checked) { en.checked = true; InvertEnableItem("PostProcessing", "MaxRateValue"); }
+    var mt = document.getElementById("PostProcessing_MaxRateType_value1");         // a per-minute bound
+    if (mt) mt.value = "RateChange";
+    var mten = document.getElementById("PostProcessing_MaxRateType_enabled");
+    if (mten && !mten.checked) { mten.checked = true; InvertEnableItem("PostProcessing", "MaxRateType"); }
 }
 
 function numberChanged() {

@@ -39,7 +39,9 @@ int main() {
     RateBounds wb = deriveRateBounds(w);
     printf("  expected=%.5f m3/min  ceiling=%.5f m3/min\n", wb.expectedMaxPerMin, wb.ceilingPerMin);
     CHECK(wb.known);
-    CHECK(APPROX(wb.expectedMaxPerMin, lpmExp/1000.0, 1e-9));
+    // deriveRateBounds uses the default Water pipe (1" = 25.4mm), not the 19.05mm physics-sanity value.
+    double lpmExpDefault = waterFlowLpm(25.4, 410.0, 3.0);
+    CHECK(APPROX(wb.expectedMaxPerMin, lpmExpDefault/1000.0, 1e-9));
     CHECK(wb.ceilingPerMin > wb.expectedMaxPerMin);
 
     printf("== generic => no model => read all ==\n");
