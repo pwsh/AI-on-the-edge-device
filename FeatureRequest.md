@@ -72,8 +72,8 @@ ____
 
 * **Request:** Add a ROI/state that flags movement between readings; sustained movement within a time window raises a leak alarm. ![example](https://user-images.githubusercontent.com/38385805/207858812-2a6ba41d-1a8c-4fa1-9b6a-53cdd113c106.png)
 * **Benefit:** Publish a leak state over MQTT to trigger actions (e.g. close a valve).
-* **Feasibility:** All boards — feasible (software only); reuse the existing ROI/diff machinery plus a timer and an MQTT state topic.
-* **Status:** ⬜ Open.
+* **Feasibility:** All boards — feasible (software only).
+* **Status:** ✅ Implemented (v17) — via the meter value rather than a separate movement ROI: **continuous usage** (the value never holds steady between two readings) past a configurable threshold (default 2 h, so lawn watering etc. doesn't false-alarm) flags a potential leak. `Leak Detection` defaults on for water/gas (off for electricity). Exposes `leak` (binary) and `continuous_usage` (seconds) to MQTT, a Home Assistant *moisture* binary sensor + *duration* sensor, InfluxDB v1/v2, and the REST `/json`.
 
 #### #33 Implement the Matter protocol
 

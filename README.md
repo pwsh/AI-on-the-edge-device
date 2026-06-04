@@ -145,7 +145,10 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 ### ⚡ Recognition & accuracy
 - **Scheduling** – run at a fixed interval *or* at specific daily times (multiple time slots).
 - **FastRead (incremental)** – re-runs the neural network only on the digits whose image actually changed, enabling **5–10&nbsp;s** update intervals.
-- **Confidence vote** – automatically recovers when a single misread latches the value too high.
+- **Meter Type + physics-bounded reading** – pick *Water / Electricity / Gas* and the device derives the maximum rate the meter can physically advance (from residential pipe/service assumptions, all overridable) to **auto-fill the Max Rate** and reject impossible jumps. See [docs/PREDICTIVE-READING.md](docs/PREDICTIVE-READING.md).
+- **Predictive digit reading** – uses that rate bound plus a per-digit history to skip digits that *cannot* have changed, and a **confident-read matrix** (shown on the overview) to resolve unknown (“N”) digits to a valid value.
+- **Confidence vote** (on by default) – automatically recovers when a single misread latches the value too high: after a few consistent lower reads it overrides the stuck-high outlier.
+- **Leak detection** (water/gas) – flags a potential leak when the meter advances *continuously* past a threshold (default **2&nbsp;h**); publishes a `leak` flag and `continuous_usage` time to MQTT, Home Assistant, InfluxDB and the REST API.
 - Per-round **diagnostics** (analysis type, digits analysed, time-to-next full read) shown on the overview and exposed via MQTT / JSON / InfluxDB.
 
 ### 🌓 Modern web interface
@@ -158,7 +161,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 ### 🔁 Reliability
 - **OTA rollback** – a crash-looping update is automatically rolled back to the last working firmware.
 - **Crash dumps are saved to the SD card** for later retrieval.
-- **Wi-Fi resilience** – exponential-backoff reconnect, automatic fall-back to the setup access point after repeated failures, fast wrong-password detection, and a 3×-reset Wi-Fi factory reset.
+- **Wi-Fi resilience** – exponential-backoff reconnect, automatic fall-back to the setup access point after repeated failures (now **including an empty/corrupt Wi-Fi config**, so the device can always be reconfigured from its portal — no SD pull needed), fast wrong-password detection, atomic `wlan.ini` writes, and a 3×-reset Wi-Fi factory reset.
 - RGB status LED (ESP32-S3) reflects the Wi-Fi / processing state.
 
 ### 🔒 Connectivity & security
