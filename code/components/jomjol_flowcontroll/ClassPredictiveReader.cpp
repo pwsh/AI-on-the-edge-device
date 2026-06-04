@@ -163,7 +163,8 @@ ReadPlan planRead(const PhysicalLimits& limits,
                   const std::vector<DigitState>& digits,
                   double minutesElapsed,
                   bool periodicAudit,
-                  float confidenceFloor) {
+                  float confidenceFloor,
+                  bool allowNegative) {
     ReadPlan plan;
     plan.bounds = deriveRateBounds(limits);
     plan.minutesElapsed = minutesElapsed < 0.0 ? 0.0 : minutesElapsed;
@@ -244,12 +245,15 @@ ReadPlan planRead(const PhysicalLimits& limits,
         plan.digits.push_back(dec);
         if (mustRead) plan.plannedReads++;
 
-        // Compute whether a carry can propagate INTO the next-higher digit.
-        // remaining headroom of this digit before it wraps = (10 - value). If the steps the
-        // increment can apply at this place can cover that headroom, a carry is possible upward.
-        const double headroom = 10.0 - (double)ds.value;
+        // Compute whether a carry/borrow can propagate INTO the next-higher digit. On an increase the
+        // digit wraps when it can reach 10 (headroom up = 10 - value); on a decrease (allowNegative) it
+        // wraps when it can reach 0 (headroom down = value + 1). A bidirectional sequence wraps if it
+        // can reach EITHER boundary, so use the nearer one.
+        const double headroomUp   = 10.0 - (double)ds.value;
+        const double headroomDown = (double)ds.value + 1.0;
+        const double headroom = allowNegative ? (headroomUp < headroomDown ? headroomUp : headroomDown) : headroomUp;
         const bool thisCanWrap = (stepsAtThisPlace >= headroom);
-        carryPossible = thisCanWrap;                 // carry into next digit only if this one can wrap
+        carryPossible = thisCanWrap;                 // carry/borrow into next digit only if this one can wrap
         lowerConfident = lowerConfident && (ds.confidence >= confidenceFloor);
     }
 
@@ -318,21 +322,27 @@ bool resolveUnknownDigit(const DigitHistory& h, bool canIncrement, bool lowerNei
 Plausibility checkPlausibility(const PhysicalLimits& limits,
                                double previousValue,
                                double newValue,
-                               double minutesElapsed) {
+                               double minutesElapsed,
+                               bool allowNegative) {
     const RateBounds rb = deriveRateBounds(limits);
     if (!rb.known || rb.ceilingPerMin < 0.0) return Plausibility::Unknown;
 
     const double delta = newValue - previousValue;
-    if (delta < 0.0) return Plausibility::NegativeChange;
+
+    // A decrease is rejected outright only when negatives are not allowed; when they are (e.g. a
+    // flow-rate display), a decrease is permitted but its MAGNITUDE is still bounded below.
+    if (!allowNegative && delta < 0.0) return Plausibility::NegativeChange;
 
     if (minutesElapsed <= 0.0) {
-        // No time reference: only a zero/negative change is judgeable; treat any increase as plausible.
+        // No time reference: the magnitude can't be judged, so treat the change as plausible.
         return Plausibility::Plausible;
     }
 
-    // Allow a small fixed epsilon plus the physical ceiling over the elapsed time.
+    // Symmetric physical ceiling over the elapsed time. With allowNegative the value may move the same
+    // distance in either direction (|delta|); without it, delta is already >= 0 here.
     const double maxPossible = rb.ceilingPerMin * minutesElapsed;
-    if (delta > maxPossible) return Plausibility::ExceedsPhysicalMax;
+    const double magnitude = (delta < 0.0) ? -delta : delta;
+    if (magnitude > maxPossible) return Plausibility::ExceedsPhysicalMax;
     return Plausibility::Plausible;
 }
 

@@ -114,6 +114,15 @@ reading, error surfaced, full re-read triggered) — **even if no `MaxRate` was 
 "remove the need to specify max rate unless overwritten" piece: `MaxRate`, if set, still applies on top
 as a tighter user override.
 
+**Symmetric bound for bidirectional sequences.** A cumulative total (e.g. accumulated usage) only ever
+increases, so a decrease is rejected (`NegativeChange`). But a sequence flagged
+[`AllowNegativeRates`](../param-docs/parameter-pages/PostProcessing/NUMBER.AllowNegativeRates.md) — such
+as an instantaneous **flow-rate** display (gallons/min) that genuinely rises and falls — is bounded
+**symmetrically**: it may move *down* as fast as physics says it could move *up* (`|Δ| ≤ ceiling·Δt`),
+and the read-gating's carry logic becomes bidirectional too (a digit at `0` can **borrow** down just as
+a digit at `9` can carry up). `checkPlausibility()` and `planRead()` both take an `allowNegative` flag
+that post-processing wires from the sequence's `AllowNegativeRates` setting.
+
 ---
 
 ## 3a. Per-digit matrix + unknown-digit resolution

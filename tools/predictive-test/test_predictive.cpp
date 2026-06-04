@@ -98,11 +98,31 @@ int main() {
     CHECK(dec3(0)->mustRead);
 
     printf("== plausibility (physical ceiling) ==\n");
-    // ceiling ~0.489 m3/min. Over 1 min, a +0.4 jump is plausible; +5.0 is impossible.
+    // water (1" default) ceiling ~0.87 m3/min. Over 1 min, +0.4 plausible; +5.0 impossible.
+    double wceil = waterFlowLpm(25.4,410.0,0.0)/1000.0; printf("  water ceiling/min = %.3f\n", wceil);
     CHECK(checkPlausibility(w, 100.0, 100.4, 1.0) == Plausibility::Plausible);
     CHECK(checkPlausibility(w, 100.0, 105.0, 1.0) == Plausibility::ExceedsPhysicalMax);
-    CHECK(checkPlausibility(w, 100.0, 99.0, 1.0) == Plausibility::NegativeChange);
+    CHECK(checkPlausibility(w, 100.0, 99.0, 1.0) == Plausibility::NegativeChange);   // negatives not allowed
     CHECK(checkPlausibility(g, 100.0, 999.0, 1.0) == Plausibility::Unknown);
+
+    printf("== symmetric bound when allowNegative (flow-rate sequences) ==\n");
+    // A small decrease is now allowed; a decrease bigger than the +ceiling is still rejected.
+    CHECK(checkPlausibility(w, 100.0, 99.5, 1.0, /*allowNeg*/true)  == Plausibility::Plausible);          // |-0.5| < ceil
+    CHECK(checkPlausibility(w, 100.0, 99.0, 1.0, /*allowNeg*/true)  == Plausibility::ExceedsPhysicalMax); // |-1.0| > ceil
+    CHECK(checkPlausibility(w, 100.0, 100.4, 1.0, /*allowNeg*/true) == Plausibility::Plausible);          // +0.4 ok
+    CHECK(checkPlausibility(w, 100.0, 105.0, 1.0, /*allowNeg*/true) == Plausibility::ExceedsPhysicalMax); // +5.0 too big
+    // Bidirectional gating: a tenths digit at 0 can BORROW (wrap down), so the ones digit above it must
+    // be read when allowNegative, but is static when only increases are allowed.
+    PhysicalLimits bn; bn.utility = Utility::Water; bn.userMaxRatePerMin = 0.5;  // maxDelta=0.75 over 1min*1.5
+    int bplaces[3] = {-1, 0, 1}; int bvals[3] = {0, 5, 5};   // tenths=0 (can borrow), ones=5, tens=5
+    std::vector<DigitState> bd;
+    for (int i=0;i<3;i++) bd.push_back(DigitState{bplaces[i], bvals[i], 1.0f, true});
+    ReadPlan pUp  = planRead(bn, bd, 1.0, false, 0.9f, /*allowNeg*/false);
+    ReadPlan pBi  = planRead(bn, bd, 1.0, false, 0.9f, /*allowNeg*/true);
+    auto onesUp = [&](ReadPlan&p){ for(auto&x:p.digits) if(x.place==0) return x.mustRead; return false; };
+    printf("  ones mustRead: up-only=%d  bidirectional=%d\n", onesUp(pUp), onesUp(pBi));
+    CHECK(!onesUp(pUp));   // up-only: tenths=0 can't wrap up -> ones static
+    CHECK(onesUp(pBi));    // bidirectional: tenths=0 can borrow down -> ones must be read
 
     printf("== user override of max rate ==\n");
     PhysicalLimits u; u.utility = Utility::Water; u.userMaxRatePerMin = 2.0;

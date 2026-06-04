@@ -614,7 +614,9 @@ void ClassFlowPostProcessing::UpdatePredictiveReadPlan(int j) {
         states.push_back(ds);
     }
 
-    predictive::ReadPlan plan = predictive::planRead(L, states, nextIntervalMin, /*audit*/ false);
+    predictive::ReadPlan plan = predictive::planRead(L, states, nextIntervalMin, /*audit*/ false,
+                                                     /*confidenceFloor*/ 0.90f,
+                                                     /*allowNegative*/ NUMBERS[j]->AllowNegativeRates);
 
     // Map decisions (LSD-first) back onto the ROIs (MSD-first).
     for (int k = 0; k < nDig; ++k) {
@@ -1114,7 +1116,8 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             if ((NUMBERS[j]->PhysLimits.utility != predictive::Utility::Generic) &&
                 (NUMBERS[j]->Value != NUMBERS[j]->PreValue) && !confidenceOverride) {
                 predictive::Plausibility _pl = predictive::checkPlausibility(
-                    NUMBERS[j]->PhysLimits, NUMBERS[j]->PreValue, NUMBERS[j]->Value, LastPreValueTimeDifference);
+                    NUMBERS[j]->PhysLimits, NUMBERS[j]->PreValue, NUMBERS[j]->Value, LastPreValueTimeDifference,
+                    NUMBERS[j]->AllowNegativeRates);   // symmetric +/- bound for flow-rate-style sequences
                 if (_pl == predictive::Plausibility::ExceedsPhysicalMax) {
                     NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate exceeds physical max - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;

@@ -198,18 +198,25 @@ RateBounds deriveRateBounds(const PhysicalLimits& limits);
 //  periodicAudit  : caller's drift-backstop flag (force a full re-read this round).
 //  confidenceFloor: a lower digit must be at least this confident before we trust it enough to
 //                   skip the digit above it (default 0.90).
+//  allowNegative  : if true (sequence flagged AllowNegativeRates), the value may move DOWN as fast as
+//                   it could move up - the reachability/carry logic becomes symmetric so a falling
+//                   value (e.g. a flow-rate display) gates its digits the same as a rising one.
 ReadPlan planRead(const PhysicalLimits& limits,
                   const std::vector<DigitState>& digitsLsdFirst,
                   double minutesElapsed,
                   bool periodicAudit,
-                  float confidenceFloor = 0.90f);
+                  float confidenceFloor = 0.90f,
+                  bool allowNegative = false);
 
 // Hard physical sanity check on a completed reading. Uses the ceiling rate (never the tighter
-// expected rate) so a physically-possible reading is never rejected.
+// expected rate) so a physically-possible reading is never rejected. When allowNegative is true the
+// bound is symmetric (|delta| <= ceiling*time): a decrease is allowed but only up to the same physical
+// rate it could increase; when false, any decrease returns NegativeChange (the legacy behaviour).
 Plausibility checkPlausibility(const PhysicalLimits& limits,
                                double previousValue,
                                double newValue,
-                               double minutesElapsed);
+                               double minutesElapsed,
+                               bool allowNegative = false);
 
 } // namespace predictive
 
