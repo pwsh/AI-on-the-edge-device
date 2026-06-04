@@ -694,9 +694,18 @@ extern "C" void app_main(void)
         StatusLED(WLAN_INIT, 1, true);
         return; // No way to continue without reading the wlan.ini
     }
-    else if (iWLANStatus == -2) { // SSID or password not configured
+    else if (iWLANStatus == -2) { // SSID or password not configured (empty/invalid in wlan.ini)
         StatusLED(WLAN_INIT, 2, true);
-        return; // No way to continue with empty SSID or password!
+        // Don't dead-end: wlan.ini exists but has no usable credentials (e.g. a corrupted SSID line).
+        // Drop into the configuration access point so Wi-Fi can be fixed from the web portal without
+        // pulling the SD card. forcedReconfig=true -> the AP periodically retries the configured Wi-Fi.
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "wlan.ini has no usable SSID/password -> starting AP mode for setup");
+        #ifdef ENABLE_SOFTAP
+            // Missing credentials is "needs setup", not "failed connection": wait in AP indefinitely
+            // (no periodic retry reboots), same as the missing-file path. The portal reboots on save.
+            StartAPModeAndWait(false);   // blocks until reboot
+        #endif
+        return; // (only reached if SoftAP is disabled at build time)
     }
 
     xDelay = 2000 / portTICK_PERIOD_MS;

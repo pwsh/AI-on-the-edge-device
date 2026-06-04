@@ -208,6 +208,38 @@ int LoadWlanFromFile(std::string fn)
 }
 
 
+// Write `lines` to `fn` without ever leaving it truncated: build a complete temp file first, then
+// replace the original. If anything goes wrong writing the temp, the original wlan.ini is left intact.
+// (FATFS rename won't overwrite, so the original is removed first; that brief window is now covered by
+// the empty-SSID -> SoftAP recovery path in main.) This replaces an in-place "w+" truncate that could
+// corrupt wlan.ini if a reboot/power event hit mid-write.
+static bool writeLinesAtomic(const std::string &fn, const std::vector<std::string> &lines)
+{
+    std::string tmp = fn + ".tmp";
+    FILE *f = fopen(tmp.c_str(), "w");
+    if (f == NULL) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "writeLinesAtomic: cannot open temp for write: " + tmp);
+        return false;
+    }
+    bool ok = true;
+    for (size_t i = 0; i < lines.size() && ok; ++i) {
+        if (fputs(lines[i].c_str(), f) == EOF) ok = false;
+    }
+    if (fflush(f) != 0) ok = false;
+    if (fclose(f) != 0) ok = false;
+    if (!ok) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "writeLinesAtomic: temp write failed; keeping original " + fn);
+        remove(tmp.c_str());
+        return false;
+    }
+    remove(fn.c_str());
+    if (rename(tmp.c_str(), fn.c_str()) != 0) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "writeLinesAtomic: rename temp -> " + fn + " failed");
+        return false;
+    }
+    return true;
+}
+
 bool ChangeHostName(std::string fn, std::string _newhostname)
 {
     if (_newhostname == wlan_config.hostname)
@@ -273,18 +305,10 @@ bool ChangeHostName(std::string fn, std::string _newhostname)
     }
     fclose(pFile);
 
-    pFile = fopen(fn.c_str(), "w+");
-    if (pFile == NULL) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ChangeHostName: Unable to open file wlan.ini (write)"); 
+    if (!writeLinesAtomic(fn, neuesfile)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ChangeHostName: failed to write wlan.ini");
         return false;
     }
-
-    for (int i = 0; i < neuesfile.size(); ++i)
-    {
-        //ESP_LOGD(TAG, "%s", neuesfile[i].c_str());
-        fputs(neuesfile[i].c_str(), pFile);
-    }
-    fclose(pFile);
 
     ESP_LOGD(TAG, "ChangeHostName done");
 
@@ -375,19 +399,10 @@ bool ChangeRSSIThreshold(std::string fn, int _newrssithreshold)
 
     fclose(pFile);
 
-    pFile = fopen(fn.c_str(), "w+");
-    if (pFile == NULL) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ChangeRSSIThreshold: Unable to open file wlan.ini (write)"); 
+    if (!writeLinesAtomic(fn, neuesfile)) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ChangeRSSIThreshold: failed to write wlan.ini");
         return false;
     }
-
-    for (int i = 0; i < neuesfile.size(); ++i)
-    {
-        //ESP_LOGD(TAG, "%s", neuesfile[i].c_str());
-        fputs(neuesfile[i].c_str(), pFile);
-    }
-
-    fclose(pFile);
 
     ESP_LOGD(TAG, "ChangeRSSIThreshold done");
 

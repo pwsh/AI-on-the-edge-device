@@ -532,6 +532,34 @@ httpd_handle_t start_webserverAP(void)
 }
 
 
+// Start the configuration access point and block until reboot. forcedReconfig == true means the
+// configured Wi-Fi exists but is unusable (couldn't connect, or invalid/empty credentials), so the AP
+// periodically reboots to retry; false means initial setup (files missing), so it waits indefinitely.
+void StartAPModeAndWait(bool forcedReconfig)
+{
+    s_apForcedReconfig = forcedReconfig;
+
+    ESP_LOGI(TAG, "Starting access point for remote configuration");
+    StatusLED(AP_OR_OTA, 2, true);
+    driveSystemStatusWs281x(0, 0, 60);   // RGB blue = AP setup / reconfiguration mode
+    wifi_init_softAP();
+    start_webserverAP();
+
+    int idleSeconds = 0;
+    while(1) { // wait until reboot (within task_do_Update_ZIP, the reboot button, or the retry below)
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        if (s_apForcedReconfig) {
+            if (s_apClientCount > 0) {
+                idleSeconds = 0;   // someone is connected and configuring -> don't disrupt them
+            }
+            else if (++idleSeconds >= WIFI_AP_RETRY_SECONDS) {
+                ESP_LOGW(TAG, "No client on AP for a while -> rebooting to retry the configured Wi-Fi");
+                esp_restart();
+            }
+        }
+    }
+}
+
 void CheckStartAPMode()
 {
     isConfigINI = FileExists(CONFIG_FILE);
@@ -556,27 +584,7 @@ void CheckStartAPMode()
     {
         // Distinguish "couldn't connect" (settings exist) from "needs initial setup" (files missing):
         // only the former periodically retries the configured Wi-Fi.
-        s_apForcedReconfig = forceAP && isConfigINI && isWlanINI;
-
-        ESP_LOGI(TAG, "Starting access point for remote configuration");
-        StatusLED(AP_OR_OTA, 2, true);
-        driveSystemStatusWs281x(0, 0, 60);   // RGB blue = AP setup / reconfiguration mode
-        wifi_init_softAP();
-        start_webserverAP();
-
-        int idleSeconds = 0;
-        while(1) { // wait until reboot (within task_do_Update_ZIP, the reboot button, or the retry below)
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            if (s_apForcedReconfig) {
-                if (s_apClientCount > 0) {
-                    idleSeconds = 0;   // someone is connected and configuring -> don't disrupt them
-                }
-                else if (++idleSeconds >= WIFI_AP_RETRY_SECONDS) {
-                    ESP_LOGW(TAG, "No client on AP for a while -> rebooting to retry the configured Wi-Fi");
-                    esp_restart();
-                }
-            }
-        }
+        StartAPModeAndWait(forceAP && isConfigINI && isWlanINI);
     }
 }
 

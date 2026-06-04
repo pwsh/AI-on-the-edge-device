@@ -19,6 +19,7 @@
 #include <esp_http_server.h>
 
 void CheckStartAPMode();
+void StartAPModeAndWait(bool forcedReconfig);
 
 #endif  //SOFTAP_H
 
