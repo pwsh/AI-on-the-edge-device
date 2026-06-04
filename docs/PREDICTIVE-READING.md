@@ -151,8 +151,10 @@ pattern (future work — it must never loosen below the physical ceiling).
 3. Next round, the digit CNN reuses the cached class for any ROI flagged `predictiveSkipNext`
    *before* cutting or diffing it — subordinate to the periodic full audit and the plausibility check.
 
-It is **off by default**. Enabling it requires both `PredictiveRead = true` in `[Digits]` and a
-`Utility` model in `[PostProcessing]`. Until the rolling history has two accepted samples (to estimate
+It is **off by default**. Enabling it requires `PredictiveRead = true` in `[Digits]` plus a rate
+bound for the sequence — either a `Utility` model in `[PostProcessing]`, **or** an existing
+`MaxRateValue` of type `RateChange` (a proven per-minute max), which the gate reuses directly. A
+sequence with neither is read in full as before. Until the rolling history has two accepted samples (to estimate
 the cadence) every digit is read, so the first rounds after a restart are always full reads. The
 plausibility check — which can only *reject*, never silently drop a real change — remains the always-on
 safety floor.

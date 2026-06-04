@@ -559,9 +559,20 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
 }
 
 void ClassFlowPostProcessing::UpdatePredictiveReadPlan(int j) {
-    // Only plan when the opt-in gate is on for the digit flow and a physics model exists.
+    // Only plan when the opt-in gate is on for the digit flow.
     if (!flowDigit || !flowDigit->IsPredictiveReadEnabled()) return;
-    if (NUMBERS[j]->PhysLimits.utility == predictive::Utility::Generic) return;
+
+    // The gate needs a rate bound. Prefer the configured physics model; otherwise fall back to the
+    // user's MaxRate (only the time-normalised RateChange type, which is already a per-minute rate) so
+    // PredictiveRead also works on a meter that just has a proven MaxRate set and no Utility model.
+    predictive::PhysicalLimits L = NUMBERS[j]->PhysLimits;
+    if (L.utility == predictive::Utility::Generic) {
+        if (NUMBERS[j]->useMaxRateValue && (NUMBERS[j]->MaxRateType == RateChange) && (NUMBERS[j]->MaxRateValue > 0)) {
+            L.userMaxRatePerMin = NUMBERS[j]->MaxRateValue;
+        } else {
+            return;   // no rate bound available -> read everything (existing behaviour)
+        }
+    }
 
     general* dg = NUMBERS[j]->digit_roi;
     if (!dg || dg->ROI.empty()) return;
@@ -597,7 +608,7 @@ void ClassFlowPostProcessing::UpdatePredictiveReadPlan(int j) {
         states.push_back(ds);
     }
 
-    predictive::ReadPlan plan = predictive::planRead(NUMBERS[j]->PhysLimits, states, nextIntervalMin, /*audit*/ false);
+    predictive::ReadPlan plan = predictive::planRead(L, states, nextIntervalMin, /*audit*/ false);
 
     // Map decisions (LSD-first) back onto the ROIs (MSD-first).
     for (int k = 0; k < nDig; ++k) {
