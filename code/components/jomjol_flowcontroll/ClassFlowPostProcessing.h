@@ -43,6 +43,9 @@ protected:
     void handleIgnoreLeadingNaN(string _decsep, string _value);
     void handleChangeRateThreshold(string _decsep, string _value);
     void handlecheckDigitIncreaseConsistency(std::string _decsep, std::string _value);
+    // Physics-bounded predictive reading: set one field of a sequence's PhysicalLimits. `_key` is the
+    // already-upper-cased parameter name; `_decsep` carries the optional `<NUMBER>.` prefix.
+    void handlePredictiveLimit(const std::string& _key, const std::string& _decsep, const std::string& _value);
 
     void WriteDataLog(int _index);
 

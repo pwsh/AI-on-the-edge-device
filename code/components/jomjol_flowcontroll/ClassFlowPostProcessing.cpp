@@ -522,6 +522,42 @@ void ClassFlowPostProcessing::handleMaxRateValue(string _decsep, string _value) 
     }
 }
 
+void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, const std::string& _decsep, const std::string& _value) {
+    // Resolve the optional "<NUMBER>." prefix the same way the other per-number handlers do.
+    std::string _digit;
+    int _pospunkt = _decsep.find_first_of(".");
+    if (_pospunkt > -1) {
+        _digit = _decsep.substr(0, _pospunkt);
+    } else {
+        _digit = "default";
+    }
+
+    std::string _val = _value;   // local non-const copy (isStringNumeric takes a non-const ref)
+
+    for (int j = 0; j < NUMBERS.size(); ++j) {
+        if (!((_digit == "default") || (NUMBERS[j]->name == _digit))) {
+            continue;
+        }
+        predictive::PhysicalLimits& L = NUMBERS[j]->PhysLimits;
+
+        if (_key == "UTILITY") {
+            std::string v = toUpper(trim(_val));
+            if (v == "WATER")            { L.utility = predictive::Utility::Water;       if (L.unitsPerValue <= 0) L.unitsPerValue = 1000.0; }
+            else if (v == "ELECTRICITY") { L.utility = predictive::Utility::Electricity; L.unitsPerValue = 1.0; }
+            else if (v == "GAS")         { L.utility = predictive::Utility::Gas;         L.unitsPerValue = 1.0; }
+            else                          L.utility = predictive::Utility::Generic;
+        }
+        else if (isStringNumeric(_val)) {
+            double d = std::stod(_val);
+            if      (_key == "PIPEDIAMETERMM")    { L.waterPipeDiameterMm = d; L.gasPipeDiameterMm = d; }
+            else if (_key == "SUPPLYPRESSUREKPA") { L.waterPressureKPa = d; L.gasPressureKPa = d; }
+            else if (_key == "SERVICEAMPS")       { L.elecServiceAmps = d; }
+            else if (_key == "SERVICEVOLTS")      { L.elecServiceVolts = d; }
+            else if (_key == "UNITSPERVALUE")     { if (d > 0) L.unitsPerValue = d; }
+        }
+    }
+}
+
 void ClassFlowPostProcessing::handleChangeRateThreshold(string _decsep, string _value) {
     string _digit, _decpos;
     int _pospunkt = _decsep.find_first_of(".");
@@ -646,6 +682,17 @@ bool ClassFlowPostProcessing::ReadParameter(FILE* pfile, string& aktparamgraph) 
         if ((toUpper(_param) == "PREVALUEAGESTARTUP") && (splitted.size() > 1)) {
             if (isStringNumeric(splitted[1])) {
                 PreValueAgeStartup = std::stoi(splitted[1]);
+            }
+        }
+
+        // Physics-bounded predictive reading. `Utility` (water/electricity/gas) turns it on and
+        // derives an automatic physical rate ceiling; the rest fine-tune the supply model.
+        {
+            std::string _pkey = toUpper(_param);
+            if ((splitted.size() > 1) &&
+                (_pkey == "UTILITY" || _pkey == "PIPEDIAMETERMM" || _pkey == "SUPPLYPRESSUREKPA" ||
+                 _pkey == "SERVICEAMPS" || _pkey == "SERVICEVOLTS" || _pkey == "UNITSPERVALUE")) {
+                handlePredictiveLimit(_pkey, splitted[0], splitted[1]);
             }
         }
     }
@@ -991,6 +1038,28 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             NUMBERS[j]->FlowRateAct = (NUMBERS[j]->Value - NUMBERS[j]->PreValue) / LastPreValueTimeDifference;
             NUMBERS[j]->ReturnRateValue =  to_string(NUMBERS[j]->FlowRateAct);
 
+            // Physics ceiling: when a utility model is configured, reject a jump that exceeds what the
+            // supply could physically deliver in the elapsed time. This derives its own bound (so no
+            // manual MaxRate is needed) and never rejects a physically-possible reading. It is skipped
+            // when the confidence vote has just accepted a lower value.
+            if ((NUMBERS[j]->PhysLimits.utility != predictive::Utility::Generic) &&
+                (NUMBERS[j]->Value != NUMBERS[j]->PreValue) && !confidenceOverride) {
+                predictive::Plausibility _pl = predictive::checkPlausibility(
+                    NUMBERS[j]->PhysLimits, NUMBERS[j]->PreValue, NUMBERS[j]->Value, LastPreValueTimeDifference);
+                if (_pl == predictive::Plausibility::ExceedsPhysicalMax) {
+                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate exceeds physical max - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma);
+                    NUMBERS[j]->Value = NUMBERS[j]->PreValue;
+                    NUMBERS[j]->ReturnValue = ErrorMessage ? "" : RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
+                    NUMBERS[j]->ReturnRateValue = "";
+                    NUMBERS[j]->timeStampLastValue = imagetime;
+                    string _zwp = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, _zwp);
+                    WriteDataLog(j);
+                    if (flowDigit) flowDigit->TriggerFullEval();   // force a full re-read next round
+                    continue;
+                }
+            }
+
             if ((NUMBERS[j]->useMaxRateValue) && (NUMBERS[j]->Value != NUMBERS[j]->PreValue) && !confidenceOverride) {
                 double _ratedifference;
 					
@@ -1029,6 +1098,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         }
         
         NUMBERS[j]->ReturnChangeAbsolute = RundeOutput(NUMBERS[j]->Value - NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
+        NUMBERS[j]->History.add(NUMBERS[j]->Value, imagetime);   // rolling window of accepted readings
         NUMBERS[j]->PreValue = NUMBERS[j]->Value;
         NUMBERS[j]->PreValueOkay = true;
         NUMBERS[j]->NegRateVoteCount = 0;   // §10: a value was accepted -> reset the confidence-vote streak

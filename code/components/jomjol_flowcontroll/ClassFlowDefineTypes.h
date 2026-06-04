@@ -4,6 +4,7 @@
 #define CLASSFLOWDEFINETYPES_H
 
 #include "ClassFlowImage.h"
+#include "ClassPredictiveReader.h"
 
 /**
  * Properties of one ROI
@@ -88,7 +89,13 @@ struct NumberPost {
     general *digit_roi;         // digitRoi; set of digit ROIs for the sequence
     general *analog_roi;        // analogRoi; set of analog ROIs for the sequence
 
-    string name;                // name; Designation for the sequence 
+    // Physics-bounded predictive reading (utility == Generic => inert; existing behaviour). When a
+    // utility model is set, a derived physical ceiling rejects impossible jumps automatically, so
+    // MaxRate only needs setting to override it. History feeds rate diagnostics / future gating.
+    predictive::PhysicalLimits PhysLimits;
+    predictive::RollingHistory History;
+
+    string name;                // name; Designation for the sequence
 };
 
 #endif
