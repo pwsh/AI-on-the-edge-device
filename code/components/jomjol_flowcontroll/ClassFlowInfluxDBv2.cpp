@@ -241,6 +241,13 @@ bool ClassFlowInfluxDBv2::doFlow(string zwtime)
             if (result.length() > 0)
                 influxdb.InfluxDBPublish(measurement, namenumber, result, resulttimeutc);
 //                InfluxDB_V2_Publish(measurement, namenumber, result, resulttimeutc);
+
+            // Leak detection: a 0/1 leak flag + seconds of continuous usage.
+            if ((*NUMBERS)[i]->LeakDetectionEnabled) {
+                std::string _lp = ((*NUMBERS)[i]->name == "default") ? "" : ((*NUMBERS)[i]->name + "/");
+                influxdb.InfluxDBPublish(measurement, _lp + "leak", (*NUMBERS)[i]->LeakDetected ? "1" : "0", resulttimeutc);
+                influxdb.InfluxDBPublish(measurement, _lp + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), resulttimeutc);
+            }
         }
 
         // Performance diagnostic: last digitization round (loop) processing time in ms, published

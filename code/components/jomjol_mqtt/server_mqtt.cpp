@@ -82,7 +82,7 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
         name = group + " " + name;
     }
 
-    if (field == "problem") { // Special case: Binary sensor which is based on error topic
+    if (field == "problem" || field == "leak") { // Binary sensors ("problem" derives from the error topic; "leak" has its own ON/OFF topic)
         component = "binary_sensor";
     }
     else if (field == "flowstart") { // Special case: Button
@@ -225,6 +225,12 @@ bool MQTThomeassistantDiscovery(int qos) {
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "timestamp",                  "Timestamp",                            "clock-time-eight-outline",  "",                    "timestamp",       "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "json",                       "JSON",                                 "code-json",                 "",                    "",                "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "problem",                    "Problem",                              "alert-outline",             "",                    "problem",         "",                 "",               qos); // Special binary sensor which is based on error topic
+
+        /* Leak detection sensors (only announced when enabled for this sequence) */
+        if ((*NUMBERS)[i]->LeakDetectionEnabled) {
+            allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group, "leak",             "Potential Leak",   "water-alert", "",  "moisture", "",            "",           qos); // Binary sensor, ON/OFF from the leak topic
+            allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group, "continuous_usage", "Continuous Usage", "timer-sand",  "s", "duration", "measurement", "diagnostic", qos); // Seconds of uninterrupted usage
+        }
     }
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all Homeassistant Discovery MQTT topics");

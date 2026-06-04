@@ -333,6 +333,13 @@ bool ClassFlowMQTT::doFlow(string zwtime)
             if (resulttimestamp.length() > 0)
                 success |= MQTTPublish(namenumber + "timestamp", resulttimestamp, qos, SetRetainFlag);
 
+            // Leak detection (water/gas): binary leak flag (ON/OFF for a HA binary_sensor) + the time
+            // the meter has been advancing continuously (seconds).
+            if ((*NUMBERS)[i]->LeakDetectionEnabled) {
+                success |= MQTTPublish(namenumber + "leak", (*NUMBERS)[i]->LeakDetected ? "ON" : "OFF", qos, SetRetainFlag);
+                success |= MQTTPublish(namenumber + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), qos, SetRetainFlag);
+            }
+
             std::string json = flowpostprocessing->getJsonFromNumber(i, "\n");
             success |= MQTTPublish(namenumber + "json", json, qos, SetRetainFlag);
         }

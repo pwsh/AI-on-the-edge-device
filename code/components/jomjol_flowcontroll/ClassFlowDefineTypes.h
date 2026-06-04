@@ -105,6 +105,15 @@ struct NumberPost {
     predictive::PhysicalLimits PhysLimits;
     predictive::RollingHistory History;
 
+    // --- Leak detection (water/gas): flag a potential leak when the meter advances continuously (no
+    // two consecutive equal readings) for longer than LeakThresholdSeconds. ContinuousUsageSeconds is
+    // the time since the value last held steady; both are exposed to MQTT/InfluxDB/REST/Home Assistant.
+    bool   LeakDetectionEnabled = false;   // config: enable leak detection for this sequence
+    long   LeakThresholdSeconds = 7200;    // config: continuous-usage time before flagging (default 2h)
+    time_t leakLastStableTime   = 0;       // runtime: last time two consecutive readings were equal
+    bool   LeakDetected         = false;   // runtime output: continuous usage exceeded the threshold
+    long   ContinuousUsageSeconds = 0;     // runtime output: seconds since the value last held steady
+
     string name;                // name; Designation for the sequence
 };
 

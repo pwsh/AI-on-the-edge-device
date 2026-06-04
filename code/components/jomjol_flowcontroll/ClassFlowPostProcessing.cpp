@@ -88,6 +88,11 @@ string ClassFlowPostProcessing::getJsonFromNumber(int i, std::string _lineend) {
         json += "    \"rate\": \"\"," + _lineend;
     }
 
+    if (NUMBERS[i]->LeakDetectionEnabled) {
+        json += "    \"leak\": " + std::string(NUMBERS[i]->LeakDetected ? "true" : "false") + "," + _lineend;
+        json += "    \"continuous_usage\": " + std::to_string(NUMBERS[i]->ContinuousUsageSeconds) + "," + _lineend;
+    }
+
     json += "    \"timestamp\": \"" + NUMBERS[i]->timeStamp + "\"" + _lineend;
     json += "  }" + _lineend;
 
@@ -448,6 +453,32 @@ void ClassFlowPostProcessing::handleAllowNegativeRate(string _decsep, string _va
     }
 }
 
+void ClassFlowPostProcessing::handleLeakDetection(string _decsep, string _value) {
+    string _digit;
+    int _pospunkt = _decsep.find_first_of(".");
+    _digit = (_pospunkt > -1) ? _decsep.substr(0, _pospunkt) : "default";
+    for (int j = 0; j < NUMBERS.size(); ++j) {
+        if ((_digit == "default") || (NUMBERS[j]->name == _digit)) {
+            NUMBERS[j]->LeakDetectionEnabled = alphanumericToBoolean(_value);
+        }
+    }
+}
+
+void ClassFlowPostProcessing::handleLeakThreshold(string _decsep, string _value) {
+    // Config value is in HOURS (user-friendly); stored internally as seconds.
+    string _digit;
+    int _pospunkt = _decsep.find_first_of(".");
+    _digit = (_pospunkt > -1) ? _decsep.substr(0, _pospunkt) : "default";
+    if (!isStringNumeric(_value)) return;
+    long _sec = (long)(std::stof(_value) * 3600.0f);
+    if (_sec < 0) _sec = 0;
+    for (int j = 0; j < NUMBERS.size(); ++j) {
+        if ((_digit == "default") || (NUMBERS[j]->name == _digit)) {
+            NUMBERS[j]->LeakThresholdSeconds = _sec;
+        }
+    }
+}
+
 void ClassFlowPostProcessing::handleIgnoreLeadingNaN(string _decsep, string _value) {
     string _digit, _decpos;
     int _pospunkt = _decsep.find_first_of(".");
@@ -739,6 +770,14 @@ bool ClassFlowPostProcessing::ReadParameter(FILE* pfile, string& aktparamgraph) 
         if ((toUpper(_param) == "CONFIDENCEVOTES") && (splitted.size() > 1)) {
             ConfidenceVotes = std::atoi(splitted[1].c_str());   // 0 = off
             if (ConfidenceVotes < 0) ConfidenceVotes = 0;
+        }
+
+        if ((toUpper(_param) == "LEAKDETECTION") && (splitted.size() > 1)) {
+            handleLeakDetection(splitted[0], splitted[1]);
+        }
+
+        if ((toUpper(_param) == "LEAKTHRESHOLD") && (splitted.size() > 1)) {
+            handleLeakThreshold(splitted[0], splitted[1]);
         }
 			
         if ((toUpper(_param) == "ERRORMESSAGE") && (splitted.size() > 1)) {
@@ -1172,6 +1211,27 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         NUMBERS[j]->ReturnChangeAbsolute = RundeOutput(NUMBERS[j]->Value - NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
         NUMBERS[j]->History.add(NUMBERS[j]->Value, imagetime);   // rolling window of accepted readings
         UpdatePredictiveReadPlan(j);                             // mark digits the next round can skip
+
+        // Leak detection: a leak makes the meter advance continuously (no two consecutive equal
+        // readings). Track the time since the value last held steady; flag a potential leak once that
+        // continuous-usage time exceeds the threshold (default 2h, so lawn watering etc. is fine).
+        // NOTE: PreValue here is still the PREVIOUS accepted value (it is updated just below).
+        if (NUMBERS[j]->LeakDetectionEnabled) {
+            double _eps = 0.5 * pow(10.0, -NUMBERS[j]->Nachkomma);   // half a displayed least-sig unit
+            bool _steady = (fabs(NUMBERS[j]->Value - NUMBERS[j]->PreValue) < _eps);
+            if (_steady || (NUMBERS[j]->leakLastStableTime == 0)) {
+                NUMBERS[j]->leakLastStableTime = imagetime;          // (re)start the continuous-usage timer
+            }
+            long _cont = (long)difftime(imagetime, NUMBERS[j]->leakLastStableTime);
+            NUMBERS[j]->ContinuousUsageSeconds = (_cont < 0) ? 0 : _cont;
+            NUMBERS[j]->LeakDetected = (NUMBERS[j]->ContinuousUsageSeconds > NUMBERS[j]->LeakThresholdSeconds);
+            if (NUMBERS[j]->LeakDetected) {
+                LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": potential leak - continuous usage for " +
+                    std::to_string(NUMBERS[j]->ContinuousUsageSeconds / 60) + " min (threshold " +
+                    std::to_string(NUMBERS[j]->LeakThresholdSeconds / 60) + " min)");
+            }
+        }
+
         NUMBERS[j]->PreValue = NUMBERS[j]->Value;
         NUMBERS[j]->PreValueOkay = true;
         NUMBERS[j]->NegRateVoteCount = 0;   // §10: a value was accepted -> reset the confidence-vote streak

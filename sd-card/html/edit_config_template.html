@@ -1123,6 +1123,30 @@
             <td>$TOOLTIP_PostProcessing_NUMBER.MaxRateType</td>
         </tr>
 
+        <tr>
+            <td class="indent2">
+                <label><class id="PostProcessing_LeakDetection_text" style="color:black;">Leak Detection</class></label>
+            </td>
+            <td>
+                <select id="PostProcessing_LeakDetection_value1">
+                    <option value="true">enabled (true)</option>
+                    <option value="false" selected>disabled (false)</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.LeakDetection</td>
+        </tr>
+
+        <tr>
+            <td class="indent2">
+                <input type="checkbox" id="PostProcessing_LeakThreshold_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "LeakThreshold")' unchecked >
+                <label for=PostProcessing_LeakThreshold_enabled><class id="PostProcessing_LeakThreshold_text" style="color:black;">Leak Threshold (hours)</class></label>
+            </td>
+            <td>
+                <input type="number" id="PostProcessing_LeakThreshold_value1" size="13" min="0" step="any" value="2">
+            </td>
+            <td>$TOOLTIP_PostProcessing_NUMBER.LeakThreshold</td>
+        </tr>
+
         <tr class="expert">
             <td class="indent2">
                 <input type="checkbox" id="PostProcessing_WaterPipeDiameterMm_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "WaterPipeDiameterMm")' unchecked >
@@ -3458,6 +3482,13 @@ function populateMaxRateFromUtility() {
     if (mt) mt.value = "RateChange";
     var mten = document.getElementById("PostProcessing_MaxRateType_enabled");
     if (mten && !mten.checked) { mten.checked = true; InvertEnableItem("PostProcessing", "MaxRateType"); }
+
+    // Leak detection defaults on for water/gas, off for electricity (the user can still override).
+    var leak = document.getElementById("PostProcessing_LeakDetection_value1");
+    if (leak) {
+        if (u === "water" || u === "gas") leak.value = "true";
+        else if (u === "electricity") leak.value = "false";
+    }
 }
 
 function numberChanged() {
