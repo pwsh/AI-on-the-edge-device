@@ -106,19 +106,70 @@ void ClassFlowCNNGeneral::AppendDigitMatrixJson(std::string &json) {
     if (CNNType != Digit) return;   // only the digit-class flow keeps a per-digit class matrix
     for (int s = 0; s < (int)GENERAL.size(); ++s) {
         if (!json.empty() && json.back() != '{') json += ",";
-        json += "\"" + GENERAL[s]->name + "\":[";
+
+        // Per-sequence confidence = the weakest digit's confidence from the most recent reads (a
+        // reading is only as trustworthy as its least-certain digit). As an integer percent, -1 = n/a.
+        int seqConf = -1;
+        for (int i = 0; i < (int)GENERAL[s]->ROI.size(); ++i) {
+            int c = (int)(GENERAL[s]->ROI[i]->result_confidence * 100.0f + 0.5f);
+            if (c < 0) c = 0; if (c > 100) c = 100;
+            if (seqConf < 0 || c < seqConf) seqConf = c;
+        }
+
+        json += "\"" + GENERAL[s]->name + "\":{\"confidence\":" + std::to_string(seqConf) + ",\"digits\":[";
         for (int i = 0; i < (int)GENERAL[s]->ROI.size(); ++i) {
             roi *R = GENERAL[s]->ROI[i];
             if (i) json += ",";
             int snap[predictive::DigitHistory::CAP];
             int n = R->hist.snapshot(snap, predictive::DigitHistory::CAP);
             std::string cur = ((R->result_klasse >= 0) && (R->result_klasse < 10)) ? std::to_string(R->result_klasse) : std::string("\"N\"");
-            json += "{\"roi\":\"" + R->name + "\",\"cur\":" + cur + ",\"hist\":[";
+            int dconf = (int)(R->result_confidence * 100.0f + 0.5f); if (dconf < 0) dconf = 0; if (dconf > 100) dconf = 100;
+            json += "{\"roi\":\"" + R->name + "\",\"cur\":" + cur + ",\"conf\":" + std::to_string(dconf) + ",\"hist\":[";
             for (int k = 0; k < n; ++k) { if (k) json += ","; json += std::to_string(snap[k]); }
             json += "]}";
         }
-        json += "]";
+        json += "]}";
     }
+}
+
+std::string ClassFlowCNNGeneral::ExamineCut(const std::string &cutOrgPath, const std::string &displayPath, bool ccw) {
+    CImageBasis *org = new CImageBasis("examineOrg", cutOrgPath);
+    if (!org || !org->ImageOkay()) { delete org; return "\"error\":\"could not load the ROI cut\""; }
+
+    // Resize the cut to the model input and save THAT (what the CNN actually sees) for display.
+    CImageBasis *rs = new CImageBasis("examineRs", modelxsize, modelysize, modelchannel);
+    org->Resize(modelxsize, modelysize, rs);
+    rs->SaveToFile(FormatFileName(displayPath));
+
+    CTfLiteClass *tfl = new CTfLiteClass;
+    std::string m = FormatFileName("/sdcard" + cnnmodelfile);
+    std::string res;
+    if (!tfl->LoadModel(m) || !tfl->MakeAllocate()) {
+        res = "\"error\":\"could not load the model\"";
+    }
+    else if (CNNType == Digit) {                       // class digit model -> class + softmax confidence
+        float conf = 0.0f;
+        int klass = tfl->GetClassFromImageBasis(rs, &conf);
+        std::string rd = ((klass >= 0) && (klass < 10)) ? std::to_string(klass) : std::string("N");
+        int pct = (int)(conf * 100.0f + 0.5f); if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+        res = "\"reading\":\"" + rd + "\",\"confidence\":" + std::to_string(pct) + ",\"type\":\"digit\"";
+    }
+    else {                                             // analog (pointer) / continuous -> value, no class confidence
+        if (tfl->LoadInputImageBasis(rs)) {
+            tfl->Invoke();
+            float f1 = tfl->GetOutputValue(0);
+            float f2 = tfl->GetOutputValue(1);
+            float v = fmod(atan2(f1, f2) / (M_PI * 2) + 2, 1) * 10.0f;
+            if (ccw) v = 10.0f - v;
+            char buf[16]; snprintf(buf, sizeof(buf), "%.1f", v);
+            res = "\"reading\":\"" + std::string(buf) + "\",\"confidence\":null,\"type\":\"analog\"";
+        } else {
+            res = "\"error\":\"inference failed\"";
+        }
+    }
+
+    delete tfl; delete rs; delete org;
+    return res;
 }
 
 // True if the less-significant neighbour (index i+1, MSD-first ordering) of digit i looks unchanged

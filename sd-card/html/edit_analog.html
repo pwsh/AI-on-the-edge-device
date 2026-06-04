@@ -153,8 +153,20 @@
 		
         <tr>
             <td colspan="3"><input type="checkbox" id="CCW" name="CCW" value="0" onclick="changeCCW()" unchecked tabindex=8><label for="CCW">Counter clockwise rotation (CCW)</label></td>
-        </tr>		
-    </table>		 
+        </tr>
+        <tr>
+            <td colspan="3" style="padding-top:6px;">
+                <input class="button" type="button" id="examineROIbtn" onclick="examineROI(true, document.getElementById('CCW').checked)" value="Examine selected ROI">
+                <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
+            </td>
+        </tr>
+    </table>
+    <div id="examineResult" style="display:none; margin-top:6px; padding:8px; border:1px solid rgba(127,127,127,.35); border-radius:6px;">
+        <img id="examineImg" alt="Analysed ROI image" style="height:72px; image-rendering:pixelated; border:1px solid rgba(127,127,127,.35); vertical-align:middle; background:#fff;">
+        <span style="margin-left:14px; font-size:1.15em;">Reading: <b id="examineReading">—</b></span>
+        <span style="margin-left:14px;">Confidence: <b id="examineConf">—</b></span>
+        <div style="font-size:.82em; color:#888; margin-top:4px;">Analysed fresh from the reference image at the current ROI box (analog dials report a value, not a class confidence).</div>
+    </div>
 </div>
 
 <hr>
@@ -280,6 +292,31 @@ The following settings are only used for easier setup, they are <b>not</b> persi
 	    
         UpdateROIs();
         draw();
+    }
+
+    // Examine the currently-selected ROI: cut its box from the reference image, run the CNN, and show
+    // the analysed image + reading + confidence inline. Uses the live x/y/Δx/Δy fields.
+    function examineROI(isAnalog, ccw) {
+        var x = parseInt(document.getElementById('refx').value);
+        var y = parseInt(document.getElementById('refy').value);
+        var dx = parseInt(document.getElementById('refdx').value);
+        var dy = parseInt(document.getElementById('refdy').value);
+        var st = document.getElementById('examineStatus');
+        if ([x, y, dx, dy].some(isNaN)) { st.textContent = 'set the ROI box first'; return; }
+        st.textContent = 'examining…';
+        var type = isAnalog ? 'analog' : 'digit';
+        var url = getDomainname() + '/editflow?task=examineroi&type=' + type +
+                  '&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy + (isAnalog ? ('&ccw=' + (ccw ? 'true' : 'false')) : '');
+        fetch(url, { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(d){
+            st.textContent = '';
+            var box = document.getElementById('examineResult'); box.style.display = 'block';
+            var rd = document.getElementById('examineReading'), cf = document.getElementById('examineConf'), im = document.getElementById('examineImg');
+            if (d.error) { rd.textContent = '—'; cf.textContent = d.error; im.removeAttribute('src'); return; }
+            im.src = getDomainname() + d.image + '?t=' + Date.now();
+            rd.textContent = d.reading;
+            cf.textContent = (d.confidence === null || typeof d.confidence === 'undefined') ? 'n/a (analog)' : (d.confidence + '%');
+            cf.style.color = (typeof d.confidence === 'number') ? (d.confidence >= 90 ? '#1f9d55' : (d.confidence >= 70 ? '#b7791f' : '#c0392b')) : '';
+        }).catch(function(e){ st.textContent = 'error: ' + e; });
     }
 
     function newROI() {

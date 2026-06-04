@@ -58,6 +58,11 @@ public:
     // Append this flow's per-digit confident-read matrix as JSON object members ("seqname":[ ... ]).
     // Only emits for digit-class flows (Digit). Caller wraps the members in { }.
     void AppendDigitMatrixJson(std::string &json);
+
+    // On-demand single-ROI examine: load the already-cut ROI image at cutOrgPath, resize it to this
+    // flow's model input (saving that analysed image to displayPath), run the CNN, and return a JSON
+    // fragment: "reading":"<digit/value/N>","confidence":<percent|null>  (no surrounding braces).
+    std::string ExamineCut(const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
 protected:
 
     bool isDigitalCNN();                       // true for Digit / Digit100

@@ -1505,6 +1505,41 @@ esp_err_t handler_editflow(httpd_req_t *req)
         httpd_resp_send(req, zw.c_str(), zw.length());
     }
 
+    // On-demand single-ROI examine: cut the given box from the reference image and run the CNN on it,
+    // returning {reading, confidence, image}. Used by the ROI editors' "Examine" button.
+    if (_task.compare("examineroi") == 0)
+    {
+        int x = 0, y = 0, dx = 20, dy = 20;
+        bool isAnalog = false, ccw = false;
+        char vc[40];
+        auto getInt = [&](const char *k, int &dst){ if (httpd_query_key_value(_query, k, vc, sizeof(vc)) == ESP_OK) { std::string s(vc); if (isStringNumeric(s)) dst = std::stoi(s); } };
+        getInt("x", x); getInt("y", y); getInt("dx", dx); getInt("dy", dy);
+        if (httpd_query_key_value(_query, "type", vc, sizeof(vc)) == ESP_OK) isAnalog = (std::string(vc) == "analog");
+        if (httpd_query_key_value(_query, "ccw",  vc, sizeof(vc)) == ESP_OK) ccw = (std::string(vc) == "true");
+
+        std::string body;
+        bool gotLock = flowRoundTryLock();
+        if (gotLock && psram_init_shared_memory_for_take_image_step())
+        {
+            CAlignAndCutImage *caic = new CAlignAndCutImage("examine", std::string("/sdcard/config/reference.jpg"));
+            caic->CutAndSave(std::string("/sdcard/img_tmp/examine_org.jpg"), x, y, dx, dy);
+            delete caic;
+            std::string frag = flowctrl.ExamineCutRoi(isAnalog, "/sdcard/img_tmp/examine_org.jpg", "/sdcard/img_tmp/examine.jpg", ccw);
+            body = "{" + frag + ",\"image\":\"/img_tmp/examine.jpg\"}";
+            psram_deinit_shared_memory_for_take_image_step();
+        }
+        else
+        {
+            body = "{\"error\":\"device is busy with a round - try again in a moment\"}";
+        }
+        if (gotLock) flowRoundUnlock();
+
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, body.c_str(), body.length());
+        return ESP_OK;
+    }
+
     if (_task.compare("cutref") == 0)
     {
         std::string in, out, zw;

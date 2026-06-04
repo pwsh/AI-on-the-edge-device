@@ -60,6 +60,9 @@ public:
 	string getReadoutAll(int _type);
 	// JSON of the per-digit confident-read matrix for every digit sequence (for the overview display).
 	string getDigitMatrixJson();
+	// On-demand: run the digit/analog CNN on an already-cut ROI image and return a JSON fragment
+	// ("reading":..,"confidence":..). Routes to the digit or analog flow. Caller handles mutex/PSRAM.
+	string ExamineCutRoi(bool isAnalog, const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
 	bool UpdatePrevalue(std::string _newvalue, std::string _numbers, bool _extern);
 	string GetPrevalue(std::string _number = "");	
 	bool ReadParameter(FILE* pfile, string& aktparamgraph);	

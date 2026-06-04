@@ -487,6 +487,15 @@ string ClassFlowControll::getDigitMatrixJson()
     return json;
 }
 
+string ClassFlowControll::ExamineCutRoi(bool isAnalog, const std::string &cutOrgPath, const std::string &displayPath, bool ccw)
+{
+    ClassFlowCNNGeneral *flow = isAnalog ? flowanalog : flowdigit;
+    if (!flow) {
+        return "\"error\":\"no " + std::string(isAnalog ? "analog" : "digit") + " model is configured\"";
+    }
+    return flow->ExamineCut(cutOrgPath, displayPath, ccw);
+}
+
 void ClassFlowControll::doFlowTakeImageOnly(string time)
 {
     std::string zw_time;
