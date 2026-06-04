@@ -57,7 +57,9 @@ public:
 	void doFlowTakeImageOnly(string time);
 	bool getStatusSetupModus(){return SetupModeActive;};
 	string getReadout(bool _rawvalue, bool _noerror, int _number);
-	string getReadoutAll(int _type);	
+	string getReadoutAll(int _type);
+	// JSON of the per-digit confident-read matrix for every digit sequence (for the overview display).
+	string getDigitMatrixJson();
 	bool UpdatePrevalue(std::string _newvalue, std::string _numbers, bool _extern);
 	string GetPrevalue(std::string _number = "");	
 	bool ReadParameter(FILE* pfile, string& aktparamgraph);	

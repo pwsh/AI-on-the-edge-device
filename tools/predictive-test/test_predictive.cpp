@@ -121,6 +121,34 @@ int main() {
     CHECK(APPROX(step, 1.0, 1e-9));   // two 60s gaps over 3 samples
     RollingHistory h1; h1.add(5.0, 0); double s1; CHECK(!h1.averageStepMinutes(s1)); // <2 samples -> false
 
+    printf("== digit history matrix ==\n");
+    DigitHistory dh;
+    dh.addConfident(5); dh.addConfident(5); dh.addConfident(6); dh.addConfident(5);
+    dh.addConfident(-1); dh.addConfident(12);   // out-of-range ignored
+    CHECK(dh.count()==4);
+    int mr; CHECK(dh.mostRecent(mr) && mr==5);
+    int mv,votes; CHECK(dh.mode(mv,votes) && mv==5 && votes==3);
+    int maj; CHECK(dh.majority(maj) && maj==5);   // 3/4 > half
+    int snap[8]; int sn=dh.snapshot(snap,8);
+    CHECK(sn==4 && snap[0]==5 && snap[1]==6 && snap[2]==5 && snap[3]==5);  // newest first
+    DigitHistory tie; tie.addConfident(1); tie.addConfident(2); int t;
+    CHECK(!tie.majority(t));   // 1 vs 1, no majority
+
+    printf("== resolveUnknownDigit ==\n");
+    int out;
+    DigitHistory empty;
+    CHECK(!resolveUnknownDigit(empty, false, false, out));   // no history -> stays N
+    // cannot increment -> majority
+    DigitHistory h7; h7.addConfident(7); h7.addConfident(7); h7.addConfident(8);
+    CHECK(resolveUnknownDigit(h7, /*canInc*/false, false, out) && out==7);   // majority 7
+    // can increment, lower stable -> most recent (8)
+    CHECK(resolveUnknownDigit(h7, /*canInc*/true, /*lowerChanged*/false, out) && out==8);
+    // can increment, lower changed -> best effort most recent (8)
+    CHECK(resolveUnknownDigit(h7, /*canInc*/true, /*lowerChanged*/true, out) && out==8);
+    // cannot increment, no majority -> most recent
+    DigitHistory h12; h12.addConfident(1); h12.addConfident(2);
+    CHECK(resolveUnknownDigit(h12, false, false, out) && out==2);
+
     printf("\n%s (%d failures)\n", failures==0?"ALL PASS":"FAILURES", failures);
     return failures==0?0:1;
 }

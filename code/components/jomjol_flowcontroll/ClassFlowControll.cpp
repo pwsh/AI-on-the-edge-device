@@ -477,6 +477,16 @@ void ClassFlowControll::setActStatus(std::string _aktstatus)
     aktstatusWithTime = aktstatus;
 }
 
+string ClassFlowControll::getDigitMatrixJson()
+{
+    string json = "{";
+    if (flowdigit) {
+        flowdigit->AppendDigitMatrixJson(json);
+    }
+    json += "}";
+    return json;
+}
+
 void ClassFlowControll::doFlowTakeImageOnly(string time)
 {
     std::string zw_time;

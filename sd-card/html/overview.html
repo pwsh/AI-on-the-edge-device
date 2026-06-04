@@ -25,6 +25,17 @@
 	@keyframes digitFlash { 0% { background: #ffd24d; } 100% { background: transparent; } }
 	html[data-theme="dark"] .digit-changed { animation: digitFlashDark 1.4s ease-out; }
 	@keyframes digitFlashDark { 0% { background: #7a5a00; } 100% { background: transparent; } }
+
+	/* Per-digit confident-read matrix (most recent identifications per digit). */
+	.dm-seq { margin-top: 8px; }
+	.dm-seq h4 { margin: 6px 0 4px; font-size: .95em; }
+	table.dm { border-collapse: collapse; font-family: monospace; font-size: .95em; }
+	table.dm th, table.dm td { border: 1px solid rgba(127,127,127,.35); padding: 2px 7px; text-align: center; min-width: 1.6em; }
+	table.dm th { font-weight: 600; }
+	table.dm tr.dm-cur td { font-weight: 700; }
+	table.dm td.dm-roi, table.dm th.dm-rowlabel { text-align: right; color: #888; font-weight: 400; }
+	table.dm td.dm-n { color: #c0392b; font-weight: 700; }
+	table.dm td.dm-blank { color: rgba(127,127,127,.4); }
 </style>
 
 </head>
@@ -58,6 +69,7 @@
 				<img id="img" src="" alt="Latest processed image">
 			</div>
 		</div>
+		<div id="digitmatrix"></div>
 	</div>
 
 	<script type="text/javascript" src="jquery-3.6.0.min.js?v=$COMMIT_HASH"></script>
@@ -83,6 +95,7 @@
 			loadValue("raw", "raw", "border-collapse: collapse; width: 100%");
 			loadValue("prevalue", "prevalue", "border-collapse: collapse; width: 100%");
 			loadValue("error", "error", "border-collapse: collapse; width: 100%");
+			loadDigitMatrix();
 			loadStatus();
 			loadDiagnostics();
 			loadSntpDate();
@@ -98,6 +111,7 @@
 			loadValue("raw", "raw", "border-collapse: collapse; width: 100%");
 			loadValue("prevalue", "prevalue", "border-collapse: collapse; width: 100%");
 			loadValue("error", "error", "border-collapse: collapse; width: 100%");
+			loadDigitMatrix();
 			loadDiagnostics();
 			loadRoundCounter();
 			LoadROIImage();
@@ -268,6 +282,51 @@
 			}
 			_prevValueText[_key] = txt;
 			return html;
+		}
+
+		// Per-digit confident-read matrix: shows, below each configured number sequence, the most
+		// recent identifications for every digit (newest first), so the raw recognition can be seen.
+		function dmEsc(s) { return String(s).replace(/[&<>]/g, function(c){ return c==='&'?'&amp;':c==='<'?'&lt;':'&gt;'; }); }
+		function loadDigitMatrix() {
+			var url = getDomainname() + '/digit_matrix';
+			var x = new XMLHttpRequest();
+			x.onreadystatechange = function() {
+				if (this.readyState != 4 || this.status != 200) return;
+				var data;
+				try { data = JSON.parse(x.responseText); } catch (e) { return; }
+				var host = document.getElementById('digitmatrix');
+				var seqs = Object.keys(data);
+				if (!seqs.length) { host.innerHTML = ''; return; }
+				var html = '<div class="app-card"><div class="ov-card-title">Digit matrix (recent identifications)</div>';
+				var any = false;
+				for (var s = 0; s < seqs.length; s++) {
+					var digits = data[seqs[s]];
+					if (!digits || !digits.length) continue;
+					any = true;
+					var maxh = 0;
+					for (var d = 0; d < digits.length; d++) maxh = Math.max(maxh, (digits[d].hist || []).length);
+					html += '<div class="dm-seq"><h4>' + dmEsc(seqs[s]) + '</h4><table class="dm">';
+					html += '<tr class="dm-cur"><th class="dm-rowlabel">now</th>';
+					for (var d = 0; d < digits.length; d++) {
+						var cur = digits[d].cur;
+						html += (cur === 'N' || cur === null) ? '<td class="dm-n">N</td>' : '<td>' + dmEsc(cur) + '</td>';
+					}
+					html += '</tr>';
+					for (var r = 0; r < maxh; r++) {
+						html += '<tr><th class="dm-rowlabel">-' + (r + 1) + '</th>';
+						for (var d = 0; d < digits.length; d++) {
+							var h = digits[d].hist || [];
+							html += (r < h.length) ? '<td>' + dmEsc(h[r]) + '</td>' : '<td class="dm-blank">·</td>';
+						}
+						html += '</tr>';
+					}
+					html += '</table></div>';
+				}
+				html += '</div>';
+				host.innerHTML = any ? html : '';
+			};
+			x.open('GET', url, true);
+			x.send();
 		}
 
 		function loadValue(_type, _div, _style) {

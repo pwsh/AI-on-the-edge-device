@@ -137,6 +137,37 @@ struct ReadPlan {
     int    plannedReads = 0;        // count of mustRead == true
 };
 
+// Per-digit rolling history of CONFIDENTLY-read class values (0..9 only). Inferred / resolved / "N"
+// values are NEVER stored here - only what the CNN actually read with confidence. Used to resolve
+// unknown digits and shown on the overview matrix.
+class DigitHistory {
+public:
+    static const int CAP = 8;
+    DigitHistory() : count_(0), head_(0) {}
+
+    void addConfident(int v);                 // store a confident 0..9 read; out-of-range is ignored
+    int  count() const { return count_; }
+    bool empty() const { return count_ == 0; }
+    bool mostRecent(int& out) const;          // newest stored value
+    bool mode(int& out, int& votes) const;    // most frequent value + how many times it appears
+    bool majority(int& out) const;            // a value held by strictly more than half the samples
+    int  snapshot(int* dst, int maxn) const;  // copy up to maxn values newest-first; returns count
+    void clear() { count_ = 0; head_ = 0; }
+
+private:
+    int buf_[CAP];
+    int count_, head_;
+    int at(int idxFromOldest) const;
+};
+
+// Resolve an "N"/unknown digit to a best-guess integer from its confident-read history and whether it
+// can physically increment this round. Returns false (keep it "N") only when there is no confident
+// history at all. Rules:
+//   * cannot increment           -> use the history majority, else the most recent confident read.
+//   * can increment, neighbour stable below -> assume unchanged -> most recent confident read.
+//   * can increment, neighbour changed below -> genuinely uncertain -> best effort: most recent read.
+bool resolveUnknownDigit(const DigitHistory& h, bool canIncrement, bool lowerNeighborChanged, int& out);
+
 enum class Plausibility {
     Plausible,            // within the physical ceiling
     ExceedsPhysicalMax,   // jump is faster than physics allows -> almost certainly a misread

@@ -2174,6 +2174,15 @@ esp_err_t handler_reload_config(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t handler_digit_matrix(httpd_req_t *req)
+{
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_type(req, "application/json");
+    std::string json = flowctrl.getDigitMatrixJson();
+    httpd_resp_sendstr(req, json.c_str());
+    return ESP_OK;
+}
+
 void register_server_main_flow_task_uri(httpd_handle_t server)
 {
     ESP_LOGI(TAG, "server_main_flow_task - Registering URI handlers");
@@ -2210,6 +2219,11 @@ void register_server_main_flow_task_uri(httpd_handle_t server)
     camuri.uri = "/reload_config";
     camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_reload_config);
     camuri.user_ctx = (void *)"Reload Config";
+    httpd_register_uri_handler(server, &camuri);
+
+    camuri.uri = "/digit_matrix";
+    camuri.handler = APPLY_BASIC_AUTH_FILTER(handler_digit_matrix);
+    camuri.user_ctx = (void *)"Digit Matrix";
     httpd_register_uri_handler(server, &camuri);
 
     camuri.uri = "/statusflow.html";

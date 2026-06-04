@@ -102,6 +102,37 @@ void ClassFlowCNNGeneral::fastReadUpdateCache(roi *r, int klasse, float value) {
     r->fastCacheValid = true;
 }
 
+void ClassFlowCNNGeneral::AppendDigitMatrixJson(std::string &json) {
+    if (CNNType != Digit) return;   // only the digit-class flow keeps a per-digit class matrix
+    for (int s = 0; s < (int)GENERAL.size(); ++s) {
+        if (!json.empty() && json.back() != '{') json += ",";
+        json += "\"" + GENERAL[s]->name + "\":[";
+        for (int i = 0; i < (int)GENERAL[s]->ROI.size(); ++i) {
+            roi *R = GENERAL[s]->ROI[i];
+            if (i) json += ",";
+            int snap[predictive::DigitHistory::CAP];
+            int n = R->hist.snapshot(snap, predictive::DigitHistory::CAP);
+            std::string cur = ((R->result_klasse >= 0) && (R->result_klasse < 10)) ? std::to_string(R->result_klasse) : std::string("\"N\"");
+            json += "{\"roi\":\"" + R->name + "\",\"cur\":" + cur + ",\"hist\":[";
+            for (int k = 0; k < n; ++k) { if (k) json += ","; json += std::to_string(snap[k]); }
+            json += "]}";
+        }
+        json += "]";
+    }
+}
+
+// True if the less-significant neighbour (index i+1, MSD-first ordering) of digit i looks unchanged
+// vs its own confident history - i.e. no carry could have reached digit i this round. The
+// least-significant digit (no neighbour below) is treated as "could have changed".
+bool ClassFlowCNNGeneral::digitLowerNeighborStable(int _seq, int i) {
+    int below = i + 1;
+    if (below >= (int)GENERAL[_seq]->ROI.size()) return false;   // no digit below -> assume changeable
+    roi *low = GENERAL[_seq]->ROI[below];
+    int mv;
+    if (!low->hist.majority(mv)) return false;                   // unknown below -> can't assume stable
+    return (low->result_klasse == mv);                           // current read matches its steady state
+}
+
 string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution, int prev, float _before_narrow_Analog, float AnalogToDigitTransitionStart) {
     string result = "";    
 
@@ -132,8 +163,25 @@ string ClassFlowCNNGeneral::getReadout(int _analog = 0, bool _extendedResolution
 
     if (CNNType == Digit) {
         for (int i = 0; i < GENERAL[_analog]->ROI.size(); ++i) {
-            if ((GENERAL[_analog]->ROI[i]->result_klasse >= 0) && (GENERAL[_analog]->ROI[i]->result_klasse < 10)) {
-                result = result + std::to_string(GENERAL[_analog]->ROI[i]->result_klasse);
+            roi *R = GENERAL[_analog]->ROI[i];
+            if ((R->result_klasse >= 0) && (R->result_klasse < 10)) {
+                result = result + std::to_string(R->result_klasse);
+            }
+            else if (ResolveUnknownEnabled) {
+                // Unknown digit: resolve it from its confident-read matrix using whether it can
+                // physically increment (predictive plan) and whether the digit below looks stable.
+                // Digits are MSD-first here, so the less-significant neighbour is index i+1.
+                int resolved;
+                bool canIncrement = !R->predictiveSkipNext;
+                bool lowerChanged = !digitLowerNeighborStable(_analog, i);
+                if (predictive::resolveUnknownDigit(R->hist, canIncrement, lowerChanged, resolved)) {
+                    result = result + std::to_string(resolved);
+                    LOGD(TAG, "getReadout: resolved unknown digit '" + R->name + "' -> " + std::to_string(resolved) +
+                        " (canIncrement=" + std::to_string(canIncrement) + ", lowerChanged=" + std::to_string(lowerChanged) + ")");
+                }
+                else {
+                    result = result + "N";   // no confident history -> genuinely unknown
+                }
             }
             else {
                 result = result + "N";
@@ -467,6 +515,10 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
 
         if ((toUpper(splitted[0]) == "PREDICTIVEREAD") && (splitted.size() > 1)) {
             PredictiveReadEnabled = alphanumericToBoolean(splitted[1]);
+        }
+
+        if ((toUpper(splitted[0]) == "RESOLVEUNKNOWNDIGITS") && (splitted.size() > 1)) {
+            ResolveUnknownEnabled = alphanumericToBoolean(splitted[1]);
         }
     }
 
@@ -869,6 +921,13 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image, &_digitConf);
                         GENERAL[n]->ROI[roi]->result_confidence = _digitConf;
                         ESP_LOGD(TAG, "General result (Digit)%i: %d (conf %.2f)", roi, GENERAL[n]->ROI[roi]->result_klasse, _digitConf);
+
+                        // Record only confident, in-range reads into the per-digit matrix (never the
+                        // inferred/"N" values), so it reflects what the CNN actually saw.
+                        if ((GENERAL[n]->ROI[roi]->result_klasse >= 0) && (GENERAL[n]->ROI[roi]->result_klasse < 10) &&
+                            (_digitConf >= DigitHistoryConfidenceFloor)) {
+                            GENERAL[n]->ROI[roi]->hist.addConfident(GENERAL[n]->ROI[roi]->result_klasse);
+                        }
 
                         if (FastReadEnabled || PredictiveReadEnabled) {
                             fastReadUpdateCache(GENERAL[n]->ROI[roi], GENERAL[n]->ROI[roi]->result_klasse, 0);

@@ -576,6 +576,9 @@ void ClassFlowPostProcessing::UpdatePredictiveReadPlan(int j) {
 
     general* dg = NUMBERS[j]->digit_roi;
     if (!dg || dg->ROI.empty()) return;
+    for (size_t i = 0; i < dg->ROI.size(); ++i) {
+        if (dg->ROI[i] == nullptr) return;   // defensive: never plan on a partially-built ROI set
+    }
 
     // Estimate the next round's elapsed time from the observed cadence. Until the history has two
     // accepted samples we cannot estimate it, so leave every digit to be read (flags default false).

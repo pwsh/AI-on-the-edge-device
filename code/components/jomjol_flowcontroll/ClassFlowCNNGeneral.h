@@ -48,6 +48,18 @@ protected:
     //     the FastRead cache to supply the reused value. ---
     bool PredictiveReadEnabled = false; // master switch (config "PredictiveRead"); default off
 
+    // --- Unknown-digit resolution + per-digit confident-read matrix ---
+    bool  ResolveUnknownEnabled = false;          // config "ResolveUnknownDigits"; default off
+    float DigitHistoryConfidenceFloor = 0.70f;    // min normalised confidence to enter the matrix
+    // True if the less-significant neighbour of digit roi (index i+1) looks unchanged vs its history.
+    bool  digitLowerNeighborStable(int _seq, int i);
+
+public:
+    // Append this flow's per-digit confident-read matrix as JSON object members ("seqname":[ ... ]).
+    // Only emits for digit-class flows (Digit). Caller wraps the members in { }.
+    void AppendDigitMatrixJson(std::string &json);
+protected:
+
     bool isDigitalCNN();                       // true for Digit / Digit100
     int  fastReadMeanDiff(roi *r);             // mean abs diff of current cut vs cached buffer
     void fastReadUpdateCache(roi *r, int klasse, float value); // copy current cut + store result

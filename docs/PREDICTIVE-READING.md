@@ -116,6 +116,27 @@ as a tighter user override.
 
 ---
 
+## 3a. Per-digit matrix + unknown-digit resolution
+
+Each digit ROI keeps a small rolling **matrix of confident reads** (`predictive::DigitHistory`, 8
+deep). Only values the CNN actually read with confidence (in range, confidence ≥ floor) ever enter it
+— resolved/inferred values never do. It is always maintained (independent of the gates) and is
+surfaced on the overview page (`/digit_matrix`) under each number sequence so the raw identifications
+are visible.
+
+With `ResolveUnknownDigits = true` (`[Digits]`, default off), a digit that would read `N` is resolved
+to a best-guess integer via [`resolveUnknownDigit()`](../code/components/jomjol_flowcontroll/ClassPredictiveReader.cpp):
+
+* **cannot increment** (predictive plan says static) → the matrix **majority**, else the most recent
+  confident read;
+* **could increment but the digit below looks unchanged** → assume unchanged → most recent confident
+  read;
+* **could increment and the digit below changed** → uncertain → best effort: most recent confident
+  read.
+
+A digit with no confident history stays `N`. This makes every digit yield a valid integer whenever any
+good reading exists, without ever feeding inferred values back into the matrix.
+
 ## 4. Rolling history
 
 [`RollingHistory`](../code/components/jomjol_flowcontroll/ClassPredictiveReader.h) keeps a fixed-size

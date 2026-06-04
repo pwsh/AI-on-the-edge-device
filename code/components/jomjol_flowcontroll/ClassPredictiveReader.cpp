@@ -256,6 +256,63 @@ ReadPlan planRead(const PhysicalLimits& limits,
     return plan;
 }
 
+// --- Per-digit confident-read history -------------------------------------------------------------
+
+void DigitHistory::addConfident(int v) {
+    if (v < 0 || v > 9) return;            // only genuine confident reads enter the matrix
+    buf_[head_] = v;
+    head_ = (head_ + 1) % CAP;
+    if (count_ < CAP) count_++;
+}
+
+int DigitHistory::at(int idxFromOldest) const {
+    int start = (head_ - count_ + CAP) % CAP;
+    return buf_[(start + idxFromOldest) % CAP];
+}
+
+bool DigitHistory::mostRecent(int& out) const {
+    if (count_ == 0) return false;
+    out = at(count_ - 1);
+    return true;
+}
+
+bool DigitHistory::mode(int& out, int& votes) const {
+    if (count_ == 0) return false;
+    int tally[10] = {0};
+    for (int i = 0; i < count_; ++i) tally[at(i)]++;
+    int best = 0;
+    for (int d = 1; d < 10; ++d) if (tally[d] > tally[best]) best = d;
+    out = best;
+    votes = tally[best];
+    return true;
+}
+
+bool DigitHistory::majority(int& out) const {
+    int v, votes;
+    if (!mode(v, votes)) return false;
+    if (votes * 2 > count_) { out = v; return true; }
+    return false;
+}
+
+int DigitHistory::snapshot(int* dst, int maxn) const {
+    int n = (count_ < maxn) ? count_ : maxn;
+    for (int k = 0; k < n; ++k) dst[k] = at(count_ - 1 - k);   // newest first
+    return n;
+}
+
+bool resolveUnknownDigit(const DigitHistory& h, bool canIncrement, bool lowerNeighborChanged, int& out) {
+    if (h.empty()) return false;            // no confident reading ever -> stays "N"
+    if (!canIncrement) {                    // cannot change -> trust the steady-state history
+        if (h.majority(out)) return true;
+        return h.mostRecent(out);
+    }
+    // can increment: if the digit below is stable, no carry could have reached us -> assume unchanged.
+    // if the digit below changed, we genuinely cannot know - provide the most recent confident value
+    // as a best effort so every digit still yields a valid integer.
+    (void)lowerNeighborChanged;
+    return h.mostRecent(out);
+}
+
 // --- Physical plausibility ------------------------------------------------------------------------
 
 Plausibility checkPlausibility(const PhysicalLimits& limits,

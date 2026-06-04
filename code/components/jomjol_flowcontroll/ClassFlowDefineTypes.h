@@ -31,6 +31,10 @@ struct roi {
     // chain prove it cannot have changed. Recomputed every round (never latched).
     float result_confidence = 1.0f;
     bool  predictiveSkipNext = false;
+
+    // Rolling matrix of CONFIDENTLY-read class values for this digit (no inferred/"N" values). Used
+    // to resolve unknown digits and shown on the overview matrix.
+    predictive::DigitHistory hist;
 };
 
 /**
