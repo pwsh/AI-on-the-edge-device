@@ -335,7 +335,7 @@ void ClassFlowPostProcessing::SavePreValue() {
 
 ClassFlowPostProcessing::ClassFlowPostProcessing(std::vector<ClassFlow*>* lfc, ClassFlowCNNGeneral *_analog, ClassFlowCNNGeneral *_digit) {
     PreValueUse = false;
-    ConfidenceVotes = 0;   // §10 confidence vote off by default (legacy negative-rate behaviour)
+    ConfidenceVotes = 3;   // §10 confidence vote ON by default: 3 consistent lower reads override a stuck-high outlier
     PreValueAgeStartup = 30;
     ErrorMessage = true;   // "Skip Messages on Error": default true (documented default) -> skip transmission on error
     ListFlowControll = NULL;

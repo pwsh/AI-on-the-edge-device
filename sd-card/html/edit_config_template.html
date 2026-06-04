@@ -1058,6 +1058,16 @@
 
         <tr>
             <td class="indent2">
+                <label><class id="PostProcessing_ConfidenceVotes_text" style="color:black;">Confidence Votes (outlier correction)</class></label>
+            </td>
+            <td>
+                <input type="number" id="PostProcessing_ConfidenceVotes_value1" size="13" min="0" step="1" value="3">
+            </td>
+            <td>$TOOLTIP_PostProcessing_ConfidenceVotes</td>
+        </tr>
+
+        <tr>
+            <td class="indent2">
                 <input type="checkbox" id="PostProcessing_DecimalShift_enabled" value="1"  onclick = 'InvertEnableItem("PostProcessing", "DecimalShift")' unchecked >
                 <label for=PostProcessing_DecimalShift_enabled><class id="PostProcessing_DecimalShift_text" style="color:black;">Decimal Shift</class></label>
             </td>

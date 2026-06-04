@@ -1,5 +1,5 @@
 # Parameter `ConfidenceVotes`
-Default Value: `0`
+Default Value: `3`
 
 Range: `0` (off) .. `10`.
 
@@ -17,13 +17,13 @@ value was the outlier and **accepts the lower value**, overriding the stuck-high
 single isolated low read is still rejected as before; only a confirmed cluster overrides, and any
 accepted reading resets the count.
 
-- `0` = disabled (default): the classic negative-rate rejection only.
-- e.g. `3` = three consecutive confirming lower reads override the suspected-high value.
+- `3` = **default**: three consecutive confirming lower reads override the suspected-high value.
+- `0` = disabled: the classic negative-rate rejection only (a stuck-high value never self-recovers).
 
 When an override happens it is written to the log as
 `value corrected from X to Y after N confirming reads`.
 
 !!! Note
-    This is a global `[PostProcessing]` parameter — it applies to all number sequences. Set a small
-    value (e.g. `3`–`5`) only if you see your meter occasionally latch onto a wrong high reading; leave
-    it at `0` otherwise.
+    This is a global `[PostProcessing]` parameter — it applies to all number sequences. It is on by
+    default (`3`); raise it (e.g. `5`) to require more agreement before overriding, or set `0` to
+    disable the recovery entirely.
