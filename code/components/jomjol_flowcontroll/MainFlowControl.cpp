@@ -1524,9 +1524,11 @@ esp_err_t handler_editflow(httpd_req_t *req)
             CAlignAndCutImage *caic = new CAlignAndCutImage("examine", std::string("/sdcard/config/reference.jpg"));
             caic->CutAndSave(std::string("/sdcard/img_tmp/examine_org.jpg"), x, y, dx, dy);
             delete caic;
+            // Free the shared PSRAM region NOW: the cut is on disk, and the CNN below needs that same
+            // region for its model + tensor arena (it is claimed only when the region is free).
+            psram_deinit_shared_memory_for_take_image_step();
             std::string frag = flowctrl.ExamineCutRoi(isAnalog, "/sdcard/img_tmp/examine_org.jpg", "/sdcard/img_tmp/examine.jpg", ccw);
             body = "{" + frag + ",\"image\":\"/img_tmp/examine.jpg\"}";
-            psram_deinit_shared_memory_for_take_image_step();
         }
         else
         {
