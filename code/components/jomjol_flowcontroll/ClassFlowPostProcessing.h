@@ -46,6 +46,10 @@ protected:
     // Physics-bounded predictive reading: set one field of a sequence's PhysicalLimits. `_key` is the
     // already-upper-cased parameter name; `_decsep` carries the optional `<NUMBER>.` prefix.
     void handlePredictiveLimit(const std::string& _key, const std::string& _decsep, const std::string& _value);
+    // Compute the per-digit-ROI read plan for sequence j and mark roi::predictiveSkipNext so the
+    // next round's digit CNN can skip provably-static digits. No-op unless PredictiveRead is enabled
+    // for the digit flow and a Utility model is configured for the sequence.
+    void UpdatePredictiveReadPlan(int j);
 
     void WriteDataLog(int _index);
 

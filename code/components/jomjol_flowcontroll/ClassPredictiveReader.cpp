@@ -149,6 +149,14 @@ bool RollingHistory::peakRatePerMin(double& out) const {
     return true;
 }
 
+bool RollingHistory::averageStepMinutes(double& out) const {
+    if (count_ < 2) return false;
+    const double mins = (double)(at(count_ - 1).t - at(0).t) / 60.0;
+    if (mins <= 0.0) return false;
+    out = mins / (double)(count_ - 1);
+    return true;
+}
+
 // --- The planner ----------------------------------------------------------------------------------
 
 ReadPlan planRead(const PhysicalLimits& limits,

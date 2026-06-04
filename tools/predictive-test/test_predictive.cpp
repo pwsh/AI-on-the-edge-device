@@ -117,6 +117,9 @@ int main() {
     double pk; CHECK(h.peakRatePerMin(pk)); printf("  peak rate = %.3f/min\n", pk);
     CHECK(APPROX(pk, 0.7, 1e-9));
     CHECK(h.size()==3 && APPROX(h.latest().value,101.2,1e-9) && APPROX(h.oldest().value,100.0,1e-9));
+    double step; CHECK(h.averageStepMinutes(step)); printf("  avg step = %.3f min\n", step);
+    CHECK(APPROX(step, 1.0, 1e-9));   // two 60s gaps over 3 samples
+    RollingHistory h1; h1.add(5.0, 0); double s1; CHECK(!h1.averageStepMinutes(s1)); // <2 samples -> false
 
     printf("\n%s (%d failures)\n", failures==0?"ALL PASS":"FAILURES", failures);
     return failures==0?0:1;

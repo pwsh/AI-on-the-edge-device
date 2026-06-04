@@ -25,6 +25,12 @@ struct roi {
     int fastCacheClass = -1;         // cached result_klasse (Digit)
     float fastCacheFloat = -1;       // cached result_float (Digit100)
     bool fastCacheValid = false;     // true once a real inference has populated the cache
+
+    // Predictive reading (opt-in "PredictiveRead"): confidence of the last real digit inference
+    // (0..1) and a flag PostProcessing sets to skip this ROI next round when physics + the carry
+    // chain prove it cannot have changed. Recomputed every round (never latched).
+    float result_confidence = 1.0f;
+    bool  predictiveSkipNext = false;
 };
 
 /**

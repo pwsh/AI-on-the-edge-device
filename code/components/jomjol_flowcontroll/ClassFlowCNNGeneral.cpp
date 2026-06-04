@@ -464,6 +464,10 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
                 }
             }
         }
+
+        if ((toUpper(splitted[0]) == "PREDICTIVEREAD") && (splitted.size() > 1)) {
+            PredictiveReadEnabled = alphanumericToBoolean(splitted[1]);
+        }
     }
 
     if (!getNetworkParameter()) {
@@ -773,7 +777,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
     // (carry / consistency failure via TriggerFullEval()), or every FastReadFullInterval
     // cycles as a drift backstop.
     bool forceAllThisCycle = true;
-    if (FastReadEnabled && isDigitalCNN()) {
+    if ((FastReadEnabled || PredictiveReadEnabled) && isDigitalCNN()) {
         if (FastReadFullInterval < 1) {
             FastReadFullInterval = 1;
         }
@@ -836,6 +840,18 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                     LOGD(TAG, "CNN Type: Digit");
                     {
                         _digitsTotal++;
+                        // PredictiveRead gate: PostProcessing proved (physics ceiling + carry chain +
+                        // confidence) that this digit cannot have changed since the cached read, so
+                        // reuse it without even cutting/diffing. Subordinate to the periodic full audit.
+                        if (PredictiveReadEnabled && !forceAllThisCycle &&
+                            GENERAL[n]->ROI[roi]->predictiveSkipNext &&
+                            GENERAL[n]->ROI[roi]->fastCacheValid) {
+                            GENERAL[n]->ROI[roi]->result_klasse = GENERAL[n]->ROI[roi]->fastCacheClass;
+                            LOGD(TAG, "PredictiveRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                                "' cannot have changed -> reuse class " + std::to_string(GENERAL[n]->ROI[roi]->result_klasse));
+                            break;
+                        }
+
                         // FastRead gate: if this digit's pixels are unchanged vs the last real
                         // inference, reuse the cached class and skip the tflite Invoke entirely.
                         if (FastReadEnabled && !forceAllThisCycle &&
@@ -848,11 +864,13 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         }
 
                         _digitsAnalyzed++;
+                        float _digitConf = 1.0f;
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
-                        GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image);
-                        ESP_LOGD(TAG, "General result (Digit)%i: %d", roi, GENERAL[n]->ROI[roi]->result_klasse);
+                        GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image, &_digitConf);
+                        GENERAL[n]->ROI[roi]->result_confidence = _digitConf;
+                        ESP_LOGD(TAG, "General result (Digit)%i: %d (conf %.2f)", roi, GENERAL[n]->ROI[roi]->result_klasse, _digitConf);
 
-                        if (FastReadEnabled) {
+                        if (FastReadEnabled || PredictiveReadEnabled) {
                             fastReadUpdateCache(GENERAL[n]->ROI[roi], GENERAL[n]->ROI[roi]->result_klasse, 0);
                         }
 

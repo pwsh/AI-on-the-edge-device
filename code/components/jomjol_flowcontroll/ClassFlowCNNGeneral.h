@@ -43,6 +43,11 @@ protected:
     bool forceFullEval;          // one-shot external trigger (e.g. carry / consistency failure)
     CTfLiteClass *residentTflite;// model kept loaded across cycles while FastRead is on
 
+    // --- PredictiveRead: proactively skip digit ROIs that physics + the carry chain prove cannot
+    //     have changed (PostProcessing sets roi::predictiveSkipNext each round). Opt-in; relies on
+    //     the FastRead cache to supply the reused value. ---
+    bool PredictiveReadEnabled = false; // master switch (config "PredictiveRead"); default off
+
     bool isDigitalCNN();                       // true for Digit / Digit100
     int  fastReadMeanDiff(roi *r);             // mean abs diff of current cut vs cached buffer
     void fastReadUpdateCache(roi *r, int klasse, float value); // copy current cut + store result
@@ -65,6 +70,10 @@ public:
     // Force the next inference pass to re-read every digit (skip the FastRead cache).
     // Intended to be called by post-processing on carry / consistency failure.
     void TriggerFullEval() { forceFullEval = true; };
+
+    // True when the opt-in predictive-read gate is enabled (PostProcessing checks this before
+    // computing a per-ROI read plan).
+    bool IsPredictiveReadEnabled() const { return PredictiveReadEnabled; };
 
     bool ReadParameter(FILE* pfile, string& aktparamgraph);
     bool doFlow(string time);

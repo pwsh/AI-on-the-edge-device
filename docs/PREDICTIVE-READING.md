@@ -135,13 +135,27 @@ pattern (future work — it must never loosen below the physical ceiling).
 | `planRead()` significance + carry + confidence gating | ✅ implemented + host-tested (engine) |
 | Rolling history | ✅ implemented, updated per round |
 | **Physical plausibility rejection** in post-processing | ✅ **active** when `Utility` is set |
-| `planRead()` wired into the live CNN inference loop (actually skipping reads) | 🟡 staged — engine ready; needs per-digit confidence plumbing + on-device validation before it gates real reads |
+| Per-digit confidence from the classification model | ✅ `CTfLiteClass::GetClassFromImageBasis(img, &conf)` |
+| `planRead()` wired into the live CNN inference loop (actually skipping reads) | ✅ **opt-in** via the `PredictiveRead` flag (default off) |
 | Dynamic ROI resize toward the active low digits | ⬜ proposed (see below) |
 
-The read-gating engine is complete and tested, but **silently skipping CNN reads on a live meter is
-rolled out carefully**: it needs the digit-class model to expose a per-digit confidence and a short
-on-device A/B against full reads. Until then the plausibility check (which can only *reject*, never
-silently drop a real change) is the active, safe half.
+### How the live read-gating is wired
+
+1. During the digit CNN pass, each real inference also records a **confidence** (the winning class's
+   output-neuron value, normalised to ~a softmax probability) on the ROI
+   ([`GetClassFromImageBasis(img, &conf)`](../code/components/jomjol_tfliteclass/CTfLiteClass.cpp)).
+2. At the end of a successful round, post-processing builds the digit states (value + confidence +
+   place, derived from the sequence's decimal layout) and calls `planRead()` with the next interval
+   estimated from the rolling history, then sets `roi::predictiveSkipNext` on each digit ROI
+   (`ClassFlowPostProcessing::UpdatePredictiveReadPlan`).
+3. Next round, the digit CNN reuses the cached class for any ROI flagged `predictiveSkipNext`
+   *before* cutting or diffing it — subordinate to the periodic full audit and the plausibility check.
+
+It is **off by default**. Enabling it requires both `PredictiveRead = true` in `[Digits]` and a
+`Utility` model in `[PostProcessing]`. Until the rolling history has two accepted samples (to estimate
+the cadence) every digit is read, so the first rounds after a restart are always full reads. The
+plausibility check — which can only *reject*, never silently drop a real change — remains the always-on
+safety floor.
 
 ### Proposed: dynamic bounding box
 
@@ -167,9 +181,19 @@ All keys are per-sequence in `[PostProcessing]` (prefix with `<NUMBER>.` for a s
 | `UnitsPerValue` | SI units per 1.0 of the displayed value (water: litres; elec: kWh; gas: m³) | water 1000, else 1 |
 | `MaxRateValue` | Existing manual rate cap — overrides the derived bound when set | unset |
 
-Example (water meter displaying m³ with 3 decimals, default ¾″ @ 60 psi supply):
+The live read-gating itself is enabled separately, in `[Digits]`:
+
+| Key | Meaning | Default |
+|-----|---------|---------|
+| `PredictiveRead` | Skip digit ROIs that physics + the carry chain prove cannot have changed | `false` |
+
+Example (water meter displaying m³ with 3 decimals, default ¾″ @ 60 psi supply, with the predictive
+gate enabled):
 
 ```ini
+[Digits]
+PredictiveRead = true
+
 [PostProcessing]
 main.Utility = water
 ```

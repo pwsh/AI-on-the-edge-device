@@ -558,6 +558,57 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
     }
 }
 
+void ClassFlowPostProcessing::UpdatePredictiveReadPlan(int j) {
+    // Only plan when the opt-in gate is on for the digit flow and a physics model exists.
+    if (!flowDigit || !flowDigit->IsPredictiveReadEnabled()) return;
+    if (NUMBERS[j]->PhysLimits.utility == predictive::Utility::Generic) return;
+
+    general* dg = NUMBERS[j]->digit_roi;
+    if (!dg || dg->ROI.empty()) return;
+
+    // Estimate the next round's elapsed time from the observed cadence. Until the history has two
+    // accepted samples we cannot estimate it, so leave every digit to be read (flags default false).
+    double nextIntervalMin = 0.0;
+    if (!NUMBERS[j]->History.averageStepMinutes(nextIntervalMin) || nextIntervalMin <= 0.0) {
+        for (size_t i = 0; i < dg->ROI.size(); ++i) dg->ROI[i]->predictiveSkipNext = false;
+        return;
+    }
+
+    const int nDig = (int)dg->ROI.size();
+    const int nAna = NUMBERS[j]->AnzahlAnalog;
+    // Place exponent of the least-significant DIGIT ROI: analog dials sit below the digits as the
+    // lowest decimals, so with `Nachkomma` total decimals and `nAna` analog decimals the lowest digit
+    // ROI sits at 10^(nAna - Nachkomma) (== 10^0 = ones when all decimals are analog).
+    const int lsdExp = nAna - NUMBERS[j]->Nachkomma;
+
+    // Build digit states least-significant first (ROIs are stored most-significant first).
+    std::vector<predictive::DigitState> states;
+    states.reserve(nDig);
+    for (int i = nDig - 1; i >= 0; --i) {
+        roi* R = dg->ROI[i];
+        int val = R->result_klasse;
+        float conf = R->result_confidence;
+        if (val < 0 || val > 9) { val = (val < 0) ? 0 : 9; conf = 0.0f; } // "N"/invalid -> untrusted
+        predictive::DigitState ds;
+        ds.place = lsdExp + (nDig - 1 - i);
+        ds.value = val;
+        ds.confidence = conf;
+        ds.cacheValid = R->fastCacheValid;
+        states.push_back(ds);
+    }
+
+    predictive::ReadPlan plan = predictive::planRead(NUMBERS[j]->PhysLimits, states, nextIntervalMin, /*audit*/ false);
+
+    // Map decisions (LSD-first) back onto the ROIs (MSD-first).
+    for (int k = 0; k < nDig; ++k) {
+        bool mustRead = plan.digits[k].mustRead;
+        // The least-significant digit ROI always reads when analog dials sit below it: their rollover
+        // can always carry into it, and that carry is not modelled among the digit ROIs themselves.
+        if (k == 0 && nAna > 0) mustRead = true;
+        dg->ROI[nDig - 1 - k]->predictiveSkipNext = !mustRead;
+    }
+}
+
 void ClassFlowPostProcessing::handleChangeRateThreshold(string _decsep, string _value) {
     string _digit, _decpos;
     int _pospunkt = _decsep.find_first_of(".");
@@ -1099,6 +1150,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         
         NUMBERS[j]->ReturnChangeAbsolute = RundeOutput(NUMBERS[j]->Value - NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
         NUMBERS[j]->History.add(NUMBERS[j]->Value, imagetime);   // rolling window of accepted readings
+        UpdatePredictiveReadPlan(j);                             // mark digits the next round can skip
         NUMBERS[j]->PreValue = NUMBERS[j]->Value;
         NUMBERS[j]->PreValueOkay = true;
         NUMBERS[j]->NegRateVoteCount = 0;   // §10: a value was accepted -> reset the confidence-vote streak

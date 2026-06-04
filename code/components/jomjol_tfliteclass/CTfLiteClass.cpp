@@ -50,6 +50,43 @@ int CTfLiteClass::GetClassFromImageBasis(CImageBasis *rs)
     return GetOutClassification();
 }
 
+int CTfLiteClass::GetClassAndConfidence(float *outConfidence)
+{
+    TfLiteTensor* output2 = interpreter->output(0);
+    if (output2 == NULL) {
+        if (outConfidence) *outConfidence = 0.0f;
+        return -1;
+    }
+
+    int numeroutput = output2->dims->data[1];
+    float zw_max = output2->data.f[0];
+    int   zw_class = 0;
+    float sum = zw_max;
+    for (int i = 1; i < numeroutput; ++i) {
+        float zw = output2->data.f[i];
+        sum += zw;
+        if (zw > zw_max) { zw_max = zw; zw_class = i; }
+    }
+
+    if (outConfidence) {
+        // Normalise so a non-softmax head still yields a comparable [0,1] confidence; guard sum<=0.
+        *outConfidence = (sum > 0.0f) ? (zw_max / sum) : zw_max;
+    }
+    return zw_class;
+}
+
+int CTfLiteClass::GetClassFromImageBasis(CImageBasis *rs, float *outConfidence)
+{
+    if (!LoadInputImageBasis(rs)) {
+        if (outConfidence) *outConfidence = 0.0f;
+        return -1000;
+    }
+
+    Invoke();
+
+    return GetClassAndConfidence(outConfidence);
+}
+
 
 int CTfLiteClass::GetOutClassification(int _von, int _bis)
 {

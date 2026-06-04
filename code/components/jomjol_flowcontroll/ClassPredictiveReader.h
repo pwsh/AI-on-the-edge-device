@@ -98,6 +98,10 @@ public:
     // Largest single-step rate seen in the window (value units per minute). Robustness diagnostic.
     bool peakRatePerMin(double& out) const;
 
+    // Average spacing between samples (minutes) across the window - an estimate of the round cadence.
+    // Returns false with fewer than two samples or no positive span.
+    bool averageStepMinutes(double& out) const;
+
     void clear() { count_ = 0; head_ = 0; }
 
 private:

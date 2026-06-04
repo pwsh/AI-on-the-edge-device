@@ -47,6 +47,11 @@ class CTfLiteClass
         int GetOutClassification(int _von = -1, int _bis = -1);
 
         int GetClassFromImageBasis(CImageBasis *rs);
+        // As above, but also returns the winning class's confidence (its output-neuron value,
+        // normalised by the output sum -> ~softmax probability in [0,1]) via outConfidence.
+        int GetClassFromImageBasis(CImageBasis *rs, float *outConfidence);
+        // Argmax over the current output tensor + winning-class confidence (no Invoke).
+        int GetClassAndConfidence(float *outConfidence);
         std::string GetStatusFlow();
 
         float GetOutputValue(int nr);
