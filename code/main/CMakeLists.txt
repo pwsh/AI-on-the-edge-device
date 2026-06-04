@@ -3,6 +3,18 @@
 
 ##################################################################
 ##################################################################
+# Re-run CMake configure (and thus regenerate version.cpp / version.txt below) whenever the git commit
+# changes, so the embedded firmware version never goes stale after a `git commit` without a manual
+# `rm version.cpp` + rebuild. `logs/HEAD` (the reflog) and `index` both change on commit. NOTE: do not
+# add `.git/HEAD` here - ESP-IDF already tracks it, and a duplicate makes ninja fail ("defined as an
+# output multiple times"). Best-effort: a plain unstaged edit (the "+" dirty flag) is not tracked.
+set(_git_dir "${CMAKE_CURRENT_SOURCE_DIR}/../../.git")
+foreach(_gitfile index logs/HEAD)
+    if(EXISTS "${_git_dir}/${_gitfile}")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_git_dir}/${_gitfile}")
+    endif()
+endforeach()
+
 execute_process(COMMAND git log --pretty=format:'%h' -n 1
                 OUTPUT_VARIABLE GIT_REV
                 ERROR_QUIET)
