@@ -545,6 +545,12 @@ void StartAPModeAndWait(bool forcedReconfig)
     wifi_init_softAP();
     start_webserverAP();
 
+    // If we reached AP mode on a freshly-OTA'd *trial* image, confirm it now. The normal post-init
+    // confirmation (main, after the STA web server is up) never runs in AP mode, so without this a
+    // user who configures Wi-Fi here and reboots would have the bootloader roll the new firmware back
+    // as an unconfirmed trial. The web server (AP) is up at this point, satisfying diagnostic().
+    ConfirmOTAUpdateAfterInit();
+
     int idleSeconds = 0;
     while(1) { // wait until reboot (within task_do_Update_ZIP, the reboot button, or the retry below)
         vTaskDelay(1000 / portTICK_PERIOD_MS);
