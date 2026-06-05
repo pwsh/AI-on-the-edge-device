@@ -30,11 +30,14 @@ if ("${GIT_REV}" STREQUAL "")
     set(GIT_TAG "N/A")
     set(GIT_BRANCH "N/A")
 else()
-    # --ignore-submodules: the "+" must flag *our* uncommitted source changes, not worktree drift in
-    # a third-party submodule (e.g. esp-protocols' nested asio), which would otherwise mark every
-    # release binary dirty even from a clean source checkout.
+    # The "+" must flag *our* uncommitted source changes only. Two things would otherwise mark every
+    # release binary dirty even from a clean checkout:
+    #  --ignore-submodules: worktree drift in a third-party submodule (e.g. esp-protocols' nested asio).
+    #  exclude code/dependencies.lock: the IDF component manager rewrites its "target:" line on every
+    #    build, so a copy committed for one target (esp32s3) always looks dirty after an esp32 build.
+    #  The :(exclude,top) pathspec is repo-root-relative, so it works from CMake's build-dir CWD.
     execute_process(
-        COMMAND bash -c "git diff --quiet --exit-code --ignore-submodules || echo +"
+        COMMAND bash -c "git diff --quiet --exit-code --ignore-submodules -- ':(exclude,top)code/dependencies.lock' || echo +"
         OUTPUT_VARIABLE GIT_DIFF)
     execute_process(
         COMMAND git describe --exact-match --tags
