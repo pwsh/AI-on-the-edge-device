@@ -30,8 +30,11 @@ if ("${GIT_REV}" STREQUAL "")
     set(GIT_TAG "N/A")
     set(GIT_BRANCH "N/A")
 else()
+    # --ignore-submodules: the "+" must flag *our* uncommitted source changes, not worktree drift in
+    # a third-party submodule (e.g. esp-protocols' nested asio), which would otherwise mark every
+    # release binary dirty even from a clean source checkout.
     execute_process(
-        COMMAND bash -c "git diff --quiet --exit-code || echo +"
+        COMMAND bash -c "git diff --quiet --exit-code --ignore-submodules || echo +"
         OUTPUT_VARIABLE GIT_DIFF)
     execute_process(
         COMMAND git describe --exact-match --tags

@@ -1,3 +1,0 @@
-Command: ninja app
-[1/1] cd /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb && /home/eric/.espressif/python_env/idf6.0_py3.12_env/bin/python /home/eric/esp/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/partition_table/partition-table.bin /home/eric/Documents/repos/AI-on-the-edge-device/code/build_s3_16mb/AI-on-the-edge.bin
-AI-on-the-edge.bin binary size 0x1a6ff0 bytes. Smallest app partition is 0x300000 bytes. 0x159010 bytes (45%) free.

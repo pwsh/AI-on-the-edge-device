@@ -5,6 +5,7 @@
 /sd-card/htm./.vscode/
 /code/build
 /code/build_s3
+/code/build_s3_16mb
 /code/build_wrover
 /code/.helper
 /sd-card/html/debug/
