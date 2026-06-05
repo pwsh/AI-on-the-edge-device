@@ -1,3 +1,36 @@
+# [17.0.0-rc.1] - 2026-06-04
+
+> First **release candidate** for 17.0.0. The ESP-IDF 6.0 migration and the alpha feature set are
+> considered feature-complete; this RC focuses on camera-recovery robustness and the ROI-editor
+> tooling. Validate on your own meter before relying on it in production.
+
+### Camera
+
+- **The PWDN hardware reset now actually runs.** `PowerResetCamera` guarded its power-down toggle
+  with `#if CAM_PIN_PWDN == GPIO_NUM_NC`, but `CAM_PIN_PWDN` expands to a `gpio_num_t` *enum* — which
+  the C preprocessor evaluates as `0` — so the test was always true and the entire reset was compiled
+  out on **every** board, including AI-Thinker (PWDN = GPIO 32). A wedged OV2640 therefore always
+  needed a physical power cycle. The guard is now a runtime check so the reset fires, and boot
+  pre-drains the sensor with escalating PWDN cycles plus a settle delay before the first init probe.
+
+### ROI editor
+
+- **On-demand "Examine selected ROI"** (digit + analog screens): cuts the selected ROI and runs the
+  CNN on the spot, showing the analysed image, reading and per-digit confidence inline. Placed
+  directly under the *Move ROI Higher/Lower* buttons.
+- **"Pull fresh camera image"**: captures + aligns a fresh frame and shows it in the canvas in place
+  of the stored reference, so you can judge whether the reference image / alignment is still accurate.
+  Examine then analyses whichever image is on screen.
+- Hardened: a failed image cut no longer panics the web-server task; the fresh examine reads the live
+  aligned frame from PSRAM (it is not normally written to SD).
+
+### Overview
+
+- **Confidence display**: per-sequence confidence above each digit matrix and below each Value reading.
+- **Fixed: the main values could appear frozen.** `/value`, `/statusflow`, `/digit_matrix` and `/info`
+  do not send `Cache-Control`, so the browser could serve cached responses while the device kept
+  returning fresh readings. The overview now cache-busts every live-data request.
+
 # [17.0.0-alpha.14] - 2026-05-30
 
 > :warning: **Alpha release.** Contains a major toolchain migration (ESP-IDF 6.0) and new,
