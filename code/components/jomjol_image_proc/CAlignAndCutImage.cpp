@@ -144,8 +144,19 @@ void CAlignAndCutImage::CutAndSave(std::string _template1, int x1, int y1, int d
     dx = x2 - x1;
     dy = y2 - y1;
 
+    // Guard against an unloaded/empty source image or a degenerate crop box. Without this, a NULL
+    // rgb_image (e.g. the JPEG failed to decode) or a non-positive size makes the copy loop below
+    // dereference out of bounds and panics the calling task (seen crashing the httpd task). Leaving
+    // the output file unwritten lets callers detect the failure via the missing/unloadable result.
+    if (rgb_image == NULL || width <= 0 || height <= 0 || x1 < 0 || y1 < 0 || dx <= 0 || dy <= 0) {
+        return;
+    }
+
     int memsize = dx * dy * channels;
     uint8_t* odata = (unsigned char*) malloc_psram_heap(std::string(TAG) + "->odata", memsize, MALLOC_CAP_SPIRAM);
+    if (odata == NULL) {
+        return;
+    }
 
     stbi_uc* p_target;
     stbi_uc* p_source;

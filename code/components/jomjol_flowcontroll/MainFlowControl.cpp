@@ -1529,13 +1529,27 @@ esp_err_t handler_editflow(httpd_req_t *req)
         if (gotLock && psram_init_shared_memory_for_take_image_step())
         {
             CAlignAndCutImage *caic = new CAlignAndCutImage("examine", srcImg);
-            caic->CutAndSave(std::string("/sdcard/img_tmp/examine_org.jpg"), x, y, dx, dy);
-            delete caic;
-            // Free the shared PSRAM region NOW: the cut is on disk, and the CNN below needs that same
-            // region for its model + tensor arena (it is claimed only when the region is free).
-            psram_deinit_shared_memory_for_take_image_step();
-            std::string frag = flowctrl.ExamineCutRoi(isAnalog, "/sdcard/img_tmp/examine_org.jpg", "/sdcard/img_tmp/examine.jpg", ccw);
-            body = "{" + frag + ",\"image\":\"/img_tmp/examine.jpg\"}";
+            // Verify the source image actually decoded before cutting. A fresh capture (src=fresh) may
+            // not exist yet, and the reference can be momentarily unreadable; cutting an unloaded image
+            // would dereference a NULL buffer and panic the httpd task.
+            if (!caic->ImageOkay()) {
+                delete caic;
+                psram_deinit_shared_memory_for_take_image_step();
+                bool wantFresh = (srcImg.find("alg.jpg") != std::string::npos);
+                body = wantFresh
+                    ? "{\"error\":\"no fresh aligned image yet - pull a fresh camera image first\"}"
+                    : "{\"error\":\"could not load the reference image\"}";
+            }
+            else
+            {
+                caic->CutAndSave(std::string("/sdcard/img_tmp/examine_org.jpg"), x, y, dx, dy);
+                delete caic;
+                // Free the shared PSRAM region NOW: the cut is on disk, and the CNN below needs that same
+                // region for its model + tensor arena (it is claimed only when the region is free).
+                psram_deinit_shared_memory_for_take_image_step();
+                std::string frag = flowctrl.ExamineCutRoi(isAnalog, "/sdcard/img_tmp/examine_org.jpg", "/sdcard/img_tmp/examine.jpg", ccw);
+                body = "{" + frag + ",\"image\":\"/img_tmp/examine.jpg\"}";
+            }
         }
         else
         {
