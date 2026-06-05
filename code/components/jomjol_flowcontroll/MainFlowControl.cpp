@@ -1517,11 +1517,18 @@ esp_err_t handler_editflow(httpd_req_t *req)
         if (httpd_query_key_value(_query, "type", vc, sizeof(vc)) == ESP_OK) isAnalog = (std::string(vc) == "analog");
         if (httpd_query_key_value(_query, "ccw",  vc, sizeof(vc)) == ESP_OK) ccw = (std::string(vc) == "true");
 
+        // Which already-aligned image to cut the ROI from. Default is the stored reference; "fresh"
+        // uses the most recent on-demand aligned capture (/img_tmp/alg.jpg from a test_take+test_align),
+        // so the user can examine the live scene against the same ROI box without saving a new reference.
+        std::string srcImg = "/sdcard/config/reference.jpg";
+        if (httpd_query_key_value(_query, "src", vc, sizeof(vc)) == ESP_OK && std::string(vc) == "fresh")
+            srcImg = "/sdcard/img_tmp/alg.jpg";
+
         std::string body;
         bool gotLock = flowRoundTryLock();
         if (gotLock && psram_init_shared_memory_for_take_image_step())
         {
-            CAlignAndCutImage *caic = new CAlignAndCutImage("examine", std::string("/sdcard/config/reference.jpg"));
+            CAlignAndCutImage *caic = new CAlignAndCutImage("examine", srcImg);
             caic->CutAndSave(std::string("/sdcard/img_tmp/examine_org.jpg"), x, y, dx, dy);
             delete caic;
             // Free the shared PSRAM region NOW: the cut is on disk, and the CNN below needs that same

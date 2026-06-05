@@ -145,12 +145,30 @@
             </td>
             <td>
 				<input class="button" type="submit" id="movePrevious" onclick="movePrevious()" value="Move ROI Higher">
-			</td> 
+			</td>
             <td>
 				<input class="button" type="submit" id="moveNext" onclick="moveNext()" value="Move ROI Lower">
 			</td>
         </tr>
+
+        <tr>
+            <td colspan="2">
+                <input class="button" type="button" id="examineROIbtn" onclick="examineROI()" value="Examine selected ROI">
+                <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
+            </td>
+            <td colspan="2">
+                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull fresh camera image">
+                <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
+            </td>
+        </tr>
     </table>
+
+    <div id="examineResult" style="display:none; margin-top:6px; padding:8px; border:1px solid rgba(127,127,127,.35); border-radius:6px;">
+        <img id="examineImg" alt="Analysed ROI image" style="height:72px; image-rendering:pixelated; border:1px solid rgba(127,127,127,.35); vertical-align:middle; background:#fff;">
+        <span style="margin-left:14px; font-size:1.15em;">Reading: <b id="examineReading">—</b></span>
+        <span style="margin-left:14px;">Confidence: <b id="examineConf">—</b></span>
+        <div id="examineSrcNote" style="font-size:.82em; color:#888; margin-top:4px;">Analysed fresh from the reference image at the current ROI box (uses the live x/y/Δx/Δy, no save needed).</div>
+    </div>
 
 	<table>
         <colgroup>
@@ -170,20 +188,6 @@
         </tr>
     </table>
 
-    <table style="margin-top:6px;">
-        <tr>
-            <td>
-                <input class="button" type="button" id="examineROIbtn" onclick="examineROI()" value="Examine selected ROI">
-                <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
-            </td>
-        </tr>
-    </table>
-    <div id="examineResult" style="display:none; margin-top:6px; padding:8px; border:1px solid rgba(127,127,127,.35); border-radius:6px;">
-        <img id="examineImg" alt="Analysed ROI image" style="height:72px; image-rendering:pixelated; border:1px solid rgba(127,127,127,.35); vertical-align:middle; background:#fff;">
-        <span style="margin-left:14px; font-size:1.15em;">Reading: <b id="examineReading">—</b></span>
-        <span style="margin-left:14px;">Confidence: <b id="examineConf">—</b></span>
-        <div style="font-size:.82em; color:#888; margin-top:4px;">Analysed fresh from the reference image at the current ROI box (uses the live x/y/Δx/Δy, no save needed).</div>
-    </div>
 </div>
 
 
@@ -205,7 +209,10 @@
         </colgroup>
 		
         <tr>
-            <td colspan="3" style="vertical-align: bottom;"><b>Reference Image:</b></td>
+            <td colspan="3" style="vertical-align: bottom;"><b>Reference Image:</b>
+                <span id="imgSourceLabel" style="font-weight:normal; font-size:.9em; color:#888;">showing: reference image</span>
+                <input class="button" type="button" id="showRefBtn" onclick="showReferenceImage()" value="Show reference image" style="display:none; margin-left:8px;">
+            </td>
             <td>
 				<input style="font-weight:bold;" class="button" type="submit" id="saveroi" name="saveroi" onclick="SaveToConfig()" value="Save Config" tabindex=11>
 			</td>
@@ -312,8 +319,50 @@
         draw();
     }
 
-    // Examine the currently-selected ROI: cut its box from the reference image, run the CNN, and show
-    // the analysed image + reading + confidence inline. Uses the live x/y/Δx/Δy fields.
+    // Tracks whether the canvas is currently showing a freshly-captured aligned image (true) or the
+    // stored reference image (false, the default). Examine cuts from whichever one is on screen.
+    var _usingFreshImage = false;
+
+    // Pull a fresh image from the camera, align it the same way a normal round does, and display that
+    // aligned image in the canvas instead of the stored reference. Lets the user judge whether the
+    // reference image / alignment is still accurate. Reuses the device's test_take + test_align steps.
+    function loadFreshImage() {
+        var st = document.getElementById('freshStatus');
+        var btn = document.getElementById('loadFreshBtn');
+        var dn = getDomainname();
+        btn.disabled = true;
+        st.textContent = 'capturing…';
+        fetch(dn + '/editflow?task=test_take', { cache: 'no-store' })
+            .then(function(r){ return r.text(); })
+            .then(function(t){
+                if (t.indexOf('Busy') >= 0) { throw new Error('device busy — try again in a moment'); }
+                st.textContent = 'aligning…';
+                return fetch(dn + '/editflow?task=test_align', { cache: 'no-store' });
+            })
+            .then(function(r){ return r.text(); })
+            .then(function(t){
+                if (t.indexOf('Busy') >= 0) { throw new Error('device busy — try again in a moment'); }
+                st.textContent = '';
+                _usingFreshImage = true;
+                document.getElementById('imgSourceLabel').textContent = 'showing: fresh aligned image';
+                document.getElementById('showRefBtn').style.display = '';
+                loadCanvas(dn + '/img_tmp/alg.jpg?t=' + Date.now());
+            })
+            .catch(function(e){ st.textContent = 'error: ' + e.message; })
+            .then(function(){ btn.disabled = false; });
+    }
+
+    // Switch the canvas back to the stored reference image.
+    function showReferenceImage() {
+        _usingFreshImage = false;
+        document.getElementById('imgSourceLabel').textContent = 'showing: reference image';
+        document.getElementById('showRefBtn').style.display = 'none';
+        loadCanvas(getDomainname() + '/fileserver/config/reference.jpg?t=' + Date.now());
+    }
+
+    // Examine the currently-selected ROI: cut its box from the on-screen image (reference, or the fresh
+    // aligned capture if one is loaded), run the CNN, and show the analysed image + reading + confidence
+    // inline. Uses the live x/y/Δx/Δy fields.
     function examineROI(isAnalog, ccw) {
         var x = parseInt(document.getElementById('refx').value);
         var y = parseInt(document.getElementById('refy').value);
@@ -324,10 +373,16 @@
         st.textContent = 'examining…';
         var type = isAnalog ? 'analog' : 'digit';
         var url = getDomainname() + '/editflow?task=examineroi&type=' + type +
-                  '&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy + (isAnalog ? ('&ccw=' + (ccw ? 'true' : 'false')) : '');
+                  '&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy +
+                  (isAnalog ? ('&ccw=' + (ccw ? 'true' : 'false')) : '') +
+                  (_usingFreshImage ? '&src=fresh' : '');
+        var note = document.getElementById('examineSrcNote');
         fetch(url, { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(d){
             st.textContent = '';
             var box = document.getElementById('examineResult'); box.style.display = 'block';
+            if (note) note.textContent = _usingFreshImage
+                ? 'Analysed from the fresh aligned camera image at the current ROI box (live x/y/Δx/Δy, no save needed).'
+                : 'Analysed from the reference image at the current ROI box (live x/y/Δx/Δy, no save needed).';
             var rd = document.getElementById('examineReading'), cf = document.getElementById('examineConf'), im = document.getElementById('examineImg');
             if (d.error) { rd.textContent = '—'; cf.textContent = d.error; im.removeAttribute('src'); return; }
             im.src = getDomainname() + d.image + '?t=' + Date.now();
