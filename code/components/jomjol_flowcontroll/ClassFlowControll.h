@@ -63,6 +63,11 @@ public:
 	// On-demand: run the digit/analog CNN on an already-cut ROI image and return a JSON fragment
 	// ("reading":..,"confidence":..). Routes to the digit or analog flow. Caller handles mutex/PSRAM.
 	string ExamineCutRoi(bool isAnalog, const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
+	// Write the most recent in-memory aligned image (the frame the last round/alignment produced) to
+	// an SD file. The live aligned image normally only lives in PSRAM (alg.jpg is written to SD only
+	// with the SaveAllFiles debug flag), so this gives the on-demand "examine fresh" a real file to
+	// cut from. Returns false if no aligned image is available. Caller handles the round mutex.
+	bool SaveFreshAlignedImage(const std::string &path);
 	bool UpdatePrevalue(std::string _newvalue, std::string _numbers, bool _extern);
 	string GetPrevalue(std::string _number = "");	
 	bool ReadParameter(FILE* pfile, string& aktparamgraph);	

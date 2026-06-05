@@ -1529,18 +1529,18 @@ esp_err_t handler_editflow(httpd_req_t *req)
         {
             if (wantFresh)
             {
-                // The freshly-aligned capture is at img_tmp/alg.jpg, but that file can be momentarily
-                // unreadable through the image loader (which opens via std::ifstream) while the flow
-                // holds a handle on it - it then reports the file as empty. Duplicate it with a plain
-                // stdio copy to a private, freshly-created file that always opens cleanly.
-                if (CopyFile("/sdcard/img_tmp/alg.jpg", "/sdcard/img_tmp/examine_src.jpg") &&
+                // The live aligned frame only lives in PSRAM - img_tmp/alg.jpg is served from memory
+                // and the SD file is written only with the SaveAllFiles debug flag, so it is normally
+                // empty on disk. Dump the in-memory aligned image to a private SD file and cut from
+                // that. (We hold the round mutex here, so the aligned image is stable.)
+                if (flowctrl.SaveFreshAlignedImage("/sdcard/img_tmp/examine_src.jpg") &&
                     file_size("/sdcard/img_tmp/examine_src.jpg") > 0)
                 {
                     srcImg = "/sdcard/img_tmp/examine_src.jpg";
                 }
                 else
                 {
-                    srcImg = "";   // no fresh capture available
+                    srcImg = "";   // no fresh aligned image available yet
                 }
             }
 

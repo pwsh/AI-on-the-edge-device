@@ -496,6 +496,19 @@ string ClassFlowControll::ExamineCutRoi(bool isAnalog, const std::string &cutOrg
     return flow->ExamineCut(cutOrgPath, displayPath, ccw);
 }
 
+bool ClassFlowControll::SaveFreshAlignedImage(const std::string &path)
+{
+    if (!flowalignment) {
+        return false;
+    }
+    CAlignAndCutImage *aligned = flowalignment->GetAlignAndCutImage();
+    if (!aligned || !aligned->ImageOkay()) {
+        return false;
+    }
+    aligned->SaveToFile(FormatFileName(path));
+    return true;
+}
+
 void ClassFlowControll::doFlowTakeImageOnly(string time)
 {
     std::string zw_time;
