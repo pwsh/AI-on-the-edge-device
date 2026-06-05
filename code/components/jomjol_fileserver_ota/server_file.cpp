@@ -974,7 +974,6 @@ std::string unzip_new(std::string _in_zip_file, std::string _html_tmp, std::stri
     size_t uncomp_size;
     mz_zip_archive zip_archive;
     void* p;
-    char archive_filename[64];
     std::string zw, ret = "";
     std::string directory = "";
 
@@ -1008,20 +1007,20 @@ std::string unzip_new(std::string _in_zip_file, std::string _html_tmp, std::stri
         {
             mz_zip_archive_file_stat file_stat;
             mz_zip_reader_file_stat(&zip_archive, i, &file_stat);
-            sprintf(archive_filename, file_stat.m_filename);
-            
+
             if (!file_stat.m_is_directory) {
-            // Try to extract all the files to the heap.
-            p = mz_zip_reader_extract_file_to_heap(&zip_archive, archive_filename, &uncomp_size, 0);
+            // Extract by index (the previous code copied m_filename into a fixed char[64] via
+            // sprintf-as-format-string: any name >= 64 chars or containing '%' overflowed/garbled).
+            p = mz_zip_reader_extract_to_heap(&zip_archive, i, &uncomp_size, 0);
                 if (!p)
                 {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "mz_zip_reader_extract_file_to_heap() failed on file " + string(archive_filename));
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "mz_zip_reader_extract_to_heap() failed on file " + string(file_stat.m_filename));
                     mz_zip_reader_end(&zip_archive);
                     return ret;
                 }
-            
+
                 // Save to File.
-                zw = std::string(archive_filename);
+                zw = std::string(file_stat.m_filename);
                 ESP_LOGD(TAG, "Rohfilename: %s", zw.c_str());
 
                 if (toUpper(zw) == "FIRMWARE.BIN")
@@ -1083,21 +1082,21 @@ std::string unzip_new(std::string _in_zip_file, std::string _html_tmp, std::stri
                 {
                     isokay = false;
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in writting extracted file (function fwrite) extracted file \"" +
-                            string(archive_filename) + "\", size " + to_string(uncomp_size));
+                            string(file_stat.m_filename) + "\", size " + to_string(uncomp_size));
                 }
 
                 DeleteFile(zw);
                 if (!isokay)
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in fwrite \"" + string(archive_filename) + "\", size " + to_string(uncomp_size));
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in fwrite \"" + string(file_stat.m_filename) + "\", size " + to_string(uncomp_size));
                 isokay = isokay && RenameFile(filename_zw, zw);
                 if (!isokay)
                     LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in Rename \"" + filename_zw + "\" to \"" + zw);
 
                 if (isokay)
-                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully extracted file \"" + string(archive_filename) + "\", size " + to_string(uncomp_size));
+                    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully extracted file \"" + string(file_stat.m_filename) + "\", size " + to_string(uncomp_size));
                 else
                 {
-                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in extracting file \"" + string(archive_filename) + "\", size " + to_string(uncomp_size));
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "ERROR in extracting file \"" + string(file_stat.m_filename) + "\", size " + to_string(uncomp_size));
                     ret = "ERROR";
                 }
                 mz_free(p);
@@ -1113,75 +1112,68 @@ std::string unzip_new(std::string _in_zip_file, std::string _html_tmp, std::stri
 }
 
 void unzip(std::string _in_zip_file, std::string _target_directory){
-    int i, sort_iter;
-    mz_bool status;
-    size_t uncomp_size;
     mz_zip_archive zip_archive;
-    void* p;
-    char archive_filename[64];
-    std::string zw;
-//    static const char* s_Test_archive_filename = "testhtml.zip";
 
     ESP_LOGD(TAG, "miniz.c version: %s", MZ_VERSION);
-    ESP_LOGD(TAG, "Zipfile: %s", _in_zip_file.c_str());
-    ESP_LOGD(TAG, "Target Dir: %s", _target_directory.c_str());
+    ESP_LOGD(TAG, "Zipfile: %s -> %s", _in_zip_file.c_str(), _target_directory.c_str());
 
-    // Now try to open the archive.
     memset(&zip_archive, 0, sizeof(zip_archive));
-    status = mz_zip_reader_init_file(&zip_archive, _in_zip_file.c_str(), 0);
-    if (!status)
+    if (!mz_zip_reader_init_file(&zip_archive, _in_zip_file.c_str(), 0))
     {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "mz_zip_reader_init_file() failed!");
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "unzip: mz_zip_reader_init_file() failed for " + _in_zip_file);
         return;
     }
 
-    // Get and print information about each file in the archive.
     int numberoffiles = (int)mz_zip_reader_get_num_files(&zip_archive);
-    for (sort_iter = 0; sort_iter < 2; sort_iter++)
+    int extracted = 0, failed = 0;
+
+    for (int i = 0; i < numberoffiles; i++)
     {
-        memset(&zip_archive, 0, sizeof(zip_archive));
-        status = mz_zip_reader_init_file(&zip_archive, _in_zip_file.c_str(), sort_iter ? MZ_ZIP_FLAG_DO_NOT_SORT_CENTRAL_DIRECTORY : 0);
-        if (!status)
+        mz_zip_archive_file_stat file_stat;
+        if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat))
+            continue;
+
+        // Skip directory entries: extracting them to heap returns NULL, and the old code treated
+        // that as fatal and aborted the whole archive (so any zip with sub-folders only extracted
+        // the files listed before the first folder entry). The parent dirs are created on demand below.
+        if (file_stat.m_is_directory)
+            continue;
+
+        // Extract by index (avoids the previous fixed 64-byte buffer + sprintf-as-format-string bug,
+        // which truncated/garbled any name >= 64 chars).
+        size_t uncomp_size = 0;
+        void *p = mz_zip_reader_extract_to_heap(&zip_archive, i, &uncomp_size, 0);
+        if (!p)
         {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "mz_zip_reader_init_file() failed!");
-            return;
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "unzip: extract failed for '" + std::string(file_stat.m_filename) + "' - skipping");
+            failed++;
+            continue;   // skip this entry, keep extracting the rest
         }
 
-        for (i = 0; i < numberoffiles; i++)
-        {
-            mz_zip_archive_file_stat file_stat;
-            mz_zip_reader_file_stat(&zip_archive, i, &file_stat);
-            sprintf(archive_filename, file_stat.m_filename);
- 
-            // Try to extract all the files to the heap.
-            p = mz_zip_reader_extract_file_to_heap(&zip_archive, archive_filename, &uncomp_size, 0);
-            if (!p)
-            {
-                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "mz_zip_reader_extract_file_to_heap() failed!");
-                mz_zip_reader_end(&zip_archive);
-                return;
-            }
+        std::string target = _target_directory + std::string(file_stat.m_filename);
+        // Make sure the parent directory exists (e.g. img/, param-tooltips/).
+        size_t slash = target.find_last_of('/');
+        if (slash != std::string::npos)
+            MakeDir(target.substr(0, slash));
 
-            // Save to File.
-            zw = std::string(archive_filename);
-            zw = _target_directory + zw;
-            ESP_LOGD(TAG, "File to extract: %s", zw.c_str());
-            FILE* fpTargetFile = fopen(zw.c_str(), "wb");
+        FILE *fpTargetFile = fopen(target.c_str(), "wb");
+        if (fpTargetFile)
+        {
             fwrite(p, 1, (uint)uncomp_size, fpTargetFile);
             fclose(fpTargetFile);
-
-            ESP_LOGD(TAG, "Successfully extracted file \"%s\", size %u", archive_filename, (uint)uncomp_size);
-            //            ESP_LOGD(TAG, "File data: \"%s\"", (const char*)p);
-
-            // We're done.
-            mz_free(p);
+            extracted++;
         }
-
-        // Close the archive, freeing any resources it was using
-        mz_zip_reader_end(&zip_archive);
+        else
+        {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "unzip: cannot open '" + target + "' for writing");
+            failed++;
+        }
+        mz_free(p);
     }
 
-    ESP_LOGD(TAG, "Success.");
+    mz_zip_reader_end(&zip_archive);
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "unzip: extracted " + std::to_string(extracted) + " file(s)" +
+            (failed ? (", " + std::to_string(failed) + " failed") : std::string("")) + " from " + _in_zip_file);
 }
 
 // ---- Config backups ---------------------------------------------------------------------------

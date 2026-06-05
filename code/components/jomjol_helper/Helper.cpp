@@ -418,7 +418,6 @@ bool RenameFile(const string& from, const string& to)
 
 bool RenameFolder(const string& from, const string& to)
 {
-	// ESP_LOGI(logTag, "Renaming Folder: %s", from.c_str());
 	DIR *fpSourceFolder = opendir(from.c_str());
 
 	// Sourcefolder does not exist otherwise there is a mistake when renaming!
@@ -427,11 +426,69 @@ bool RenameFolder(const string& from, const string& to)
 		ESP_LOGE(TAG, "RenameFolder: Folder %s does not exist!", from.c_str());
 		return false;
 	}
-
 	closedir(fpSourceFolder);
-	rename(from.c_str(), to.c_str());
 
-	return true;
+	// Fast path: a plain rename(). On FATFS this is UNRELIABLE for a directory that contains files
+	// or sub-directories - rename() can return success yet not actually move it (this silently left
+	// the OTA's html_tmp->html swap with an empty /sdcard/html, wiping the web UI). So verify the
+	// move really happened (dest now opens, source is gone); otherwise fall back to a recursive
+	// file-level move, since renaming individual *files* DOES work on FATFS.
+	if (rename(from.c_str(), to.c_str()) == 0)
+	{
+		DIR *dst = opendir(to.c_str());
+		if (dst)
+		{
+			closedir(dst);
+			DIR *stillThere = opendir(from.c_str());
+			if (!stillThere)
+				return true;           // dest exists and source gone -> real move
+			closedir(stillThere);
+		}
+		ESP_LOGW(TAG, "RenameFolder: rename(%s,%s) did not move the directory; using recursive move", from.c_str(), to.c_str());
+	}
+
+	// Recursive move fallback.
+	if (!MakeDir(to))
+	{
+		ESP_LOGE(TAG, "RenameFolder: cannot create target folder %s", to.c_str());
+		return false;
+	}
+	DIR *dir = opendir(from.c_str());
+	if (!dir)
+		return false;
+
+	bool ok = true;
+	struct dirent *entry;
+	while ((entry = readdir(dir)) != NULL)
+	{
+		std::string name = entry->d_name;
+		if (name == "." || name == "..")
+			continue;
+		std::string sf = from + "/" + name;
+		std::string df = to + "/" + name;
+
+		bool isDir = (entry->d_type == DT_DIR);
+		if (entry->d_type == DT_UNKNOWN)   // some FATFS builds don't populate d_type
+		{
+			struct stat st;
+			if (stat(sf.c_str(), &st) == 0)
+				isDir = S_ISDIR(st.st_mode);
+		}
+
+		if (isDir)
+		{
+			ok = RenameFolder(sf, df) && ok;     // recurse
+		}
+		else if (rename(sf.c_str(), df.c_str()) != 0)
+		{
+			// last resort if even a file rename fails (e.g. across an odd VFS edge): copy + delete
+			ok = (CopyFile(sf, df) && DeleteFile(sf)) && ok;
+		}
+	}
+	closedir(dir);
+	rmdir(from.c_str());     // drop the now-empty source directory
+
+	return ok;
 }
 
 bool FileExists(const string& filename)
