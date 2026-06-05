@@ -1520,22 +1520,37 @@ esp_err_t handler_editflow(httpd_req_t *req)
         // Which already-aligned image to cut the ROI from. Default is the stored reference; "fresh"
         // uses the most recent on-demand aligned capture (/img_tmp/alg.jpg from a test_take+test_align),
         // so the user can examine the live scene against the same ROI box without saving a new reference.
+        bool wantFresh = (httpd_query_key_value(_query, "src", vc, sizeof(vc)) == ESP_OK && std::string(vc) == "fresh");
         std::string srcImg = "/sdcard/config/reference.jpg";
-        if (httpd_query_key_value(_query, "src", vc, sizeof(vc)) == ESP_OK && std::string(vc) == "fresh")
-            srcImg = "/sdcard/img_tmp/alg.jpg";
 
         std::string body;
         bool gotLock = flowRoundTryLock();
         if (gotLock && psram_init_shared_memory_for_take_image_step())
         {
-            CAlignAndCutImage *caic = new CAlignAndCutImage("examine", srcImg);
+            if (wantFresh)
+            {
+                // The freshly-aligned capture is at img_tmp/alg.jpg, but that file can be momentarily
+                // unreadable through the image loader (which opens via std::ifstream) while the flow
+                // holds a handle on it - it then reports the file as empty. Duplicate it with a plain
+                // stdio copy to a private, freshly-created file that always opens cleanly.
+                if (CopyFile("/sdcard/img_tmp/alg.jpg", "/sdcard/img_tmp/examine_src.jpg") &&
+                    file_size("/sdcard/img_tmp/examine_src.jpg") > 0)
+                {
+                    srcImg = "/sdcard/img_tmp/examine_src.jpg";
+                }
+                else
+                {
+                    srcImg = "";   // no fresh capture available
+                }
+            }
+
+            CAlignAndCutImage *caic = srcImg.empty() ? NULL : new CAlignAndCutImage("examine", srcImg);
             // Verify the source image actually decoded before cutting. A fresh capture (src=fresh) may
             // not exist yet, and the reference can be momentarily unreadable; cutting an unloaded image
             // would dereference a NULL buffer and panic the httpd task.
-            if (!caic->ImageOkay()) {
+            if (!caic || !caic->ImageOkay()) {
                 delete caic;
                 psram_deinit_shared_memory_for_take_image_step();
-                bool wantFresh = (srcImg.find("alg.jpg") != std::string::npos);
                 body = wantFresh
                     ? "{\"error\":\"no fresh aligned image yet - pull a fresh camera image first\"}"
                     : "{\"error\":\"could not load the reference image\"}";
