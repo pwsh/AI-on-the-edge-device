@@ -96,6 +96,13 @@
 			return i;
 		}
 
+		// Append a unique parameter so the browser can't serve a cached response. The live data
+		// endpoints (/value, /statusflow, /digit_matrix, /info) don't send Cache-Control, so without
+		// this the values freeze on screen even though the device keeps returning fresh readings.
+		function noCache(u) {
+			return u + (u.indexOf("?") >= 0 ? "&" : "?") + "_nc=" + Date.now();
+		}
+
 		$(document).ready(function() {
 			LoadData();
 			LoadROIImage();
@@ -147,7 +154,7 @@
 					} catch (e) { }
 				}
 			}
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -188,7 +195,7 @@
 				}
 			}
 
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -202,7 +209,7 @@
 				}
 			}
 			
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -231,7 +238,7 @@
 				}
 			}
 			
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();		
 		}
 
@@ -245,7 +252,7 @@
 				}
 			}
 
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -259,7 +266,7 @@
 				}
 			}
 			
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -273,7 +280,7 @@
 				}
 			}
 			
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();
 		}
 
@@ -351,7 +358,7 @@
 				html += '</div>';
 				host.innerHTML = any ? html : '';
 			};
-			x.open('GET', url, true);
+			x.open('GET', noCache(url), true);
 			x.send();
 		}
 
@@ -412,7 +419,7 @@
 				}
 			};
 			
-			xhttp.open("GET", url, true);
+			xhttp.open("GET", noCache(url), true);
 			xhttp.send();		
 		}
 
