@@ -539,6 +539,15 @@ extern "C" void app_main(void)
                 else { // PSRAM OK
                     // Init camera
                     // ********************************************
+                    // Before the first probe, give the sensor extra settle time and pre-drain it with
+                    // a couple of escalating power-down cycles. A sensor left wedged by a software-
+                    // exception reset (which does NOT power-cycle it) often needs a longer/repeated
+                    // PWDN drain than a single in-loop reset; doing it up front makes the first InitCam
+                    // far more likely to take. (No-op on boards without a PWDN pin.)
+                    PowerResetCamera(1500);
+                    PowerResetCamera(2500);
+                    vTaskDelay(500 / portTICK_PERIOD_MS);   // let the rail settle before the first probe
+
                     // Retry a few times with a power-down reset between attempts. A sensor left in
                     // a stuck state (e.g. after a software-exception reset, which does NOT power-
                     // cycle the camera) can need several PWDN cycles before it probes correctly.

@@ -4,6 +4,7 @@
 #include "string.h"
 
 #include "esp_camera.h"
+#include "driver/gpio.h"   // gpio_config / GPIO_NUM_* - needed now PowerResetCamera's PWDN path actually compiles
 #include "ClassControllCamera.h"
 #include "MainFlowControl.h"
 
@@ -18,14 +19,23 @@ static const char *TAG = "server_cam";
 
 void PowerResetCamera(int downMs)
 {
-#if CAM_PIN_PWDN == GPIO_NUM_NC // Use reset only if pin is available
-    LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "No power down pin availbale to reset camera");
-#else
+    // This guard MUST be a runtime check, not a preprocessor "#if". CAM_PIN_PWDN expands to a
+    // gpio_num_t *enum* constant (e.g. GPIO_NUM_32), and the C preprocessor treats enum identifier
+    // tokens as 0 - so "#if CAM_PIN_PWDN == GPIO_NUM_NC" was always true and silently compiled this
+    // entire power-down reset out on EVERY board, including those that do have a PWDN pin. That is
+    // why a wedged sensor always needed a physical power cycle: the hardware reset never ran.
+    if (CAM_PIN_PWDN == GPIO_NUM_NC) { // no power-down pin wired on this board -> nothing to toggle
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "No power down pin available to reset camera");
+        return;
+    }
+
     if (downMs < 200) downMs = 200;   // keep it long enough to actually drain the sensor rail
     ESP_LOGD(TAG, "Resetting camera by power down line (%dms down)", downMs);
     gpio_config_t conf;
     conf.intr_type = GPIO_INTR_DISABLE;
-    conf.pin_bit_mask = 1LL << CAM_PIN_PWDN;
+    // (CAM_PIN_PWDN > 0 ? CAM_PIN_PWDN : 0) keeps the shift well-defined at compile time on boards
+    // where CAM_PIN_PWDN is GPIO_NUM_NC (-1); the runtime guard above means it is never reached there.
+    conf.pin_bit_mask = 1ULL << (CAM_PIN_PWDN > 0 ? (int)CAM_PIN_PWDN : 0);
     conf.mode = GPIO_MODE_OUTPUT;
     conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     conf.pull_up_en = GPIO_PULLUP_DISABLE;
@@ -36,7 +46,6 @@ void PowerResetCamera(int downMs)
     vTaskDelay(downMs / portTICK_PERIOD_MS);
     gpio_set_level(CAM_PIN_PWDN, 0);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-#endif
 }
 
 esp_err_t handler_lightOn(httpd_req_t *req)
