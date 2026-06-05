@@ -114,19 +114,20 @@ There are several options for what to do with that value:
   The redesigned, responsive web UI with a built-in dark mode. Live on a real water meter below:
 
   <p align="center">
-    <img src="images/webui/overview.png" width="420" alt="Overview – live reading, ROI overlay and per-round diagnostics">
-    <img src="images/webui/configuration.png" width="420" alt="Configuration – card layout, FastRead and config backup/restore">
+    <img src="images/webui/overview.png" width="420" alt="Overview – live reading, ROI overlay, per-round diagnostics and recognition confidence">
+    <img src="images/webui/roi-editor.png" width="420" alt="ROI editor – Examine a single region on demand: analysed crop, reading and confidence shown inline">
   </p>
   <p align="center">
-    <em>Overview (live reading + ROI overlay + per-round diagnostics) &nbsp;·&nbsp; Configuration (FastRead, expert parameters, Backup&nbsp;on&nbsp;save / Restore)</em>
+    <em>Overview (live reading + ROI overlay + per-round diagnostics + recognition&nbsp;confidence) &nbsp;·&nbsp; ROI editor (Examine a region on demand — reading&nbsp;+&nbsp;confidence inline; pull a fresh aligned frame)</em>
   </p>
 
   <p align="center">
-    <img src="images/webui/system-info.png" width="420" alt="System info – firmware/web-UI version, chip, camera and host details">
-    <img src="images/webui/overview-mobile.png" width="200" alt="Overview on a phone – the layout stacks responsively">
+    <img src="images/webui/configuration.png" width="280" alt="Configuration – card layout, FastRead and config backup/restore">
+    <img src="images/webui/system-info.png" width="280" alt="System info – firmware/web-UI version, chip, camera and host details">
+    <img src="images/webui/overview-mobile.png" width="160" alt="Overview on a phone – the layout stacks responsively">
   </p>
   <p align="center">
-    <em>System info &nbsp;·&nbsp; Mobile-friendly responsive layout</em>
+    <em>Configuration (FastRead, expert parameters, Backup&nbsp;on&nbsp;save / Restore) &nbsp;·&nbsp; System info &nbsp;·&nbsp; Mobile-friendly responsive layout</em>
   </p>
 
 ---
@@ -153,12 +154,16 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 
 ### 🌓 Modern web interface
 - **Dark mode** and a **responsive, mobile-friendly** layout built from content cards.
+- **Confidence display** – the overview shows the recognition **confidence** for each number sequence (above its digit matrix and below its value), so a low-confidence read is visible at a glance.
+- **Examine a single ROI on demand** – in the digit/analog ROI editors, an **Examine selected ROI** button runs the neural network on just that region and shows the analysed crop, the reading and its confidence inline — no save or full round needed.
+- **Pull a fresh camera image** – the ROI editors can grab and align a **live frame** to use in place of the stored reference image, so you can tell at a glance whether the reference / alignment is still accurate.
 - **Configuration backups** – every save snapshots the configuration; **one-click Restore** keeps the latest 10 (bundled models are excluded to keep backups small).
 - **Changed-digit highlighting** on the overview, a **Pause processing** control, and an auto-tailing live log viewer.
 - **Keyboard nudging** in the ROI editors and faster **WebGL** data graphs.
 - **Apply the interval live** (no reboot) and a **one-click migration** prompt when the firmware and web-UI versions differ.
 
 ### 🔁 Reliability
+- **Camera auto-recovery** – a stuck OV2640 is now power-cycled in firmware over its power-down line before each init attempt (with escalating drains), so a sensor wedged by a software reset recovers on its own instead of needing a physical unplug. *(Fixes a long-standing bug where the reset was silently compiled out on every board.)*
 - **OTA rollback** – a crash-looping update is automatically rolled back to the last working firmware.
 - **Crash dumps are saved to the SD card** for later retrieval.
 - **Wi-Fi resilience** – exponential-backoff reconnect, automatic fall-back to the setup access point after repeated failures (now **including an empty/corrupt Wi-Fi config**, so the device can always be reconfigured from its portal — no SD pull needed), fast wrong-password detection, atomic `wlan.ini` writes, and a 3×-reset Wi-Fi factory reset.

@@ -23,6 +23,7 @@ between the ESP32-CAM and the ESP32-S3 variants.
 | **`USE_FLASH_FS`** | not defined | defined | defined |
 | **Camera peripheral** | I2S DVP | LCD_CAM DVP | LCD_CAM DVP |
 | **Camera driver** | esp32-camera (via `ICameraBackend`) | esp32-camera (via `ICameraBackend`) | same |
+| **Camera PWDN reset (stuck-sensor auto-recovery)** | ✅ `CAM_PIN_PWDN = GPIO 32` — firmware power-cycles a wedged OV2640 over the PWDN line before init | ❌ no PWDN pin (`GPIO_NUM_NC`) — software reset only | ❌ same |
 | **Status / flash LED** | PWM LED (LEDC); `USE_PWM_LEDFLASH`; flash GPIO4 | **WS2812 RGB** on GPIO48 (RMT); flash via GPIO handler | same |
 | **RGB Wi-Fi status feedback** | ❌ (simple LED) | ✅ `driveSystemStatusWs281x()` (orange/red/green) | ✅ |
 | **Info-page "Hardware details" section** | ❌ hidden (S3-gated) | ✅ shown | ✅ shown |

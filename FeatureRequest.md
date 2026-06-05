@@ -86,8 +86,8 @@ ____
 
 * **Request:** Let the user fix a wrongly-read value; save the offending ROIs to a "training data" folder, ideally uploadable with one button.
 * **Benefit:** Easy corrections and a feedback loop to improve the models.
-* **Feasibility:** All boards — feasible (software only); some SD/flash space for saved ROIs. The v17 confidence-vote logic (a single spurious high read can be overridden) reduces some bad reads but is not the manual-correction UI this asks for.
-* **Status:** ⬜ Open (related robustness improved in v17).
+* **Feasibility:** All boards — feasible (software only); some SD/flash space for saved ROIs. The v17 confidence-vote logic (a single spurious high read can be overridden) reduces some bad reads but is not the manual-correction UI this asks for. v17 also adds an **Examine selected ROI** tool in the ROI editors that runs the CNN on one region on demand and shows the analysed crop + reading + confidence — a natural building block for a "save this ROI as training data" button.
+* **Status:** 🟡 Partially — on-demand single-ROI examination + confidence display exist (v17); the save-to-training-folder + one-click upload loop is still open.
 
 #### #31 InfluxDB v2.x interface
 
