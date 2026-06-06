@@ -79,6 +79,13 @@ struct NumberPost {
     string ReturnValue;         // valueStr; corrected return value, if necessary with error message
     string ReturnPreValue;      // lastValidValueStr; corrected return value without error message
     string ErrorMessageText;    // errorMessage; Error message for consistency checks
+    float  ReturnConfidence = -1.0f; // per-sequence recognition confidence 0..100 (-1 = not available);
+                                     // aggregated from the digit ROIs, publishable via the Data Publishing page
+    // "Send only changed readings" mode: each publisher tracks the ReturnValue it last sent (they run
+    // independently each round, so they cannot share one tracker).
+    string LastPubMqtt;
+    string LastPubInflux;
+    string LastPubInfluxV2;
     int AnzahlAnalog;           // numAnalogRoi; number of analog ROIs used in this sequence
     int AnzahlDigit;          // numDigitRoi; number of digit ROIs used in this sequence
     int DecimalShift;           // decimalShift; each increment shifts the decimal separator by one digit; value=value*10^decimalShift; pos. value shifts to the right

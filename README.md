@@ -170,6 +170,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - RGB status LED (ESP32-S3) reflects the Wi-Fi / processing state.
 
 ### 🔒 Connectivity & security
+- **Data Publishing page** – a per-platform matrix to pick exactly **which parameters** are sent to **MQTT, InfluxDB and Home Assistant** (including values the device gathers but didn't previously send, like *previous value* and *recognition confidence*), plus an **"only send changed readings"** mode to cut traffic. Disabled Home Assistant entities are removed via an empty retained discovery message.
 - **Verified MQTTS / HTTPS out of the box** via a built-in Mozilla CA bundle — connect to public TLS brokers (e.g. HiveMQ Cloud) and InfluxDB Cloud **without uploading a certificate**.
 - Default hostname `edgeai-<mac>` so multiple devices don't clash on the network.
 

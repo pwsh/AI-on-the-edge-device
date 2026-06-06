@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" xml:lang="en">
+
+<head>
+    <link rel="stylesheet" href="app.css?v=$COMMIT_HASH" type="text/css">
+    <link rel="stylesheet" href="theme.css?v=$COMMIT_HASH" type="text/css">
+    <script src="theme.js?v=$COMMIT_HASH"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Publishing</title>
+
+    <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet">
+    <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="jquery-3.6.0.min.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="firework.js?v=$COMMIT_HASH"></script>
+
+    <style>
+        body { font-family: arial; padding: 0 12px; }
+        table.pub { border-collapse: collapse; width: 100%; max-width: 760px; }
+        table.pub th, table.pub td { border: 1px solid rgba(127,127,127,.35); padding: 5px 8px; }
+        table.pub th { text-align: center; }
+        table.pub td.field { text-align: left; }
+        table.pub td.cell { text-align: center; width: 90px; }
+        table.pub td.na { color: rgba(127,127,127,.45); }
+        table.pub tr.group td { background: rgba(127,127,127,.12); font-weight: 700; text-align: left; }
+        table.pub td.field small { color: #888; }
+        .platcol { min-width: 90px; }
+        .modebox { max-width: 760px; margin: 10px 0 16px; padding: 10px 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; }
+        .modebox label { display: block; margin: 4px 0; }
+        .actions { margin: 14px 0 30px; max-width: 760px; }
+        #savebtn { font-weight: bold; }
+        .colhelp { font-size: .85em; color: #888; }
+        #reboot_button { background:#f44336; color:#fff; padding:5px 9px; border-radius:5px; font-weight:bold; text-decoration:none; cursor:pointer; }
+    </style>
+</head>
+
+<body>
+    <h2>Data Publishing</h2>
+    <details style="font-size:15px; max-width:760px">
+        <summary><b>CLICK HERE</b> for a description</summary>
+        <p>Choose exactly which values get pushed to each integration. Columns are <b>MQTT</b>,
+           <b>InfluxDB</b> and <b>Home&nbsp;Assistant</b>; tick a box to publish that parameter to that
+           platform. Greyed cells are not applicable to that platform. Parameters the device gathers but
+           does not normally send (previous value, recognition confidence, raw/rate for InfluxDB&hellip;)
+           are listed here too &mdash; just tick them to start sending.</p>
+        <p>Turning parameters off, or using <b>only send changed readings</b>, reduces how much data the
+           device pushes. Changes take effect after the next <b>reboot</b>.</p>
+    </details>
+
+    <div class="modebox">
+        <b>When to send readings</b>
+        <label><input type="radio" name="mode" id="mode_always" value="always"> Always send the current values every round <span class="colhelp">(default)</span></label>
+        <label><input type="radio" name="mode" id="mode_changed" value="changed"> Only send a sequence's readings when its value changed <span class="colhelp">(diagnostics &amp; leak state still send every round)</span></label>
+    </div>
+
+    <table class="pub" id="matrix">
+        <thead>
+            <tr>
+                <th class="field" style="text-align:left">Parameter</th>
+                <th class="platcol">MQTT</th>
+                <th class="platcol">InfluxDB</th>
+                <th class="platcol">Home&nbsp;Assistant</th>
+            </tr>
+        </thead>
+        <tbody id="matrixBody"></tbody>
+    </table>
+
+    <div class="actions">
+        <input class="button" type="button" id="savebtn" value="Save" onclick="saveConfig()">
+        <input class="button" type="button" value="Reset to defaults" onclick="applyDefaults(); firework.launch('Reset to defaults — press Save to keep', 'success', 4000);">
+        <span id="status" style="margin-left:10px; color:#888;"></span>
+    </div>
+
+<script type="text/javascript">
+    var domainname = getDomainname();
+    var CFG = "/config/publishing.cfg";
+
+    // Matrix definition. Per platform: 1 = applicable & on by default, 0 = applicable & off by default,
+    // null = not applicable (greyed). Defaults mirror the firmware baseline (PublishConfig.cpp) so the
+    // page shows today's behaviour out of the box.
+    var GROUPS = [
+        { title: "Readings — per number sequence", rows: [
+            { k:"value",                       label:"Value",                          mqtt:1,    influx:1,    ha:1 },
+            { k:"raw",                         label:"Raw value (with N / leading 0)", mqtt:1,    influx:0,    ha:1 },
+            { k:"prevalue",                    label:"Previous value (last error-free)", mqtt:0,  influx:0,    ha:null },
+            { k:"rate",                        label:"Rate (per minute)",              mqtt:1,    influx:0,    ha:null },
+            { k:"rate_per_time_unit",          label:"Rate (per time unit)",           mqtt:1,    influx:null, ha:1 },
+            { k:"rate_per_digitization_round", label:"Change per round",               mqtt:1,    influx:null, ha:1 },
+            { k:"confidence",                  label:"Recognition confidence (%)",     mqtt:0,    influx:0,    ha:null },
+            { k:"error",                       label:"Error message",                  mqtt:1,    influx:null, ha:1 },
+            { k:"problem",                     label:"Problem (binary, from error)",   mqtt:null, influx:null, ha:1 },
+            { k:"timestamp",                   label:"Timestamp",                      mqtt:1,    influx:null, ha:1 },
+            { k:"json",                        label:"JSON (all fields)",              mqtt:1,    influx:null, ha:1 }
+        ]},
+        { title: "Leak detection — per sequence (when leak detection is enabled)", rows: [
+            { k:"leak",                        label:"Leak detected (ON/OFF)",         mqtt:1,    influx:1,    ha:1 },
+            { k:"continuous_usage",            label:"Continuous usage (seconds)",     mqtt:1,    influx:1,    ha:1 }
+        ]},
+        { title: "Device &amp; diagnostics", rows: [
+            { k:"uptime",         label:"Uptime",               mqtt:1,    influx:null, ha:1 },
+            { k:"freeMem",        label:"Free memory",          mqtt:1,    influx:null, ha:1 },
+            { k:"wifiRSSI",       label:"Wi-Fi RSSI",           mqtt:1,    influx:null, ha:1 },
+            { k:"CPUtemp",        label:"CPU temperature",      mqtt:1,    influx:null, ha:1 },
+            { k:"processingTime", label:"Processing time (ms)", mqtt:1,    influx:1,    ha:1 },
+            { k:"analysisType",   label:"Analysis type",        mqtt:1,    influx:1,    ha:null },
+            { k:"digitsAnalyzed", label:"Digits analyzed",      mqtt:1,    influx:1,    ha:null },
+            { k:"digitsTotal",    label:"Digits total",         mqtt:1,    influx:null, ha:null },
+            { k:"fwVersion",      label:"Firmware version",     mqtt:1,    influx:null, ha:1 },
+            { k:"MAC",            label:"MAC address",          mqtt:1,    influx:null, ha:1 },
+            { k:"IP",             label:"IP address",           mqtt:1,    influx:null, ha:1 },
+            { k:"hostname",       label:"Hostname",             mqtt:1,    influx:null, ha:1 },
+            { k:"interval",       label:"Interval (min)",       mqtt:1,    influx:null, ha:1 },
+            { k:"status",         label:"Status",               mqtt:null, influx:null, ha:1 },
+            { k:"flowstart",      label:"Start flow (button)",  mqtt:null, influx:null, ha:1 },
+            { k:"connection",     label:"Connection (LWT)",     mqtt:1,    influx:null, ha:null }
+        ]}
+    ];
+
+    var PLATFORMS = ["mqtt", "influx", "ha"];
+
+    function cellId(p, k) { return "cb_" + p + "_" + k; }
+
+    function buildTable() {
+        var html = "";
+        GROUPS.forEach(function(g) {
+            html += '<tr class="group"><td colspan="4">' + g.title + '</td></tr>';
+            g.rows.forEach(function(r) {
+                html += '<tr><td class="field">' + r.label + '<br><small>' + r.k + '</small></td>';
+                PLATFORMS.forEach(function(p) {
+                    var d = r[p];
+                    if (d === null || typeof d === 'undefined') {
+                        html += '<td class="cell na">—</td>';
+                    } else {
+                        html += '<td class="cell"><input type="checkbox" id="' + cellId(p, r.k) + '"></td>';
+                    }
+                });
+                html += '</tr>';
+            });
+        });
+        document.getElementById("matrixBody").innerHTML = html;
+    }
+
+    // Set every checkbox to its built-in default and mode=always.
+    function applyDefaults() {
+        document.getElementById("mode_always").checked = true;
+        GROUPS.forEach(function(g) { g.rows.forEach(function(r) {
+            PLATFORMS.forEach(function(p) {
+                if (r[p] === null || typeof r[p] === 'undefined') return;
+                document.getElementById(cellId(p, r.k)).checked = (r[p] === 1);
+            });
+        }); });
+    }
+
+    // Apply a parsed { "mqtt.value":true, ... , mode:"changed" } map; fall back to defaults for absent keys.
+    function applyConfig(map) {
+        document.getElementById((map["mode"] === "changed") ? "mode_changed" : "mode_always").checked = true;
+        GROUPS.forEach(function(g) { g.rows.forEach(function(r) {
+            PLATFORMS.forEach(function(p) {
+                if (r[p] === null || typeof r[p] === 'undefined') return;
+                var key = p + "." + r.k;
+                var v = (key in map) ? map[key] : (r[p] === 1);
+                document.getElementById(cellId(p, r.k)).checked = !!v;
+            });
+        }); });
+    }
+
+    function loadConfig() {
+        var url = domainname + "/fileserver" + CFG + "?t=" + Date.now();
+        fetch(url, { cache: "no-store" }).then(function(resp) {
+            if (!resp.ok) throw new Error("no file");
+            return resp.text();
+        }).then(function(txt) {
+            var map = {};
+            txt.split("\n").forEach(function(line) {
+                line = line.trim();
+                if (!line || line[0] === '#' || line[0] === ';') return;
+                var i = line.indexOf("=");
+                if (i < 0) return;
+                var k = line.substr(0, i).trim();
+                var val = line.substr(i + 1).trim().toLowerCase();
+                if (k === "mode") map["mode"] = val;
+                else map[k] = (val === "1" || val === "true" || val === "on");
+            });
+            applyConfig(map);
+            document.getElementById("status").textContent = "Loaded current selection.";
+        }).catch(function() {
+            applyDefaults();
+            document.getElementById("status").textContent = "No saved selection yet — showing defaults.";
+        });
+    }
+
+    function buildContent() {
+        var lines = [];
+        lines.push("# Data publishing selection - written by publishing.html. Do not hand-edit casually.");
+        lines.push("mode=" + (document.getElementById("mode_changed").checked ? "changed" : "always"));
+        GROUPS.forEach(function(g) { g.rows.forEach(function(r) {
+            PLATFORMS.forEach(function(p) {
+                if (r[p] === null || typeof r[p] === 'undefined') return;
+                var on = document.getElementById(cellId(p, r.k)).checked ? "1" : "0";
+                lines.push(p + "." + r.k + "=" + on);
+            });
+        }); });
+        return lines.join("\n") + "\n";
+    }
+
+    function saveConfig() {
+        var content = buildContent();
+        // Mirror the config.ini save: delete then upload (the upload handler refuses to overwrite).
+        FileDeleteOnServer(CFG, domainname);
+        var ok = FileSendContent(content, CFG, domainname);
+        if (ok) {
+            firework.launch('Saved. Changes apply after a reboot.<br><br>\n<a id="reboot_button" onclick="doReboot()">reboot now</a>', 'success', 8000);
+        } else {
+            firework.launch('Save failed — check the connection and try again.', 'danger', 20000);
+        }
+    }
+
+    function doReboot() {
+        var url = getDomainname() + "/reboot";
+        window.location.assign(url);
+    }
+
+    buildTable();
+    loadConfig();
+</script>
+</body>
+</html>

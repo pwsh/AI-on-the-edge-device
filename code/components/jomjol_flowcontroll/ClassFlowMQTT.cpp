@@ -11,6 +11,7 @@
 #include "time_sntp.h"
 #include "interface_mqtt.h"
 #include "ClassFlowPostProcessing.h"
+#include "PublishConfig.h"
 #include "ClassFlowControll.h"
 
 #include "server_mqtt.h"
@@ -301,47 +302,67 @@ bool ClassFlowMQTT::doFlow(string zwtime)
             else
                 namenumber = maintopic + "/" + namenumber + "/";
 
-            if ((domoticzintopic.length() > 0) && (result.length() > 0)) 
+            // Per-parameter publish control + "only send changed readings" mode (Data Publishing page).
+            // P(f) = field enabled for MQTT. R(f) = enabled AND (value changed, or not in changed-mode):
+            // reading topics are skipped when the sequence value is unchanged; status/leak/diagnostics
+            // always send.
+            bool readingsChanged = !PublishConfig::SendOnlyChanged() ||
+                                   (result != (*NUMBERS)[i]->LastPubMqtt);
+            auto P = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
+            auto R = [&](const std::string &f){ return readingsChanged && P(f); };
+
+            if ((domoticzintopic.length() > 0) && (result.length() > 0))
                 success |= MQTTPublish(domoticzintopic, domoticzpayload, qos, SetRetainFlag);
 
-            if (result.length() > 0)
+            if (R("value") && result.length() > 0)
                 success |= MQTTPublish(namenumber + "value", result, qos, SetRetainFlag);
-            if (resulterror.length() > 0)  
+            if (R("prevalue") && resultpre.length() > 0)
+                success |= MQTTPublish(namenumber + "prevalue", resultpre, qos, SetRetainFlag);
+            if (R("confidence") && (*NUMBERS)[i]->ReturnConfidence >= 0)
+                success |= MQTTPublish(namenumber + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), qos, SetRetainFlag);
+            if (P("error") && resulterror.length() > 0)
                 success |= MQTTPublish(namenumber + "error", resulterror, qos, SetRetainFlag);
 
             if (resultrate.length() > 0) {
-                success |= MQTTPublish(namenumber + "rate", resultrate, qos, SetRetainFlag);
-                
-                std::string resultRatePerTimeUnit;
-                if (getTimeUnit() == "h") { // Need conversion to be per hour
-                    resultRatePerTimeUnit = resultRatePerTimeUnit = to_string((*NUMBERS)[i]->FlowRateAct * 60); // per minutes => per hour
+                if (R("rate"))
+                    success |= MQTTPublish(namenumber + "rate", resultrate, qos, SetRetainFlag);
+
+                if (R("rate_per_time_unit")) {
+                    std::string resultRatePerTimeUnit;
+                    if (getTimeUnit() == "h") // Need conversion to be per hour
+                        resultRatePerTimeUnit = to_string((*NUMBERS)[i]->FlowRateAct * 60); // per minutes => per hour
+                    else // Keep per minute
+                        resultRatePerTimeUnit = resultrate;
+                    success |= MQTTPublish(namenumber + "rate_per_time_unit", resultRatePerTimeUnit, qos, SetRetainFlag);
                 }
-                else { // Keep per minute
-                    resultRatePerTimeUnit = resultrate;
-                }
-                success |= MQTTPublish(namenumber + "rate_per_time_unit", resultRatePerTimeUnit, qos, SetRetainFlag);
             }
 
-            if (resultchangabs.length() > 0) {
-                success |= MQTTPublish(namenumber + "changeabsolut", resultchangabs, qos, SetRetainFlag); // Legacy API
+            if (R("rate_per_digitization_round") && resultchangabs.length() > 0) {
+                success |= MQTTPublish(namenumber + "changeabsolut", resultchangabs, qos, SetRetainFlag); // Legacy alias
                 success |= MQTTPublish(namenumber + "rate_per_digitization_round", resultchangabs, qos, SetRetainFlag);
             }
 
-            if (resultraw.length() > 0)   
+            if (R("raw") && resultraw.length() > 0)
                 success |= MQTTPublish(namenumber + "raw", resultraw, qos, SetRetainFlag);
 
-            if (resulttimestamp.length() > 0)
+            if (R("timestamp") && resulttimestamp.length() > 0)
                 success |= MQTTPublish(namenumber + "timestamp", resulttimestamp, qos, SetRetainFlag);
 
             // Leak detection (water/gas): binary leak flag (ON/OFF for a HA binary_sensor) + the time
-            // the meter has been advancing continuously (seconds).
+            // the meter has been advancing continuously (seconds). State/safety -> sent every round.
             if ((*NUMBERS)[i]->LeakDetectionEnabled) {
-                success |= MQTTPublish(namenumber + "leak", (*NUMBERS)[i]->LeakDetected ? "ON" : "OFF", qos, SetRetainFlag);
-                success |= MQTTPublish(namenumber + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), qos, SetRetainFlag);
+                if (P("leak"))
+                    success |= MQTTPublish(namenumber + "leak", (*NUMBERS)[i]->LeakDetected ? "ON" : "OFF", qos, SetRetainFlag);
+                if (P("continuous_usage"))
+                    success |= MQTTPublish(namenumber + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), qos, SetRetainFlag);
             }
 
-            std::string json = flowpostprocessing->getJsonFromNumber(i, "\n");
-            success |= MQTTPublish(namenumber + "json", json, qos, SetRetainFlag);
+            if (R("json")) {
+                std::string json = flowpostprocessing->getJsonFromNumber(i, "\n");
+                success |= MQTTPublish(namenumber + "json", json, qos, SetRetainFlag);
+            }
+
+            (*NUMBERS)[i]->LastPubMqtt = result;
         }
     }
 

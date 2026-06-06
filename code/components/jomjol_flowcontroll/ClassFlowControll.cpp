@@ -24,6 +24,7 @@ extern "C" {
 #include <cstdlib>     // atoi
 #include <cstdio>      // snprintf
 #include "Helper.h"
+#include "PublishConfig.h"
 #include "server_ota.h"
 #include "server_backup.h"
 #ifdef ENABLE_MQTT
@@ -459,6 +460,10 @@ void ClassFlowControll::InitFlow(std::string config)
             flowdigit->ShiftROIs(dx, dy);
         }
     }
+
+    // Load the per-parameter publish selection + send-mode (Data Publishing page) so MQTT/InfluxDB/HA
+    // honour it from the first round. Independent of config.ini (own file: /sdcard/config/publishing.cfg).
+    PublishConfig::Load();
 }
 
 std::string* ClassFlowControll::getActStatusWithTime()

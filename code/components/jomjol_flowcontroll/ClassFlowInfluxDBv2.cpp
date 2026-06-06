@@ -8,6 +8,7 @@
 #include "interface_influxdb.h"
 
 #include "ClassFlowPostProcessing.h"
+#include "PublishConfig.h"
 #include "esp_log.h"
 #include "../../include/defines.h"
 
@@ -238,28 +239,49 @@ bool ClassFlowInfluxDBv2::doFlow(string zwtime)
             
             printf("vor sende Influx_DB_V2 - namenumber. %s, result: %s, timestampt: %s", namenumber.c_str(), result.c_str(), resulttimestamp.c_str());
 
-            if (result.length() > 0)
-                influxdb.InfluxDBPublish(measurement, namenumber, result, resulttimeutc);
-//                InfluxDB_V2_Publish(measurement, namenumber, result, resulttimeutc);
+            // Per-parameter publish control + "only send changed readings" mode (Data Publishing page).
+            bool changed = !PublishConfig::SendOnlyChanged() || (result != (*NUMBERS)[i]->LastPubInfluxV2);
+            auto P = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::INFLUX, f); };
+            auto R = [&](const std::string &f){ return changed && P(f); };
+            std::string _np = ((*NUMBERS)[i]->name == "default") ? "" : ((*NUMBERS)[i]->name + "/");
 
-            // Leak detection: a 0/1 leak flag + seconds of continuous usage.
+            if (R("value") && result.length() > 0)
+                influxdb.InfluxDBPublish(measurement, namenumber, result, resulttimeutc);
+
+            // Opt-in numeric fields (default off): raw, rate, prevalue, confidence.
+            if (R("raw") && resultraw.length() > 0)
+                influxdb.InfluxDBPublish(measurement, _np + "raw", resultraw, resulttimeutc);
+            if (R("rate") && resultrate.length() > 0)
+                influxdb.InfluxDBPublish(measurement, _np + "rate", resultrate, resulttimeutc);
+            if (R("prevalue") && (*NUMBERS)[i]->ReturnPreValue.length() > 0)
+                influxdb.InfluxDBPublish(measurement, _np + "prevalue", (*NUMBERS)[i]->ReturnPreValue, resulttimeutc);
+            if (R("confidence") && (*NUMBERS)[i]->ReturnConfidence >= 0)
+                influxdb.InfluxDBPublish(measurement, _np + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), resulttimeutc);
+
+            // Leak detection: a 0/1 leak flag + seconds of continuous usage (state/safety -> every round).
             if ((*NUMBERS)[i]->LeakDetectionEnabled) {
-                std::string _lp = ((*NUMBERS)[i]->name == "default") ? "" : ((*NUMBERS)[i]->name + "/");
-                influxdb.InfluxDBPublish(measurement, _lp + "leak", (*NUMBERS)[i]->LeakDetected ? "1" : "0", resulttimeutc);
-                influxdb.InfluxDBPublish(measurement, _lp + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), resulttimeutc);
+                if (P("leak"))
+                    influxdb.InfluxDBPublish(measurement, _np + "leak", (*NUMBERS)[i]->LeakDetected ? "1" : "0", resulttimeutc);
+                if (P("continuous_usage"))
+                    influxdb.InfluxDBPublish(measurement, _np + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), resulttimeutc);
             }
+
+            (*NUMBERS)[i]->LastPubInfluxV2 = result;
         }
 
         // Performance diagnostic: last digitization round (loop) processing time in ms, published
-        // under the first number's measurement with field "processingTime".
+        // under the first number's measurement (per-field gateable).
         if ((*NUMBERS).size() > 0) {
-            influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "processingTime",
-                std::to_string(getFlowProcessingTime()), (*NUMBERS)[0]->timeStampTimeUTC);
-            // What the last round did (string field) + how many digits were inferred.
-            influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "analysisType",
-                "\"" + getLastAnalysisType() + "\"", (*NUMBERS)[0]->timeStampTimeUTC);
-            influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "digitsAnalyzed",
-                std::to_string(getLastDigitsAnalyzed()), (*NUMBERS)[0]->timeStampTimeUTC);
+            auto Pd = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::INFLUX, f); };
+            if (Pd("processingTime"))
+                influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "processingTime",
+                    std::to_string(getFlowProcessingTime()), (*NUMBERS)[0]->timeStampTimeUTC);
+            if (Pd("analysisType"))
+                influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "analysisType",
+                    "\"" + getLastAnalysisType() + "\"", (*NUMBERS)[0]->timeStampTimeUTC);
+            if (Pd("digitsAnalyzed"))
+                influxdb.InfluxDBPublish((*NUMBERS)[0]->MeasurementV2, "digitsAnalyzed",
+                    std::to_string(getLastDigitsAnalyzed()), (*NUMBERS)[0]->timeStampTimeUTC);
         }
     }
 

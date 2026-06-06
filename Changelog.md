@@ -1,3 +1,22 @@
+# [Unreleased]
+
+### Integrations
+
+- **Data Publishing page** (`publishing.html`): a per-platform matrix to choose exactly which parameters
+  are published to **MQTT, InfluxDB and Home Assistant**. Every currently-sent field can be turned off,
+  and fields the device already gathers but never sent are now opt-in exposed (per-sequence **previous
+  value** and **recognition confidence**; **raw/rate** for InfluxDB). Defaults match the previous
+  behaviour exactly, so existing devices are unchanged until a parameter is toggled.
+- **"Only send changed readings"** mode (toggle on the main config screen + the Data Publishing page):
+  when a sequence's value is unchanged since the last publish, its reading topics are skipped; leak
+  state and device/diagnostic topics still send every round. Reduces MQTT/InfluxDB traffic.
+- Selection is stored in its own `/sdcard/config/publishing.cfg` (not `config.ini`, which the web config
+  editor would otherwise strip). Turning a Home Assistant parameter off removes its entity via an empty
+  retained discovery message.
+
+> Note: the **rc.1** tag also moved to include the OTA web-UI fix (`fix(ota)`) and the clean-release
+> build hygiene that landed right after the entry below.
+
 # [17.0.0-rc.1] - 2026-06-04
 
 > First **release candidate** for 17.0.0. The ESP-IDF 6.0 migration and the alpha feature set are

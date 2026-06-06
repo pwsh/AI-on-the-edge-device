@@ -1005,7 +1005,20 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         #ifdef SERIAL_DEBUG
             ESP_LOGD(TAG, "After digit->getReadout: ReturnRaw %s", NUMBERS[j]->ReturnRawValue.c_str());
         #endif
-	    
+
+        // Per-sequence recognition confidence = the weakest digit's confidence (0..100), mirroring the
+        // overview digit matrix. Opt-in publishable via the Data Publishing page; -1 when unavailable.
+        NUMBERS[j]->ReturnConfidence = -1.0f;
+        if (NUMBERS[j]->digit_roi && !NUMBERS[j]->digit_roi->ROI.empty()) {
+            int seqConf = 100;
+            for (size_t i = 0; i < NUMBERS[j]->digit_roi->ROI.size(); ++i) {
+                if (NUMBERS[j]->digit_roi->ROI[i] == nullptr) continue;
+                int c = (int)(NUMBERS[j]->digit_roi->ROI[i]->result_confidence * 100.0f + 0.5f);
+                if (c < seqConf) seqConf = c;
+            }
+            NUMBERS[j]->ReturnConfidence = (float)(seqConf < 0 ? 0 : (seqConf > 100 ? 100 : seqConf));
+        }
+
         NUMBERS[j]->ReturnRawValue = ShiftDecimal(NUMBERS[j]->ReturnRawValue, NUMBERS[j]->DecimalShift);
 
         #ifdef SERIAL_DEBUG

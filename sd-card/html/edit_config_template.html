@@ -318,6 +318,54 @@
     </details>
     <hr />
 
+    <!-- Data publishing quick control. Writes /config/publishing.cfg (NOT config.ini), so it is saved
+         on change here and is independent of the "Save Config" button. The full per-parameter matrix
+         lives on the Data Publishing page. -->
+    <div id="pubModeBox" style="border:1px solid rgba(127,127,127,.35); border-radius:6px; padding:10px 12px; margin:6px 0 14px; max-width:760px;">
+        <b>Data publishing</b> &mdash; when to push readings to MQTT / InfluxDB / Home&nbsp;Assistant:
+        <label style="display:block; margin-top:5px;"><input type="radio" name="pubmode" id="pubmode_always" value="always" onchange="savePubMode()"> Always send the current values every round</label>
+        <label style="display:block;"><input type="radio" name="pubmode" id="pubmode_changed" value="changed" onchange="savePubMode()"> Only send a sequence's readings when its value changed</label>
+        <div style="margin-top:7px;">
+            <a href="publishing.html?v=$COMMIT_HASH" class="button" style="text-decoration:none;">Choose which parameters are sent &rarr;</a>
+            <span id="pubmodeStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
+        </div>
+    </div>
+    <script type="text/javascript">
+        // Self-contained (fetch only) so it doesn't depend on the heavier config.ini machinery / load order.
+        function loadPubMode() {
+            fetch(getDomainname() + '/fileserver/config/publishing.cfg?t=' + Date.now(), { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; })
+                .then(function (txt) {
+                    var mode = 'always';
+                    txt.split('\n').forEach(function (l) { l = l.trim().toLowerCase(); if (l.indexOf('mode=') === 0) mode = l.substr(5).trim(); });
+                    var el = document.getElementById(mode === 'changed' ? 'pubmode_changed' : 'pubmode_always');
+                    if (el) el.checked = true;
+                });
+        }
+        function savePubMode() {
+            var mode = document.getElementById('pubmode_changed').checked ? 'changed' : 'always';
+            var base = getDomainname();
+            var st = document.getElementById('pubmodeStatus');
+            st.textContent = 'saving…';
+            // Read-modify-write so the per-parameter matrix lines are preserved; delete then upload
+            // (the upload handler refuses to overwrite).
+            fetch(base + '/fileserver/config/publishing.cfg?t=' + Date.now(), { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; })
+                .then(function (txt) {
+                    var lines = txt.split('\n').filter(function (l) {
+                        var t = l.trim(); return t !== '' && t.toLowerCase().indexOf('mode=') !== 0;
+                    });
+                    lines.unshift('mode=' + mode);
+                    var content = lines.join('\n') + '\n';
+                    return fetch(base + '/delete/config/publishing.cfg', { method: 'POST' }).catch(function () {})
+                        .then(function () { return fetch(base + '/upload/config/publishing.cfg', { method: 'POST', body: content }); });
+                })
+                .then(function () { st.innerHTML = 'Saved &mdash; reboot to apply.'; })
+                .catch(function () { st.textContent = 'Save failed.'; });
+        }
+        window.addEventListener('load', loadPubMode);
+    </script>
+
 <div id="divall" style="display:none">
     <table class="table">
         <colgroup>

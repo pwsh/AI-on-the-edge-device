@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "ClassLogFile.h"
 #include "Helper.h"   // getFlowProcessingTime()
+#include "PublishConfig.h"   // per-parameter publish toggles (Data Publishing page)
 #include "connect_wlan.h"
 #include "read_wlanini.h"
 #include "server_mqtt.h"
@@ -100,7 +101,14 @@ bool sendHomeAssistantDiscoveryTopic(std::string group, std::string field,
     */
     std::string node_id = createNodeId(maintopic);
     topicFull = "homeassistant/" + component + "/" + node_id + "/" + configTopic + "/config";
-    
+
+    // Respect the per-parameter Home Assistant toggle (Data Publishing page). When a field is disabled,
+    // publish an empty retained payload to its discovery topic so HA removes any previously-created
+    // entity, then stop (don't advertise it).
+    if (!PublishConfig::IsEnabled(PublishConfig::HA, field)) {
+        return MQTTPublish(topicFull, "", qos, true);
+    }
+
     /* See https://www.home-assistant.io/docs/mqtt/discovery/ */
     payload = string("{")  +
         "\"~\": \"" + maintopic + "\","  +
@@ -259,31 +267,44 @@ bool publishSystemData(int qos) {
 
 	int aFreeInternalHeapSizeBefore = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
 
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + std::string(LWT_TOPIC), LWT_CONNECTED, qos, retainFlag); // Publish "connected" to maintopic/connection
+    // Device/diagnostic topics: always sent each round (not gated by changed-mode), but each can be
+    // turned off per-field on the Data Publishing page.
+    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
 
-    sprintf(tmp_char, "%ld", (long)getUpTime());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "uptime", std::string(tmp_char), qos, retainFlag);
-    
-    sprintf(tmp_char, "%lu", (long) getESPHeapSize());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "freeMem", std::string(tmp_char), qos, retainFlag);
+    if (P("connection"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + std::string(LWT_TOPIC), LWT_CONNECTED, qos, retainFlag); // Publish "connected" to maintopic/connection
 
-    sprintf(tmp_char, "%d", get_WIFI_RSSI());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "wifiRSSI", std::string(tmp_char), qos, retainFlag);
-
-    sprintf(tmp_char, "%d", (int)temperatureRead());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "CPUtemp", std::string(tmp_char), qos, retainFlag);
-
-    sprintf(tmp_char, "%ld", getFlowProcessingTime());   // last round (loop) processing time in ms
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "processingTime", std::string(tmp_char), qos, retainFlag);
-
+    if (P("uptime")) {
+        sprintf(tmp_char, "%ld", (long)getUpTime());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "uptime", std::string(tmp_char), qos, retainFlag);
+    }
+    if (P("freeMem")) {
+        sprintf(tmp_char, "%lu", (long) getESPHeapSize());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "freeMem", std::string(tmp_char), qos, retainFlag);
+    }
+    if (P("wifiRSSI")) {
+        sprintf(tmp_char, "%d", get_WIFI_RSSI());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "wifiRSSI", std::string(tmp_char), qos, retainFlag);
+    }
+    if (P("CPUtemp")) {
+        sprintf(tmp_char, "%d", (int)temperatureRead());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "CPUtemp", std::string(tmp_char), qos, retainFlag);
+    }
+    if (P("processingTime")) {
+        sprintf(tmp_char, "%ld", getFlowProcessingTime());   // last round (loop) processing time in ms
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "processingTime", std::string(tmp_char), qos, retainFlag);
+    }
     // What the last round actually did, plus how many digits were inferred (vs reused from cache).
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "analysisType", getLastAnalysisType(), qos, retainFlag);
-
-    sprintf(tmp_char, "%d", getLastDigitsAnalyzed());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsAnalyzed", std::string(tmp_char), qos, retainFlag);
-
-    sprintf(tmp_char, "%d", getLastDigitsTotal());
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsTotal", std::string(tmp_char), qos, retainFlag);
+    if (P("analysisType"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "analysisType", getLastAnalysisType(), qos, retainFlag);
+    if (P("digitsAnalyzed")) {
+        sprintf(tmp_char, "%d", getLastDigitsAnalyzed());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsAnalyzed", std::string(tmp_char), qos, retainFlag);
+    }
+    if (P("digitsTotal")) {
+        sprintf(tmp_char, "%d", getLastDigitsTotal());
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "digitsTotal", std::string(tmp_char), qos, retainFlag);
+    }
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all System MQTT topics");
 
@@ -310,14 +331,22 @@ bool publishStaticData(int qos) {
 
 	int aFreeInternalHeapSizeBefore = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
 
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "fwVersion", getFwVersion().c_str(), qos, retainFlag);
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "MAC", getMac(), qos, retainFlag);
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "IP", *getIPAddress(), qos, retainFlag);
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "hostname", wlan_config.hostname, qos, retainFlag);
+    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
 
-    std::stringstream stream;
-    stream << std::fixed << std::setprecision(1) << roundInterval; // minutes
-    allSendsSuccessed |= MQTTPublish(maintopic + "/" + "interval", stream.str(), qos, retainFlag);
+    if (P("fwVersion"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "fwVersion", getFwVersion().c_str(), qos, retainFlag);
+    if (P("MAC"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "MAC", getMac(), qos, retainFlag);
+    if (P("IP"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "IP", *getIPAddress(), qos, retainFlag);
+    if (P("hostname"))
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "hostname", wlan_config.hostname, qos, retainFlag);
+
+    if (P("interval")) {
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(1) << roundInterval; // minutes
+        allSendsSuccessed |= MQTTPublish(maintopic + "/" + "interval", stream.str(), qos, retainFlag);
+    }
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Successfully published all Static MQTT topics");
 
