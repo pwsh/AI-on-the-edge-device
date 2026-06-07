@@ -30,8 +30,9 @@ namespace {
     // so an existing device (no/partial publishing.cfg) behaves exactly as before this feature.
     bool defaultEnabled(const std::string &platform, const std::string &field) {
         static const std::set<std::string> mqttOn = {
-            "value", "raw", "error", "rate", "rate_per_time_unit", "rate_per_digitization_round",
-            "timestamp", "leak", "continuous_usage", "json",
+            // raw + json are opt-in (default off) - they are bulky and most setups don't need them.
+            "value", "error", "rate", "rate_per_time_unit", "rate_per_digitization_round",
+            "timestamp", "leak", "continuous_usage",
             "uptime", "freeMem", "wifiRSSI", "CPUtemp", "processingTime", "analysisType",
             "digitsAnalyzed", "digitsTotal", "fwVersion", "MAC", "IP", "hostname", "interval",
             "connection"   // status/flowstart are Home-Assistant-only entities, not MQTT topics
@@ -43,8 +44,9 @@ namespace {
             "processingTime", "analysisType", "digitsAnalyzed"
         };
         static const std::set<std::string> haOn = {
-            "value", "raw", "error", "rate_per_time_unit", "rate_per_digitization_round",
-            "timestamp", "json", "problem", "leak", "continuous_usage",
+            // raw + json are opt-in (default off).
+            "value", "error", "rate_per_time_unit", "rate_per_digitization_round",
+            "timestamp", "problem", "leak", "continuous_usage",
             "uptime", "MAC", "fwVersion", "hostname", "freeMem", "wifiRSSI", "CPUtemp",
             "processingTime", "interval", "IP", "status", "flowstart"
         };

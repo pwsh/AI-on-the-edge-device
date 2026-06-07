@@ -84,7 +84,7 @@
     var GROUPS = [
         { title: "Readings — per number sequence", rows: [
             { k:"value",                       label:"Value",                          mqtt:1,    influx:1,    ha:1 },
-            { k:"raw",                         label:"Raw value (with N / leading 0)", mqtt:1,    influx:0,    ha:1 },
+            { k:"raw",                         label:"Raw value (with N / leading 0)", mqtt:0,    influx:0,    ha:0 },
             { k:"prevalue",                    label:"Previous value (last error-free)", mqtt:0,  influx:0,    ha:0 },
             { k:"rate",                        label:"Rate (per minute)",              mqtt:1,    influx:0,    ha:null },
             { k:"rate_per_time_unit",          label:"Rate (per time unit)",           mqtt:1,    influx:null, ha:1 },
@@ -93,7 +93,7 @@
             { k:"error",                       label:"Error message",                  mqtt:1,    influx:null, ha:1 },
             { k:"problem",                     label:"Problem (binary, from error)",   mqtt:null, influx:null, ha:1 },
             { k:"timestamp",                   label:"Timestamp",                      mqtt:1,    influx:null, ha:1 },
-            { k:"json",                        label:"JSON (all fields)",              mqtt:1,    influx:null, ha:1 }
+            { k:"json",                        label:"JSON (all fields)",              mqtt:0,    influx:null, ha:0 }
         ]},
         { title: "Leak detection — per sequence (when leak detection is enabled)", rows: [
             { k:"leak",                        label:"Leak detected (ON/OFF)",         mqtt:1,    influx:1,    ha:1 },
