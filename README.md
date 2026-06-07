@@ -130,6 +130,13 @@ There are several options for what to do with that value:
     <em>Configuration (FastRead, expert parameters, Backup&nbsp;on&nbsp;save / Restore) &nbsp;·&nbsp; System info &nbsp;·&nbsp; Mobile-friendly responsive layout</em>
   </p>
 
+  <p align="center">
+    <img src="images/webui/publishing.png" width="300" alt="Data Publishing – a per-platform matrix choosing exactly which parameters reach MQTT, InfluxDB and Home Assistant, plus a send-only-changed mode">
+  </p>
+  <p align="center">
+    <em>Data Publishing — pick exactly which parameters reach MQTT / InfluxDB / Home&nbsp;Assistant, and send only when values change</em>
+  </p>
+
 ---
 
 <br>
@@ -170,7 +177,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - RGB status LED (ESP32-S3) reflects the Wi-Fi / processing state.
 
 ### 🔒 Connectivity & security
-- **Data Publishing page** – a per-platform matrix to pick exactly **which parameters** are sent to **MQTT, InfluxDB and Home Assistant** (including values the device gathers but didn't previously send, like *previous value* and *recognition confidence*), plus an **"only send changed readings"** mode to cut traffic. Disabled Home Assistant entities are removed via an empty retained discovery message.
+- **Data Publishing page** – a per-platform matrix to pick exactly **which parameters** are sent to **MQTT, InfluxDB and Home Assistant**, including values the device gathers but didn't previously send (*previous value*, *recognition confidence*, plus *raw/rate* for InfluxDB). The bulky **raw** and **JSON** topics are now **off by default**. An **"only send changed readings"** mode skips a sequence's reading topics while its value is unchanged (diagnostics & leak state still send), cutting traffic. Home Assistant entities (now also covering confidence, previous value and the round diagnostics) carry proper units/device-classes — e.g. free memory converts between B/kB/MB — and a disabled entity is removed via an empty retained discovery message.
 - **Verified MQTTS / HTTPS out of the box** via a built-in Mozilla CA bundle — connect to public TLS brokers (e.g. HiveMQ Cloud) and InfluxDB Cloud **without uploading a certificate**.
 - Default hostname `edgeai-<mac>` so multiple devices don't clash on the network.
 

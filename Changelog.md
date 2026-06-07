@@ -13,6 +13,14 @@
 - Selection is stored in its own `/sdcard/config/publishing.cfg` (not `config.ini`, which the web config
   editor would otherwise strip). Turning a Home Assistant parameter off removes its entity via an empty
   retained discovery message.
+- **Home Assistant** discovery now also covers per-sequence **recognition confidence** and **previous
+  value**, plus device **analysis type / digits analysed / digits total**. An HA entity reads its state
+  from the matching MQTT topic, so enabling a field for Home Assistant keeps its MQTT topic on (the page
+  mirrors this when you tick an HA box).
+- **Home Assistant units/device-classes**: *free memory* gained `data_size` (so HA offers B / kB / MB
+  conversion) and *interval* gained `duration`; the other entities already carried a unit where one applies.
+- **`raw` and `json` are now off by default** on all platforms (bulky, rarely needed) — re-enable per
+  platform on the Data Publishing page.
 
 > Note: the **rc.1** tag also moved to include the OTA web-UI fix (`fix(ota)`) and the clean-release
 > build hygiene that landed right after the entry below.

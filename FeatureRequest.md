@@ -216,7 +216,7 @@ ____
 * **Request:** Let the user define the MQTT payload format. See [#344](https://github.com/jomjol/AI-on-the-edge-device/issues/344).
 * **Benefit:** Match downstream consumers (custom JSON, units, field names) without code changes.
 * **Feasibility:** All boards — feasible (software only); a template/format string in config.
-* **Status:** ⬜ Open.
+* **Status:** 🟡 Partially — the v17 **Data Publishing** page lets you pick exactly which parameters are sent per platform (MQTT / InfluxDB / Home Assistant), turn off bulky topics, and only publish on change; a free-form payload **template** (custom JSON shape / field renaming) is still open.
 
 #### #10 Improve and fix image-logging
 
