@@ -1,4 +1,13 @@
-# [Unreleased]
+# [17.0.0] - 2026-06-06
+
+> **Production release of 17.0.0.** The ESP-IDF 6.0 migration, ESP32-S3 support and the full v17
+> feature set are now considered stable. This consolidates everything from the alpha and rc.1
+> entries below, plus the integrations work and the items in this entry.
+
+### General
+
+- **Faster first reading after boot**: the post-boot stabilisation delay before the first round was
+  reduced from 10&nbsp;s to **3&nbsp;s**.
 
 ### Integrations
 
@@ -22,8 +31,10 @@
 - **`raw` and `json` are now off by default** on all platforms (bulky, rarely needed) — re-enable per
   platform on the Data Publishing page.
 
-> Note: the **rc.1** tag also moved to include the OTA web-UI fix (`fix(ota)`) and the clean-release
-> build hygiene that landed right after the entry below.
+### Reliability
+
+- Full **zip-OTA** now reliably deploys the bundled web UI (the on-device unzip + folder swap were
+  fixed); release-build hygiene cleaned up so binaries report a clean version.
 
 # [17.0.0-rc.1] - 2026-06-04
 
