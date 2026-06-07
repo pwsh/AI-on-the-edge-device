@@ -46,6 +46,8 @@
            are listed here too &mdash; just tick them to start sending.</p>
         <p>Turning parameters off, or using <b>only send changed readings</b>, reduces how much data the
            device pushes. Changes take effect after the next <b>reboot</b>.</p>
+        <p><b>Home Assistant</b> entities read their value from the matching MQTT topic, so ticking a
+           parameter in the Home&nbsp;Assistant column automatically keeps its MQTT topic on.</p>
     </details>
 
     <div class="modebox">
@@ -83,11 +85,11 @@
         { title: "Readings — per number sequence", rows: [
             { k:"value",                       label:"Value",                          mqtt:1,    influx:1,    ha:1 },
             { k:"raw",                         label:"Raw value (with N / leading 0)", mqtt:1,    influx:0,    ha:1 },
-            { k:"prevalue",                    label:"Previous value (last error-free)", mqtt:0,  influx:0,    ha:null },
+            { k:"prevalue",                    label:"Previous value (last error-free)", mqtt:0,  influx:0,    ha:0 },
             { k:"rate",                        label:"Rate (per minute)",              mqtt:1,    influx:0,    ha:null },
             { k:"rate_per_time_unit",          label:"Rate (per time unit)",           mqtt:1,    influx:null, ha:1 },
             { k:"rate_per_digitization_round", label:"Change per round",               mqtt:1,    influx:null, ha:1 },
-            { k:"confidence",                  label:"Recognition confidence (%)",     mqtt:0,    influx:0,    ha:null },
+            { k:"confidence",                  label:"Recognition confidence (%)",     mqtt:0,    influx:0,    ha:0 },
             { k:"error",                       label:"Error message",                  mqtt:1,    influx:null, ha:1 },
             { k:"problem",                     label:"Problem (binary, from error)",   mqtt:null, influx:null, ha:1 },
             { k:"timestamp",                   label:"Timestamp",                      mqtt:1,    influx:null, ha:1 },
@@ -103,9 +105,9 @@
             { k:"wifiRSSI",       label:"Wi-Fi RSSI",           mqtt:1,    influx:null, ha:1 },
             { k:"CPUtemp",        label:"CPU temperature",      mqtt:1,    influx:null, ha:1 },
             { k:"processingTime", label:"Processing time (ms)", mqtt:1,    influx:1,    ha:1 },
-            { k:"analysisType",   label:"Analysis type",        mqtt:1,    influx:1,    ha:null },
-            { k:"digitsAnalyzed", label:"Digits analyzed",      mqtt:1,    influx:1,    ha:null },
-            { k:"digitsTotal",    label:"Digits total",         mqtt:1,    influx:null, ha:null },
+            { k:"analysisType",   label:"Analysis type",        mqtt:1,    influx:1,    ha:0 },
+            { k:"digitsAnalyzed", label:"Digits analyzed",      mqtt:1,    influx:1,    ha:0 },
+            { k:"digitsTotal",    label:"Digits total",         mqtt:1,    influx:null, ha:0 },
             { k:"fwVersion",      label:"Firmware version",     mqtt:1,    influx:null, ha:1 },
             { k:"MAC",            label:"MAC address",          mqtt:1,    influx:null, ha:1 },
             { k:"IP",             label:"IP address",           mqtt:1,    influx:null, ha:1 },
@@ -121,6 +123,15 @@
 
     function cellId(p, k) { return "cb_" + p + "_" + k; }
 
+    // A Home Assistant entity reads its state from the matching MQTT topic, so enabling a field for HA
+    // also turns its MQTT topic on. The "problem" binary sensor derives from the "error" topic.
+    function haNeedsMqtt(k, checked) {
+        if (!checked) return;
+        var dep = (k === "problem") ? "error" : k;
+        var m = document.getElementById("cb_mqtt_" + dep);
+        if (m) m.checked = true;
+    }
+
     function buildTable() {
         var html = "";
         GROUPS.forEach(function(g) {
@@ -132,7 +143,11 @@
                     if (d === null || typeof d === 'undefined') {
                         html += '<td class="cell na">—</td>';
                     } else {
-                        html += '<td class="cell"><input type="checkbox" id="' + cellId(p, r.k) + '"></td>';
+                        // Ticking Home Assistant ensures the matching MQTT topic is on (HA reads its
+                        // value from that topic). For the "problem" binary sensor, the dependency is the
+                        // "error" MQTT topic.
+                        var oc = (p === 'ha') ? ' onchange="haNeedsMqtt(\'' + r.k + '\', this.checked)"' : '';
+                        html += '<td class="cell"><input type="checkbox" id="' + cellId(p, r.k) + '"' + oc + '></td>';
                     }
                 });
                 html += '</tr>';

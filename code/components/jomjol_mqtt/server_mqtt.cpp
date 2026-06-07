@@ -198,6 +198,10 @@ bool MQTThomeassistantDiscovery(int qos) {
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "interval",        "Interval",          "clock-time-eight-outline", "min",  "",               "measurement", "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "IP",              "IP",                "network-outline",           "",    "",               "",            "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "status",          "Status",            "list-status",               "",    "",               "",            "diagnostic", qos);
+    // Opt-in round diagnostics (Data Publishing page; gated inside the call, default off).
+    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "analysisType",    "Analysis Type",     "cog-outline",               "",    "",               "",            "diagnostic", qos);
+    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "digitsAnalyzed",  "Digits Analyzed",   "counter",                   "",    "",               "measurement", "diagnostic", qos);
+    allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "digitsTotal",     "Digits Total",      "counter",                   "",    "",               "measurement", "diagnostic", qos);
     allSendsSuccessed |= sendHomeAssistantDiscoveryTopic("",     "flowstart",       "Manual Flow Start", "timer-play-outline",        "",    "",               "",            "",           qos);
 
 
@@ -233,6 +237,9 @@ bool MQTThomeassistantDiscovery(int qos) {
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "timestamp",                  "Timestamp",                            "clock-time-eight-outline",  "",                    "timestamp",       "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "json",                       "JSON",                                 "code-json",                 "",                    "",                "",                 "diagnostic",     qos);
         allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "problem",                    "Problem",                              "alert-outline",             "",                    "problem",         "",                 "",               qos); // Special binary sensor which is based on error topic
+        // Opt-in (Data Publishing page; gated inside sendHomeAssistantDiscoveryTopic, default off).
+        allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "confidence",                 "Recognition Confidence",               "check-decagram-outline",    "%",                   "",                "measurement",      "diagnostic",     qos);
+        allSendsSuccessed |= sendHomeAssistantDiscoveryTopic(group,   "prevalue",                   "Previous Value",                       "history",                   valueUnit,             "",                "",                 "diagnostic",     qos);
 
         /* Leak detection sensors (only announced when enabled for this sequence) */
         if ((*NUMBERS)[i]->LeakDetectionEnabled) {
@@ -269,7 +276,7 @@ bool publishSystemData(int qos) {
 
     // Device/diagnostic topics: always sent each round (not gated by changed-mode), but each can be
     // turned off per-field on the Data Publishing page.
-    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
+    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f) || PublishConfig::IsEnabled(PublishConfig::HA, f); };
 
     if (P("connection"))
         allSendsSuccessed |= MQTTPublish(maintopic + "/" + std::string(LWT_TOPIC), LWT_CONNECTED, qos, retainFlag); // Publish "connected" to maintopic/connection
@@ -331,7 +338,7 @@ bool publishStaticData(int qos) {
 
 	int aFreeInternalHeapSizeBefore = heap_caps_get_free_size(MALLOC_CAP_8BIT | MALLOC_CAP_INTERNAL);
 
-    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
+    auto P = [](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f) || PublishConfig::IsEnabled(PublishConfig::HA, f); };
 
     if (P("fwVersion"))
         allSendsSuccessed |= MQTTPublish(maintopic + "/" + "fwVersion", getFwVersion().c_str(), qos, retainFlag);

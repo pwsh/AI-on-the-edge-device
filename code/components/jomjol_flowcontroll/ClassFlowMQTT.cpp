@@ -308,7 +308,10 @@ bool ClassFlowMQTT::doFlow(string zwtime)
             // always send.
             bool readingsChanged = !PublishConfig::SendOnlyChanged() ||
                                    (result != (*NUMBERS)[i]->LastPubMqtt);
-            auto P = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f); };
+            // A field's MQTT topic is published if either the MQTT or the Home Assistant column wants
+            // it: an HA entity reads its state from the matching MQTT topic, so HA-on implies the topic.
+            auto P = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::MQTT, f) ||
+                                                       PublishConfig::IsEnabled(PublishConfig::HA, f); };
             auto R = [&](const std::string &f){ return readingsChanged && P(f); };
 
             if ((domoticzintopic.length() > 0) && (result.length() > 0))
@@ -320,7 +323,9 @@ bool ClassFlowMQTT::doFlow(string zwtime)
                 success |= MQTTPublish(namenumber + "prevalue", resultpre, qos, SetRetainFlag);
             if (R("confidence") && (*NUMBERS)[i]->ReturnConfidence >= 0)
                 success |= MQTTPublish(namenumber + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), qos, SetRetainFlag);
-            if (P("error") && resulterror.length() > 0)
+            // The HA "problem" binary sensor derives from the error topic, so publish error if either
+            // error or problem is wanted.
+            if ((P("error") || PublishConfig::IsEnabled(PublishConfig::HA, "problem")) && resulterror.length() > 0)
                 success |= MQTTPublish(namenumber + "error", resulterror, qos, SetRetainFlag);
 
             if (resultrate.length() > 0) {
