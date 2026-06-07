@@ -64,8 +64,18 @@
             <b>Decimal Shift</b> setting is applied (an expert parameter on the configuration page, default: 0).
         </p>
         <p>
+            <b>"Examine ROI"</b> runs the recognition on just the selected ROI right now and shows the
+            cropped image it analysed and the reading (analog dials report a value rather than a class
+            confidence) &mdash; a quick way to check a single dial without saving or waiting for a full
+            round. <b>"Pull camera image"</b> captures and aligns a fresh frame from the camera and shows it
+            in place of the stored reference image, so you can judge whether the reference image and
+            alignment are still accurate (use <b>"Show reference image"</b> to switch back; <b>Examine
+            ROI</b> then analyses whichever image is shown). Both use the live x/y/&Delta;x/&Delta;y values,
+            so there is no need to save first.
+        </p>
+        <p>
             After defining the analog ROIs, don't forget to save with the <b>"Save Config"</b> button!<br>
-            <b>NOTE:</b> There is no need to perform a reboot after every saving or step. It's sufficient to reboot after all configuration steps 
+            <b>NOTE:</b> There is no need to perform a reboot after every saving or step. It's sufficient to reboot after all configuration steps
             (reference image, alignment, ROI configuration) are completed to activate new configuration.
         </p>
     </details>
@@ -135,11 +145,11 @@
 
         <tr>
             <td colspan="2">
-                <input class="button" type="button" id="examineROIbtn" onclick="examineROI(true, document.getElementById('CCW').checked)" value="Examine selected ROI">
+                <input class="button" type="button" id="examineROIbtn" onclick="examineROI(true, document.getElementById('CCW').checked)" value="Examine ROI">
                 <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
             </td>
             <td colspan="2">
-                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull fresh camera image">
+                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull camera image">
                 <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
             </td>
         </tr>
