@@ -55,5 +55,12 @@ git checkout -q -- sd-card/html/edit_reference.html 2>/dev/null || true
 rm -f sd-card/html/edit_config.html
 git status --porcelain sd-card/html | awk '$1=="??"{print $2}' | grep -E '\.(png|jpg)$' | xargs -r rm -f
 
+# SECURITY: a released flash-FS image must never carry user Wi-Fi credentials. wlan.ini is *runtime*
+# config - it is written by the device's own SoftAP setup flow, not assembled here - so strip any copy
+# that might have slipped into the staging dir (e.g. a developer's local sd-card/wlan.ini). This keeps
+# the shipped esp32s3 storage.bin clean even if upstream paths change.
+_leaked="$(find "$FFS" -iname 'wlan.ini' -print -delete 2>/dev/null)"
+[ -n "$_leaked" ] && echo "== SECURITY: stripped wlan.ini from flash-FS staging: $_leaked =="
+
 echo "== flashfs assembled: $(du -sh "$FFS" | cut -f1) (storage partition is 1.86 MB) =="
 du -sh "$FFS/html" "$FFS/config"
