@@ -263,7 +263,6 @@ function ParseConfig() {
     ParamAddValue(param, catname, "IO1", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO3", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO4", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
-    ParamAddValue(param, catname, "IO12", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO13", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "LEDType");
     ParamAddValue(param, catname, "LEDNumbers");
@@ -770,7 +769,7 @@ function getCamConfig() {
     // "invalid value" warning and the LED keeps working on the same pin.
     // Just clear the legacy LED mode off the pin; LEDPin keeps its own value (default 21), so the LED
     // lands on the recommended pin rather than the old camera pin.
-    ["IO0", "IO1", "IO3", "IO4", "IO12", "IO13"].forEach(function (io) {
+    ["IO0", "IO1", "IO3", "IO4", "IO13"].forEach(function (io) {
         var p = param["GPIO"][io];
         if (p && p["found"] && p["value1"] === "external-flash-ws281x") {
             p["value1"] = "input";

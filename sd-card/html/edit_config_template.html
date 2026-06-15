@@ -2045,79 +2045,6 @@
             <td>$TOOLTIP_GPIO_OnboardLED</td>
         </tr>
 
-        <!------------- GPIO12 begin (generic GPIO pin; expert-only - the external LED now lives in its
-             own "External LED Configuration" section via the LEDPin data-pin field) ------------------>
-        <tr class="GPIO_item expert">
-            <td class="indent1">
-                <input type="checkbox" id="GPIO_IO12_enabled" value="1"  onclick = 'InvertEnableItem("GPIO", "IO12")' unchecked>
-                <label for=GPIO_IO12_enabled><span id="GPIO_IO12_text">GPIO12 (advanced raw pin)</span></label>
-            </td>
-            <td>
-                <select id="GPIO_IO12_value1">
-                    <option value="input">input</option>
-                    <option value="input-pullup">input pullup</option>
-                    <option value="input-pulldown">input pulldown</option>
-                    <option value="output">output</option>
-                    <!-- <option value="output-pwm">output-pwm</option> -->
-                    <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->
-                </select>
-            </td>
-            <td>$TOOLTIP_GPIO_IO12</td>
-        </tr>
-
-        <tr class="GPIO_IO12 GPIO_item expert">
-            <td class="indent2">
-                <span class="GPIO_IO12 GPIO_item">GPIO12 Use Interrupt</span>
-            </td>
-            <td>
-                <select class="GPIO_IO12 GPIO_item" id="GPIO_IO12_value2">
-                    <option value="disabled">disabled</option>
-                    <option value="rising-edge">rising edge</option>
-                    <option value="falling-edge">falling edge</option>
-                    <option value="rising-and-falling">rising and falling</option>
-                    <option value="low-level-trigger">low level trigger</option>
-                    <option value="high-level-trigger">high level trigger</option>
-                </select>	
-            </td>
-            <td></td>
-        </tr>
-
-        <tr class="GPIO_IO12 GPIO_item expert">
-            <td class="indent2">
-                <span class="GPIO_IO12 GPIO_item">GPIO12 PWM Duty Cycle Resolution</span>
-            </td>
-            <td>
-                <input required type="number" id="GPIO_IO12_value3" min="1" max="20"
-                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.rangeOverflow||(value=20)) && 
-                        (!validity.stepMismatch||(value=parseInt(this.value)));"><span class="GPIO_IO12 GPIO_item">Bits</span>
-            </td>
-            <td></td>
-        </tr>
-
-        <tr class="GPIO_IO12 GPIO_item expert">
-            <td class="indent2">
-                <span class="GPIO_IO12 GPIO_item">GPIO12 Enable MQTT</span>
-            </td>
-            <td><input type="checkbox" id="GPIO_IO12_value4"></td>
-            <td></td>
-        </tr>
-
-        <tr class="GPIO_IO12 GPIO_item expert">
-            <td class="indent2">
-                <span class="GPIO_IO12 GPIO_item">GPIO12 Enable REST API</span>
-            </td>
-            <td><input type="checkbox" id="GPIO_IO12_value5"></td>
-            <td></td>
-        </tr>
-
-        <tr class="GPIO_IO12 GPIO_item expert">
-            <td class="indent2">
-                <span class="GPIO_IO12 GPIO_item">GPIO12 Name</span>
-            </td>
-            <td><input type="text" id="GPIO_IO12_value6"></td>
-            <td></td>
-        </tr>
-
         <tr class="GPIO_item">
             <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;"><h4>External LED Configuration</h4></td>
         </tr>
@@ -2304,9 +2231,6 @@
             <td>$TOOLTIP_GPIO_StatusLEDError</td>
         </tr>
         <!------------- Status LED end ------------------>
-
-        <!------------- GPIO12 end ------------------>
-
         <!------------- GPIO13 begin ------------------>
         <tr class="GPIO_IO13 GPIO_item expert">
             <td class="indent1">
@@ -2960,7 +2884,6 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "IO1", true);
     WriteParameter(param, category, "GPIO", "IO3", true);
     WriteParameter(param, category, "GPIO", "IO4", true);
-    WriteParameter(param, category, "GPIO", "IO12", true);
     WriteParameter(param, category, "GPIO", "IO13", true);
     WriteParameter(param, category, "GPIO", "ExternalLED", false);
     WriteParameter(param, category, "GPIO", "LEDType", false);
@@ -3315,7 +3238,6 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "IO1", true);
     ReadParameter(param, "GPIO", "IO3", true);
     ReadParameter(param, "GPIO", "IO4", true);
-    ReadParameter(param, "GPIO", "IO12", true);
     ReadParameter(param, "GPIO", "IO13", true);
     ReadParameter(param, "GPIO", "ExternalLED", false);
     ReadParameter(param, "GPIO", "LEDType", false);
@@ -3410,8 +3332,8 @@ function UpdateExpertModus() {
         // document.getElementById(expert[i].id).style = _style;
     }
 
-    // Non-expert mode: GPIO4 only offers its built-in flash-LED role. (GPIO12's old WS281x role has
-    // moved to the dedicated External LED data-pin field, so it's a plain expert-only GPIO now.)
+    // Non-expert mode: GPIO4 only offers its built-in flash-LED role. (GPIO12's old WS281x role
+    // moved to the dedicated External LED data-pin field, and its raw-pin block was removed.)
     Array.from(document.querySelector("#GPIO_IO4_value1").options).forEach(function(option_element) {
         if (option_element.value != "built-in-led") {
             option_element.hidden = _hidden;
