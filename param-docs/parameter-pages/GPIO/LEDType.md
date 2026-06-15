@@ -1,3 +1,5 @@
 # Parameter `LEDType`
 Default Value: `WS2812`
-Type of the `WS2812x` which is connected to GPIO12 (See `IO12` parameter).
+
+Chipset of the **external** addressable LED strip on the `LEDPin` GPIO: `WS2812`, `WS2812B`, `SK6812`
+or `WS2813`.

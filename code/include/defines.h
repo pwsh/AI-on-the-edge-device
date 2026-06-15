@@ -402,6 +402,16 @@
 
 #endif //USE_PWM_LEDFLASH
 
+// ******* External LED (WS281x / NeoPixel) current budgeting
+// The external LED chain is powered from the board's 5V rail. To stop a long/bright chain from
+// browning out the board, the firmware estimates the chain's peak draw and clamps brightness so it
+// stays under this budget. The estimate uses ~LED_MA_PER_CHANNEL_FULL mA per colour channel at full
+// scale (255), i.e. ~60 mA per pixel at full white. The budget is overridable at runtime when the
+// user supplies external 5V injection (LEDPowerInjection=true + LEDMaxCurrent in config) - off by
+// default. Single flat value for now; split per board here if a board needs a different default.
+#define EXTERNAL_LED_5V_BUDGET_MA   500   // default mA budget for the external chain (board-powered)
+#define LED_MA_PER_CHANNEL_FULL     20    // WS281x per-channel draw at value 255 (mA)
+
 
 //softAP
 #ifdef ENABLE_SOFTAP

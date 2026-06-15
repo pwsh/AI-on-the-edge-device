@@ -148,6 +148,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - Rebuilt on **ESP-IDF 6.0.1** (modern GCC&nbsp;15 / C++ toolchain).
 - **New: ESP32-S3 support** (8&nbsp;MB and 16&nbsp;MB variants) alongside the classic **ESP32-CAM**. ESP32-S3 boards run **with or without an SD card** — the web UI, CNN models and configuration can live in on-board flash. The **ESP32-WROVER** is also supported.
 - Camera sensors supported: **OV2640, OV3660 and OV5640**.
+- **LED brightness & 5V current safety** – the external WS281x (NeoPixel) strip gains an explicit **output % control**, and the firmware **caps its draw to the board's safe 5V budget (500&nbsp;mA)** — automatically dimming a long/bright strip so it can't brown out the board. A **5V power-injection** toggle (off by default) raises the cap to your own supply's rating when the strip is powered separately. (The internal flash LED keeps its existing 0–100&nbsp;% intensity.)
 - A maintained [Board Feature Matrix](docs/BOARD-FEATURE-MATRIX.md) tracks the differences between boards.
 
 ### ⚡ Recognition & accuracy

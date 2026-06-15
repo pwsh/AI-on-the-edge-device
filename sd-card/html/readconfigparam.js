@@ -268,16 +268,28 @@ function ParseConfig() {
     ParamAddValue(param, catname, "LEDType");
     ParamAddValue(param, catname, "LEDNumbers");
     ParamAddValue(param, catname, "LEDColor", 3);
+    // External LED data GPIO (lets the strip sit on any free pin instead of a fixed IOxx row).
+    ParamAddValue(param, catname, "LEDPin", 1, false, "21");
+    ParamAddValue(param, catname, "ExternalLED", 1, false, "true");   // master on/off for the external strip
+    // External LED output % + 5V current budgeting (global GPIO params, not per-number).
+    ParamAddValue(param, catname, "LEDBrightness", 1, false, "100");
+    ParamAddValue(param, catname, "LEDPowerInjection", 1, false, "false");
+    ParamAddValue(param, catname, "LEDMaxCurrent", 1, false, "1000");
      // Default Values, um abwärtskompatiblität zu gewährleisten
     param[catname]["LEDType"]["value1"] = "WS2812";
     param[catname]["LEDNumbers"]["value1"] = "2";
+    param[catname]["LEDPin"]["value1"] = "21";
     param[catname]["LEDColor"]["value1"] = "50";
     param[catname]["LEDColor"]["value2"] = "50";
     param[catname]["LEDColor"]["value3"] = "50";
+    param[catname]["LEDBrightness"]["value1"] = "100";
+    param[catname]["LEDPowerInjection"]["value1"] = "false";
+    param[catname]["LEDMaxCurrent"]["value1"] = "1000";
     // Status LED: show the current processing stage as a colour (defaults match the firmware).
     // Global GPIO param (NOT per-number) -> _isNUMBER must be false, otherwise it gets written
     // as "main.StatusLED"/"rate.StatusLED" instead of a single "StatusLED" line.
     ParamAddValue(param, catname, "StatusLED", 1, false, "false");
+    ParamAddValue(param, catname, "OnboardLED", 1, false, "true");   // ESP32-S3 onboard RGB (GPIO48) on/off
     ParamAddValue(param, catname, "StatusLEDIdle", 3);
     ParamAddValue(param, catname, "StatusLEDTakeImage", 3);
     ParamAddValue(param, catname, "StatusLEDAlign", 3);
@@ -714,7 +726,19 @@ function getCamConfig() {
     // Status LED (GPIO): keep these always editable (like the LED/cam params) so the controls
     // are not greyed out when the parameters are absent from an older config.ini. Defaults match
     // the firmware (server_GPIO.cpp initStatusLedDefaults).
+    // The GPIO section is now "LED Configuration" with no category checkbox - keep it always active so
+    // the LED settings apply on their own (each LED has its own enable toggle).
+    category["GPIO"]["enabled"] = true;
+
     param["GPIO"]["StatusLED"]["enabled"] = true;
+    // Onboard LED (S3): keep editable + default on even when absent from an older config.ini.
+    if (param["GPIO"]["OnboardLED"]) {
+        param["GPIO"]["OnboardLED"]["enabled"] = true;
+        if (!param["GPIO"]["OnboardLED"]["found"]) {
+            param["GPIO"]["OnboardLED"]["found"] = true;
+            param["GPIO"]["OnboardLED"].value1 = "true";
+        }
+    }
     if (!param["GPIO"]["StatusLED"]["found"]) {
         param["GPIO"]["StatusLED"]["found"] = true;
         param["GPIO"]["StatusLED"].value1 = 'false';
@@ -735,6 +759,37 @@ function getCamConfig() {
             param["GPIO"][_stage].value1 = _statusLedDefaults[_stage][0];
             param["GPIO"][_stage].value2 = _statusLedDefaults[_stage][1];
             param["GPIO"][_stage].value3 = _statusLedDefaults[_stage][2];
+        }
+    }
+
+    // External LED brightness + 5V current budgeting: keep these always editable (like the LED/cam
+    // params above) so the controls are not greyed out when the keys are absent from an older
+    // config.ini. Defaults match the firmware (server_GPIO.cpp / defines.h).
+    // Migrate the legacy "IOxx = external-flash-ws281x" LED mechanism to the new LEDPin field: move the
+    // pin into LEDPin and reset the IOxx to plain input, so the removed dropdown option can't trip an
+    // "invalid value" warning and the LED keeps working on the same pin.
+    // Just clear the legacy LED mode off the pin; LEDPin keeps its own value (default 21), so the LED
+    // lands on the recommended pin rather than the old camera pin.
+    ["IO0", "IO1", "IO3", "IO4", "IO12", "IO13"].forEach(function (io) {
+        var p = param["GPIO"][io];
+        if (p && p["found"] && p["value1"] === "external-flash-ws281x") {
+            p["value1"] = "input";
+        }
+    });
+
+    // Remember whether the config actually specified the LED pin; if not, the page fills a board-
+    // specific default (ESP32-S3 -> 21, ESP32-CAM -> 12) once it knows the SoC. GPIO21 is a camera pin
+    // on the ESP32-CAM, so a single shared default would be wrong there.
+    try { window._ledPinFromConfig = !!(param["GPIO"]["LEDPin"] && param["GPIO"]["LEDPin"]["found"]); } catch (e) {}
+
+    var _extLedDefaults = { LEDBrightness: "100", LEDPowerInjection: "false", LEDMaxCurrent: "1000", LEDPin: "21", ExternalLED: "true" };
+    for (var _extKey in _extLedDefaults) {
+        if (param["GPIO"][_extKey]) {
+            param["GPIO"][_extKey]["enabled"] = true;
+            if (!param["GPIO"][_extKey]["found"]) {
+                param["GPIO"][_extKey]["found"] = true;
+                param["GPIO"][_extKey].value1 = _extLedDefaults[_extKey];
+            }
         }
     }
 

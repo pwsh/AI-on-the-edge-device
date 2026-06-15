@@ -115,6 +115,12 @@
         display: none;
     }
 
+    /* Board-specific rows: shown for the detected SoC (body gets 'is-s3' on ESP32-S3). Onboard-LED
+       row is S3-only; the GPIO4 flash-LED block is ESP32-CAM-only (GPIO4 is a camera pin on the S3). */
+    .cfg-s3-only { display: none; }
+    body.is-s3 .cfg-s3-only { display: table-row; }
+    body.is-s3 .cfg-cam-only { display: none; }
+
     .expert {
         background-color: #ffefef;
         font-size: 16px;
@@ -498,8 +504,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAutoSharpness_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAutoSharpness</td>
@@ -556,8 +562,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAwb_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAwb</td>
@@ -569,8 +575,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAwbGain_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAwbGain</td>
@@ -582,8 +588,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAec_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAec</td>
@@ -595,8 +601,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAec2_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAec2</td>
@@ -630,8 +636,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamAgc_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamAgc</td>
@@ -655,8 +661,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamBpc_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamBpc</td>
@@ -668,8 +674,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamWpc_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamWpc</td>
@@ -681,8 +687,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamRawGma_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamRawGma</td>
@@ -694,8 +700,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamLenc_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamLenc</td>
@@ -707,8 +713,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamHmirror_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamHmirror</td>
@@ -720,8 +726,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamVflip_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamVflip</td>
@@ -733,8 +739,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamDcw_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamDcw</td>
@@ -757,8 +763,8 @@
             </td>
             <td>
                 <select id="TakeImage_CamZoom_value1" onchange="cameraParameterChanged()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamZoom</td>
@@ -799,7 +805,7 @@
 
         <tr unused_id="TakeImage_LEDIntensity_ex3">
             <td class="indent1">
-                <class id="TakeImage_LEDIntensity_text" style="color:black;">LED Intensity</class>
+                <class id="TakeImage_LEDIntensity_text" style="color:black;">LED Intensity (internal flash LED, %)</class>
             </td>
             <td>
                 <input required type="number" id="TakeImage_LEDIntensity_value1" size="13" min="0" max="100" onchange="cameraParameterChanged()"
@@ -816,8 +822,8 @@
             </td>
             <td>
                 <select id="TakeImage_Demo_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_Demo</td>
@@ -942,8 +948,8 @@
             </td>
             <td>
                 <select id="Digits_FastRead_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_Digits_FastRead</td>
@@ -1052,8 +1058,8 @@
             </td>
             <td>
                 <select id="PostProcessing_PreValueUse_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_PreValueUse</td>
@@ -1077,8 +1083,8 @@
             </td>
             <td>
                 <select id="PostProcessing_ErrorMessage_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_ErrorMessage</td>
@@ -1097,8 +1103,8 @@
             </td>
             <td>
                 <select id="PostProcessing_AllowNegativeRates_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.AllowNegativeRates</td>
@@ -1187,8 +1193,8 @@
             </td>
             <td>
                 <select id="PostProcessing_LeakDetection_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.LeakDetection</td>
@@ -1257,8 +1263,8 @@
             </td>
             <td>
                 <select id="PostProcessing_ExtendedResolution_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.ExtendedResolution</td>
@@ -1270,8 +1276,8 @@
             </td>
             <td>
                 <select id="PostProcessing_IgnoreLeadingNaN_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.IgnoreLeadingNaN</td>
@@ -1283,8 +1289,8 @@
             </td>
             <td>
                 <select id="PostProcessing_IgnoreAllNaN_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.IgnoreAllNaN</td>
@@ -1296,8 +1302,8 @@
             </td>
             <td>
                 <select id="PostProcessing_CheckDigitIncreaseConsistency_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.CheckDigitIncreaseConsistency</td>
@@ -1408,8 +1414,8 @@
             </td>
             <td>
                 <select id="MQTT_ValidateServerCert_value1">
-                    <option value="true" selected>enabled (true)</option>
-                    <option value="false">disabled (false)</option>
+                    <option value="true" selected>enabled</option>
+                    <option value="false">disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_MQTT_ValidateServerCert</td>
@@ -1421,8 +1427,8 @@
             </td>
             <td>
                 <select id="MQTT_RetainMessages_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_MQTT_RetainMessages</td>
@@ -1443,8 +1449,8 @@
             </td>
             <td>
                 <select id="MQTT_HomeassistantDiscovery_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_MQTT_HomeassistantDiscovery</td>
@@ -1470,8 +1476,8 @@
                     <option value="energy_mwh">Energymeter (Value: MWh, Rate: MW)</option>
                     <option value="energy_gj">Energymeter (Value: GJ, Rate: GJ/h)    ⚠️ Not supported by Homeassistant 2025.7 and later! ⚠️</option>
                     <option value="temperature_c">Thermometer (Value: °C, Rate: °C/min)</option>
-                    <option value="temperature_c">Thermometer (Value: °F, Rate: °F/min)</option>
-                    <option value="temperature_c">Thermometer (Value: K, Rate: K/min)</option>
+                    <option value="temperature_f">Thermometer (Value: °F, Rate: °F/min)</option>
+                    <option value="temperature_k">Thermometer (Value: K, Rate: K/min)</option>
                 </select>
             </td>
             <td>$TOOLTIP_MQTT_MeterType</td>
@@ -1719,11 +1725,14 @@
             <td>$TOOLTIP_Webhook_UploadImg</td>
         </tr>
 
-        <!------------- GPIO ------------------>
+        <!------------- LED Configuration (the [GPIO] section: onboard + external LED and any GPIO pins).
+             Always active - each LED has its own enable, so there is no category checkbox to tick. The
+             hidden Category_GPIO_enabled checkbox is kept (always checked) only so the existing
+             load/save code keeps working. Generic GPIO pins live here too, but expert-only. ------------>
         <tr style="border-bottom: 2px solid lightgray;">
             <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;">
-                <h4><input type="checkbox" id="Category_GPIO_enabled" value="1"  onclick='UpdateAfterCategoryCheck()' unchecked > 
-                <label for=Category_GPIO_enabled>GPIO (General Purpose Input / Output)</label></h4>
+                <input type="checkbox" id="Category_GPIO_enabled" value="1" style="display:none" checked>
+                <h4>LED Configuration</h4>
             </td>
         </tr>
 
@@ -1940,8 +1949,9 @@
         </tr>
         <!------------- GPIO3 end ------------------>
 
-        <!------------- GPIO4 begin ------------------>
-        <tr class="GPIO_item" style="border-bottom: 0px;">
+        <!------------- GPIO4 begin (ESP32-CAM only: GPIO4 is the built-in flash LED. On the ESP32-S3
+             GPIO4 is the camera's I2C pin and the onboard LED is GPIO48 - see the Onboard LED row) --->
+        <tr class="GPIO_item cfg-cam-only" style="border-bottom: 0px;">
             <td class="indent1">
                 <input type="checkbox" id="GPIO_IO4_enabled" value="1"  onclick = 'InvertEnableItem("GPIO", "IO4")' checked>
                 <label for=GPIO_IO4_enabled><span id="GPIO_IO4_text">GPIO4 Configuration</span></label>
@@ -1958,7 +1968,7 @@
             <td>$TOOLTIP_GPIO_IO4</td>
         </tr>
 
-        <tr class="GPIO_item" style="border-top: 0px;">
+        <tr class="GPIO_item cfg-cam-only" style="border-top: 0px;">
             <td colspan="2" style="padding-left:28px">
                 <b>IMPORTANT NOTE:</b><br>
                 If you'd like to use the built-in flash LED in parallel with other GPIO functionality,
@@ -1967,7 +1977,7 @@
             </td>
         </tr>
 
-        <tr class="GPIO_IO4 GPIO_item expert">
+        <tr class="GPIO_IO4 GPIO_item expert cfg-cam-only">
             <td class="indent2">
                 <span class="GPIO_IO4 GPIO_item">GPIO4 Use Interrupt</span>
             </td>
@@ -1984,7 +1994,7 @@
             <td></td>
         </tr>
 
-        <tr class="GPIO_IO4 GPIO_item expert">
+        <tr class="GPIO_IO4 GPIO_item expert cfg-cam-only">
             <td class="indent2">
                 <span class="GPIO_IO4 GPIO_item">GPIO4 PWM Duty Cycle Resolution</span>
             </td>
@@ -1996,7 +2006,7 @@
             <td></td>
         </tr>
 
-        <tr class="GPIO_IO4 GPIO_item expert">
+        <tr class="GPIO_IO4 GPIO_item expert cfg-cam-only">
             <td class="indent2">
                 <span class="GPIO_IO4 GPIO_item">GPIO4 Enable MQTT</span>
             </td>
@@ -2004,7 +2014,7 @@
             <td></td>
         </tr>
 
-        <tr class="GPIO_IO4 GPIO_item expert">
+        <tr class="GPIO_IO4 GPIO_item expert cfg-cam-only">
             <td class="indent2">
                 <span class="GPIO_IO4 GPIO_item">GPIO4 Enable REST API</span>
             </td>
@@ -2012,7 +2022,7 @@
             <td></td>
         </tr>
 
-        <tr class="GPIO_IO4 GPIO_item expert">
+        <tr class="GPIO_IO4 GPIO_item expert cfg-cam-only">
             <td class="indent2">
                 <span class="GPIO_IO4 GPIO_item">GPIO4 Name</span>
             </td>
@@ -2021,8 +2031,23 @@
         </tr>
         <!------------- GPIO4 end ------------------>
 
-        <!------------- GPIO12 begin ------------------>
-        <tr class="GPIO_item">
+        <!------------- Onboard LED (ESP32-S3 only: onboard RGB on GPIO48) ------------------>
+        <tr class="GPIO_item cfg-s3-only">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_OnboardLED_text">Onboard LED (GPIO48)</span>
+            </td>
+            <td>
+                <select class="GPIO_item" id="GPIO_OnboardLED_value1">
+                    <option value="true">enabled</option>
+                    <option value="false">disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_GPIO_OnboardLED</td>
+        </tr>
+
+        <!------------- GPIO12 begin (generic GPIO pin; expert-only - the external LED now lives in its
+             own "External LED Configuration" section via the LEDPin data-pin field) ------------------>
+        <tr class="GPIO_item expert">
             <td class="indent1">
                 <input type="checkbox" id="GPIO_IO12_enabled" value="1"  onclick = 'InvertEnableItem("GPIO", "IO12")' unchecked>
                 <label for=GPIO_IO12_enabled><span id="GPIO_IO12_text">GPIO12 Configuration</span></label>
@@ -2034,8 +2059,7 @@
                     <option value="input-pulldown">input pulldown</option>
                     <option value="output">output</option>
                     <!-- <option value="output-pwm">output-pwm</option> -->
-                    <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->				
-                    <option value="external-flash-ws281x">external flash light ws281x controlled</option>
+                    <!-- <option value="external-flash-pwm">external-flash-pwm</option> -->
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_IO12</td>
@@ -2094,9 +2118,26 @@
             <td></td>
         </tr>
 
+        <tr class="GPIO_item">
+            <td colspan="3" style="padding-left: 0px; padding-bottom: 3px;"><h4>External LED Configuration</h4></td>
+        </tr>
+
+        <tr class="GPIO_item" unused_id="extleden">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_ExternalLED_text">Enable external LED</span>
+            </td>
+            <td>
+                <select class="GPIO_item" id="GPIO_ExternalLED_value1">
+                    <option value="true">enabled</option>
+                    <option value="false">disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_GPIO_ExternalLED</td>
+        </tr>
+
         <tr class="GPIO_item" unused_id="wstypeex3">
             <td class="indent1">
-                <span class="GPIO_IO12 GPIO_item" id="GPIO_LEDType_text">LED Type (NeoPixel)</span>
+                <span class="GPIO_item" id="GPIO_LEDType_text">LED Type (NeoPixel)</span>
             </td>
             <td class="GPIO_item">
                 <select class="GPIO_item" id="GPIO_LEDType_value1">
@@ -2120,15 +2161,76 @@
             <td>$TOOLTIP_GPIO_LEDNumbers</td>
         </tr>
 
-        <tr class="GPIO_item" unused_id="LEDRGBex9">
+        <tr class="GPIO_item" unused_id="LEDPINex8b">
             <td class="indent1">
-                <span class="GPIO_item" id="GPIO_LEDColor_text">LED Color</span>
+                <span class="GPIO_item" id="GPIO_LEDPin_text">External LED data pin (GPIO)</span>
             </td>
             <td>
-                <input type="color" class="GPIO_IO12 GPIO_item" id="GPIO_LEDColor_color" oninput="syncStatusColorToRgb('LEDColor')">
+                <input required type="number" id="GPIO_LEDPin_value1" size="13" min="0" max="48"
+                    oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=48))">
+            </td>
+            <td>$TOOLTIP_GPIO_LEDPin</td>
+        </tr>
+
+        <tr class="GPIO_item" unused_id="LEDRGBex9">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDColor_text">LED Color (external strip)</span>
+            </td>
+            <td>
+                <input type="color" class="GPIO_item" id="GPIO_LEDColor_color" oninput="syncStatusColorToRgb('LEDColor'); updateExtLedEstimate()">
                 <input type="hidden" id="GPIO_LEDColor_value1"><input type="hidden" id="GPIO_LEDColor_value2"><input type="hidden" id="GPIO_LEDColor_value3">
             </td>
             <td>$TOOLTIP_GPIO_LEDColor</td>
+        </tr>
+
+        <tr class="GPIO_item" unused_id="LEDBRIGHTex10">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDBrightness_text">External LED brightness (%)</span>
+            </td>
+            <td>
+                <input required type="number" id="GPIO_LEDBrightness_value1" size="13" min="0" max="100"
+                    oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=100)); updateExtLedEstimate(); liveSetExtLedBrightness(this.value)">
+            </td>
+            <td>$TOOLTIP_GPIO_LEDBrightness</td>
+        </tr>
+
+        <tr class="GPIO_item" unused_id="LEDINJECTex11">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDPowerInjection_text">External 5V power injection</span>
+            </td>
+            <td>
+                <select class="GPIO_item" id="GPIO_LEDPowerInjection_value1" onchange="updateExtLedEstimate()">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_GPIO_LEDPowerInjection</td>
+        </tr>
+
+        <tr class="GPIO_item" id="GPIO_LEDMaxCurrent_row" unused_id="LEDMAXAex12">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDMaxCurrent_text">&nbsp;&nbsp;Injected supply max current (mA)</span>
+            </td>
+            <td>
+                <input required type="number" id="GPIO_LEDMaxCurrent_value1" size="13" min="0" step="50"
+                    oninput="updateExtLedEstimate()">
+            </td>
+            <td>$TOOLTIP_GPIO_LEDMaxCurrent</td>
+        </tr>
+
+        <tr class="GPIO_item" unused_id="LEDESTex13">
+            <td class="indent1">
+                <span class="GPIO_item">&nbsp;&nbsp;Estimated peak current</span>
+            </td>
+            <td>
+                <span class="GPIO_item" id="GPIO_LEDCurrentEstimate" style="font-weight:bold;">&ndash;</span>
+            </td>
+            <td>
+                <div class="rst-content"><div class="tooltip"><img src="help.png" width="32px"><span class="tooltiptext">
+                    Live estimate of the external strip's peak 5V draw (~60&nbsp;mA per LED at full white &times; colour &times; brightness),
+                    shown against the active budget. When it would exceed the budget the firmware dims the strip to fit and this value turns red.
+                </span></div></div>
+            </td>
         </tr>
 
         <!------------- Status LED (processing-stage colours) ------------------>
@@ -2138,8 +2240,8 @@
             </td>
             <td>
                 <select class="GPIO_item" id="GPIO_StatusLED_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_GPIO_StatusLED</td>
@@ -2287,8 +2389,8 @@
             </td>
             <td>
                 <select id="AutoTimer_AutoStart_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_AutoTimer_AutoStart</td>
@@ -2345,8 +2447,8 @@
             </td>
             <td>
                 <select id="DataLogging_DataLogActive_value1">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td>$TOOLTIP_DataLogging_DataLogActive</td>
@@ -2478,8 +2580,8 @@
             </td>
             <td>
                 <select id="System_Tooltip_value1" onchange="UpdateTooltipModus()">
-                    <option value="true">enabled (true)</option>
-                    <option value="false" selected>disabled (false)</option>
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
                 </select>
             </td>
             <td></td>
@@ -2564,6 +2666,28 @@ var canvas = document.getElementById('canvas'),
     category,
     NUNBERSAkt = -1,
     NUMBERS;
+
+// Detect the SoC so the page can show board-appropriate rows (e.g. the onboard-LED toggle on the
+// ESP32-S3, whose onboard RGB is GPIO48, vs the GPIO4 flash-LED block on the ESP32-CAM).
+(function detectBoard() {
+    try {
+        fetch(getDomainname() + '/info?type=ChipModel', { cache: 'no-store' })
+            .then(function (r) { return r.text(); })
+            .then(function (m) {
+                var isS3 = m && m.indexOf('S3') !== -1;
+                if (isS3) document.body.classList.add('is-s3');
+                // External-LED default data pin differs by board (ESP32-S3 -> 21; ESP32-CAM -> 12,
+                // since GPIO21 there is a camera data line). Only fill it when the config had none.
+                if (!window._ledPinFromConfig) {
+                    var rec = isS3 ? '21' : '12';
+                    var el = document.getElementById('GPIO_LEDPin_value1');
+                    if (el) el.value = rec;
+                    try { if (param && param['GPIO'] && param['GPIO']['LEDPin']) param['GPIO']['LEDPin'].value1 = rec; } catch (e) {}
+                }
+            })
+            .catch(function () {});
+    } catch (e) {}
+})();
 
 function cameraParameterChanged() {
     changeCamValue = 1;
@@ -2838,10 +2962,17 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "IO4", true);
     WriteParameter(param, category, "GPIO", "IO12", true);
     WriteParameter(param, category, "GPIO", "IO13", true);
+    WriteParameter(param, category, "GPIO", "ExternalLED", false);
     WriteParameter(param, category, "GPIO", "LEDType", false);
     WriteParameter(param, category, "GPIO", "LEDNumbers", false);
+    WriteParameter(param, category, "GPIO", "LEDPin", false);
     WriteParameter(param, category, "GPIO", "LEDColor", false);
+    WriteParameter(param, category, "GPIO", "LEDBrightness", false);
+    WriteParameter(param, category, "GPIO", "LEDPowerInjection", false);
+    WriteParameter(param, category, "GPIO", "LEDMaxCurrent", false);
+    updateExtLedEstimate();   // refresh the live current estimate + show/hide the injection mA field
     WriteParameter(param, category, "GPIO", "StatusLED", false);
+    WriteParameter(param, category, "GPIO", "OnboardLED", false);
     WriteParameter(param, category, "GPIO", "StatusLEDIdle", false);
     WriteParameter(param, category, "GPIO", "StatusLEDTakeImage", false);
     WriteParameter(param, category, "GPIO", "StatusLEDAlign", false);
@@ -2943,6 +3074,74 @@ function syncStatusColorsFromValues() {
         }
         picker.value = '#' + rgb.map(function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
     }
+}
+
+// External LED 5V current budgeting - mirror the firmware (defines.h / server_GPIO.cpp::scaleExtLedColor)
+// so the page shows the same estimate/clamp the device will apply. Keep these in sync with defines.h.
+var EXTERNAL_LED_5V_BUDGET_MA = 500;   // board default budget (no power injection)
+var LED_MA_PER_CHANNEL_FULL = 20;      // WS281x per-channel draw at value 255
+
+// Apply the external-LED brightness on the device immediately (no reboot) as the slider moves, so you
+// can see the strip dim live. Debounced to avoid flooding the device. The value is still persisted on
+// "Save Config" (it's a normal param); this is just the live preview.
+var _liveLedTimer = null;
+function liveSetExtLedBrightness(v) {
+    var pct = parseInt(v);
+    if (isNaN(pct)) return;
+    pct = Math.max(0, Math.min(100, pct));
+    clearTimeout(_liveLedTimer);
+    _liveLedTimer = setTimeout(function () {
+        try { fetch(getDomainname() + '/ledbrightness?value=' + pct, { cache: 'no-store' }).catch(function () {}); }
+        catch (e) {}
+    }, 150);
+}
+
+function updateExtLedEstimate() {
+    var out = document.getElementById('GPIO_LEDCurrentEstimate');
+    if (!out) return;
+
+    // These three controls always apply (they're not optional GPIO pins), so keep them editable even
+    // when their keys are absent from an older config.ini - otherwise EnDisableItem greys them out.
+    // Done here (in the page, called after the params load) so it holds regardless of a possibly
+    // cached older readconfigparam.js.
+    ['GPIO_LEDBrightness_value1', 'GPIO_LEDPowerInjection_value1', 'GPIO_LEDMaxCurrent_value1'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) { el.disabled = false; el.removeAttribute('disabled'); el.style.color = ''; }
+    });
+
+    // Show/hide the injected-supply mA field based on the injection toggle.
+    var injectSel = document.getElementById('GPIO_LEDPowerInjection_value1');
+    var injection = injectSel && injectSel.value === 'true';
+    var maxRow = document.getElementById('GPIO_LEDMaxCurrent_row');
+    if (maxRow) maxRow.style.display = injection ? '' : 'none';
+
+    var n = parseInt((document.getElementById('GPIO_LEDNumbers_value1') || {}).value);
+    if (isNaN(n) || n < 0) n = 0;
+    var bright = parseInt((document.getElementById('GPIO_LEDBrightness_value1') || {}).value);
+    if (isNaN(bright)) bright = 100;
+    bright = Math.max(0, Math.min(100, bright));
+
+    // Read the decimal RGB from the hidden value fields (kept in sync by syncStatusColorToRgb on
+    // every picker change, and populated on load) - NOT the colour picker, which is only synced
+    // from these values later in the load sequence, so reading it here would yield black -> 0 mA.
+    var r = parseInt((document.getElementById('GPIO_LEDColor_value1') || {}).value);
+    var g = parseInt((document.getElementById('GPIO_LEDColor_value2') || {}).value);
+    var b = parseInt((document.getElementById('GPIO_LEDColor_value3') || {}).value);
+    if (isNaN(r)) r = 0; if (isNaN(g)) g = 0; if (isNaN(b)) b = 0;
+
+    var budget = EXTERNAL_LED_5V_BUDGET_MA;
+    if (injection) {
+        var mc = parseInt((document.getElementById('GPIO_LEDMaxCurrent_value1') || {}).value);
+        budget = (isNaN(mc) || mc < 0) ? 0 : mc;
+    }
+
+    // gamma ~2 (square), matching the firmware's perceptual brightness scaling
+    var estimate = n * (r + g + b) * LED_MA_PER_CHANNEL_FULL / 255 * (bright * bright / 10000);
+    var clamped = budget > 0 && estimate > budget;
+    var shown = clamped ? budget : estimate;
+    out.textContent = '~' + Math.round(shown) + ' mA / ' + budget + ' mA budget' +
+        (clamped ? ' (dimmed to fit)' : '');
+    out.style.color = clamped ? '#c00' : '';
 }
 
 // Expose only the camera controls the connected sensor actually supports: hide the rows for
@@ -3118,10 +3317,16 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "IO4", true);
     ReadParameter(param, "GPIO", "IO12", true);
     ReadParameter(param, "GPIO", "IO13", true);
+    ReadParameter(param, "GPIO", "ExternalLED", false);
     ReadParameter(param, "GPIO", "LEDType", false);
     ReadParameter(param, "GPIO", "LEDNumbers", false);
+    ReadParameter(param, "GPIO", "LEDPin", false);
     ReadParameter(param, "GPIO", "LEDColor", false);
+    ReadParameter(param, "GPIO", "LEDBrightness", false);
+    ReadParameter(param, "GPIO", "LEDPowerInjection", false);
+    ReadParameter(param, "GPIO", "LEDMaxCurrent", false);
     ReadParameter(param, "GPIO", "StatusLED", false);
+    ReadParameter(param, "GPIO", "OnboardLED", false);
     ReadParameter(param, "GPIO", "StatusLEDIdle", false);
     ReadParameter(param, "GPIO", "StatusLEDTakeImage", false);
     ReadParameter(param, "GPIO", "StatusLEDAlign", false);
@@ -3205,15 +3410,10 @@ function UpdateExpertModus() {
         // document.getElementById(expert[i].id).style = _style;
     }
 
-    // Enable / disable the options in the selection menus. If not in expert mode, only one value (built-in-led or external-flash-ws281x) should be possible
+    // Non-expert mode: GPIO4 only offers its built-in flash-LED role. (GPIO12's old WS281x role has
+    // moved to the dedicated External LED data-pin field, so it's a plain expert-only GPIO now.)
     Array.from(document.querySelector("#GPIO_IO4_value1").options).forEach(function(option_element) {
         if (option_element.value != "built-in-led") {
-            option_element.hidden = _hidden;
-        }
-    });	
-
-    Array.from(document.querySelector("#GPIO_IO12_value1").options).forEach(function(option_element) {
-        if (option_element.value != "external-flash-ws281x") {
             option_element.hidden = _hidden;
         }
     });
@@ -3237,6 +3437,22 @@ function UpdateTooltipModus() {
     }
 }
 
+// Find global (non-per-ROI) dropdown settings whose current value is not one of the offered options
+// (their <select> ends up with no selection). Returns [{cat, name, value}] with the old value, if known.
+function collectInvalidSettings() {
+    var out = [];
+    for (var cat in param) {
+        for (var name in param[cat]) {
+            if (param[cat][name]["Numbers"]) continue;
+            var el = document.getElementById(cat + "_" + name + "_value1");
+            if (el && el.tagName && el.tagName.toLowerCase() === "select" && el.selectedIndex === -1) {
+                out.push({ cat: cat, name: name, value: param[cat][name]["_invalidValue"] || "(unset)" });
+            }
+        }
+    }
+    return out;
+}
+
 function saveTextAsFile() {
     ReadParameterAll();
     if (document.getElementsByClassName("invalid-input").length > 0) {
@@ -3245,6 +3461,23 @@ function saveTextAsFile() {
     }
 
 	ReadParameterAll();
+
+    // Settings whose stored value is no longer a valid option (e.g. a dropdown choice that was removed
+    // in a newer firmware). Warn once and comment them out (keeping the old value) so they can't break
+    // the saved config - rather than silently writing an invalid value.
+    var _invalidCfg = collectInvalidSettings();
+    if (_invalidCfg.length > 0) {
+        var _m = "The following setting(s) have a value that is no longer a valid option and will be "
+               + "commented out (disabled) in the saved configuration:\n\n";
+        _invalidCfg.forEach(function (x) { _m += "  • [" + x.cat + "] " + x.name + " = " + x.value + "\n"; });
+        _m += "\nOK = save with these commented out.   Cancel = go back and fix them first.";
+        if (!confirm(_m)) return;
+        _invalidCfg.forEach(function (x) {
+            param[x.cat][x.name]["enabled"] = false;                                  // -> line written as ';...'
+            if (x.value !== "(unset)") param[x.cat][x.name]["value1"] = x.value;       // keep the old value visible
+        });
+    }
+
 	WriteConfigININew();
 	SaveConfigToServer(domainname);
 
@@ -3828,7 +4061,11 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
         anzpara = _param[_cat][_name].anzParam;	
     }
     catch (error) {
-        firework.launch("Parameter '" + _name + "' in category '" + _cat + "' is unknown!", 'danger', 30000);
+        // The param isn't registered in this readconfigparam.js - almost always a stale browser cache
+        // (page JS newer than the cached config-param script). Log quietly instead of a scary alert;
+        // a hard refresh resolves it, and the param is simply skipped here.
+        console.warn("WriteParameter: unknown parameter '" + _cat + "/" + _name + "' (skipped). " +
+                     "If you just updated the web UI, hard-refresh to clear the cache.");
         return;
     }
 
@@ -3870,9 +4107,7 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
                 }
 				
                 if (!_isFound) {
-                    _zw_txt = "In the selected field the value '" + textToFind + "' in the parameter '";
-                    _zw_txt = _zw_txt + _cat + "' in the field '" + _name + "' is invalid. PLEASE CHECK BEFORE SAVING!";
-                    firework.launch(_zw_txt, 'warning', 10000);
+                    NUMBERS[_number][_cat][_name]["_invalidValue"] = textToFind;   // record for the Save-time prompt
                 }
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {
@@ -3921,9 +4156,9 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
                 }
 				
                 if (!_isFound) {
-                    _zw_txt = "In the selected field the value '" + textToFind + "' in the section '";
-                    _zw_txt = _zw_txt + _cat + "' in the field '" + _name + "' is invalid. PLEASE CHECK BEFORE SAVING!";
-                    firework.launch(_zw_txt, 'warning', 10000);
+                    // The stored value is no longer a valid option (e.g. a removed dropdown choice).
+                    // Don't nag per-field on load; record it so Save can warn once and comment it out.
+                    _param[_cat][_name]["_invalidValue"] = textToFind;
                 }
 
             }

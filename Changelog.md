@@ -1,3 +1,45 @@
+# [Unreleased]
+
+### General
+
+- **External LED brightness + 5V current budgeting**: the external WS281x (NeoPixel) strip now has an
+  explicit **output % control** (`LEDBrightness`, 0–100). The firmware estimates the strip's peak 5V draw
+  (≈ 60&nbsp;mA per LED at full white, scaled by colour and brightness) and **automatically dims it to stay
+  under the board's safe budget (500&nbsp;mA)** so a long/bright strip can't brown out the board. A new
+  **5V power-injection** toggle (`LEDPowerInjection`, off by default) lets you raise that cap to your own
+  injected supply's rating (`LEDMaxCurrent`, mA) when the strip is powered separately. The config page
+  shows a live "estimated peak current vs budget" readout that warns (red) when the strip will be dimmed.
+- The internal flash LED's existing 0–100&nbsp;% intensity is now labelled **"internal flash LED"** to
+  distinguish it from the new external-strip control. Defaults preserve previous behaviour
+  (`LEDBrightness=100`, injection off).
+- **Perceptual (gamma) brightness**: the external-LED brightness % now follows a gamma curve so the
+  number tracks *perceived* brightness (20&nbsp;% looks dim, not ~45&nbsp;% as raw PWM did). Applied to
+  the flash, stage colours and the onboard RGB. Brightness can be changed **live** (`/ledbrightness`).
+- **External LED on any GPIO** via a new **`LEDPin`** data-pin field, with a board-specific default
+  (ESP32-S3 → 21, ESP32-CAM → 12) and an **`ExternalLED`** master enable. The legacy
+  `IOxx = external-flash-ws281x` mechanism is retired from the UI (auto-migrated to `LEDPin` on load).
+- **Camera/SD-pin guard**: the firmware refuses to drive an LED/flash on a camera or SD pin (driving one
+  broke image capture and crash-looped the device), logging a clear error instead.
+- **ESP32-S3 onboard RGB (GPIO48)**: a board-aware **`OnboardLED`** enable/disable toggle; the GPIO4
+  flash-LED block is hidden on the S3 (GPIO4 is a camera pin there). The GPIO config section is now
+  labelled **"LED Configuration"** with each LED enabled on its own.
+
+### Connectivity & security
+
+- **Captive portal in setup/AP mode**: a small DNS responder + DHCP DNS option make phones/laptops pop
+  the "Sign in to network" page straight onto the Wi-Fi setup form when connected to the `AI-on-the-Edge`
+  access point. STA operation is unaffected.
+
+### Web interface
+
+- **Consistent config controls**: all enable/disable dropdowns read `enabled`/`disabled` (no raw
+  `true`/`false`), and tooltips/labels match the controls and the current `LEDPin`.
+- **Fixed Meter Type**: the Thermometer **°F** and **K** options were both mapped to Celsius
+  (`temperature_c`) — they now correctly select `temperature_f` / `temperature_k`.
+- **Safer Save**: a setting whose stored value is no longer a valid option is no longer nagged on every
+  load; instead Save warns once and **comments it out** (keeping the old value) so it can't break the
+  config. A stale-cache "unknown parameter" is a quiet console note, not a red alert.
+
 # [17.0.0] - 2026-06-06
 
 > **Production release of 17.0.0.** The ESP-IDF 6.0 migration, ESP32-S3 support and the full v17

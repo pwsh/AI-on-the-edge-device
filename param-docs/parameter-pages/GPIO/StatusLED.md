@@ -1,6 +1,6 @@
 # Parameter `StatusLED`
-Default Value: `false`
+Default Value: `disabled`
 
-When enabled, the addressable LED(s) attached to GPIO12 (see `LEDType` / `LEDNumbers`)
-are used to indicate the current processing stage with a configurable colour.
-This is independent of the LED flash used during image capture.
+When **enabled**, the external addressable LED strip (the one set by `LEDPin` / `LEDType` / `LEDNumbers`)
+shows the current processing stage as a configurable colour. This is independent of the LED flash used
+during image capture.

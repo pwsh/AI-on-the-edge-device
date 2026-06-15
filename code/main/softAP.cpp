@@ -35,6 +35,9 @@
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
+#include "esp_netif.h"
+#include "lwip/sockets.h"
+#include "lwip/inet.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu.
    If you'd rather not, just change the below entries to strings with
@@ -103,6 +106,127 @@ void wifi_init_softAP(void)
 
     ESP_LOGI(TAG, "started with SSID \"%s\", password: \"%s\", channel: %d. Connect to AP and open http://192.168.4.1",
              EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS, EXAMPLE_ESP_WIFI_CHANNEL);
+
+    // Captive portal, part 1: make the AP's DHCP server hand out *ourselves* (192.168.4.1) as the DNS
+    // server. Without this the client has no DNS in AP mode, so its connectivity-check lookup never
+    // reaches us and the "Sign in to network" page never pops. dhcps must be stopped to change options.
+    esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (ap_netif != NULL) {
+        esp_netif_dhcps_stop(ap_netif);   // ignore "already stopped"
+        esp_netif_dns_info_t dns_info = {};
+        dns_info.ip.type = ESP_IPADDR_TYPE_V4;
+        dns_info.ip.u_addr.ip4.addr = esp_ip4addr_aton("192.168.4.1");
+        esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns_info);
+        uint8_t dns_offer = 0x02;   // OFFER_DNS - tell dhcps to include the DNS-server option (6)
+        esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER,
+                               &dns_offer, sizeof(dns_offer));
+        esp_netif_dhcps_start(ap_netif);
+    }
+}
+
+
+// Captive portal, part 2: a minimal DNS server that answers *every* A query with the AP's own IP
+// (192.168.4.1). Combined with the DHCP DNS offer above, this hijacks the client's connectivity-check
+// lookup (Android connectivitycheck.gstatic.com, Apple captive.apple.com, Windows msftconnecttest.com)
+// onto our HTTP server, which then serves/redirects to the setup page - triggering the OS captive-portal
+// prompt automatically. AP-mode only; the task lives until the device reboots out of AP mode.
+#define CAPTIVE_DNS_PORT 53
+#define CAPTIVE_DNS_MAXLEN 256
+
+typedef struct __attribute__((packed)) {
+    uint16_t id;
+    uint16_t flags;
+    uint16_t qd_count;
+    uint16_t an_count;
+    uint16_t ns_count;
+    uint16_t ar_count;
+} captive_dns_header_t;
+
+static void captive_dns_task(void *pvParameters)
+{
+    uint8_t rx[CAPTIVE_DNS_MAXLEN];
+    uint8_t tx[CAPTIVE_DNS_MAXLEN];
+
+    uint32_t ap_ip;
+    esp_netif_t *ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    esp_netif_ip_info_t ip_info;
+    if (ap_netif != NULL && esp_netif_get_ip_info(ap_netif, &ip_info) == ESP_OK) {
+        ap_ip = ip_info.ip.addr;            // already in network byte order
+    } else {
+        ap_ip = esp_ip4addr_aton("192.168.4.1");
+    }
+
+    struct sockaddr_in server_addr = {};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    server_addr.sin_port = htons(CAPTIVE_DNS_PORT);
+
+    int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+    if (sock < 0) {
+        ESP_LOGE(TAG, "Captive DNS: socket() failed (errno %d)", errno);
+        vTaskDelete(NULL);
+        return;
+    }
+    if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        ESP_LOGE(TAG, "Captive DNS: bind() failed (errno %d)", errno);
+        close(sock);
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(TAG, "Captive DNS server up on :53 -> 192.168.4.1 (resolves every name to the portal)");
+
+    while (1) {
+        struct sockaddr_in client;
+        socklen_t clen = sizeof(client);
+        int len = recvfrom(sock, rx, sizeof(rx), 0, (struct sockaddr *)&client, &clen);
+        if (len < (int)sizeof(captive_dns_header_t)) {
+            if (len < 0) break;   // socket error -> stop
+            continue;
+        }
+
+        captive_dns_header_t *qh = (captive_dns_header_t *)rx;
+        if ((ntohs(qh->flags) & 0x8000) != 0 || ntohs(qh->qd_count) < 1) {
+            continue;   // not a standard query
+        }
+
+        // Walk past the first QNAME (sequence of length-prefixed labels, terminated by a 0 byte).
+        int p = sizeof(captive_dns_header_t);
+        while (p < len && rx[p] != 0) {
+            p += rx[p] + 1;
+        }
+        p += 1;                 // skip the terminating zero
+        int q_end = p + 4;      // + QTYPE(2) + QCLASS(2)
+        if (q_end > len || q_end + 16 > (int)sizeof(tx)) {
+            continue;
+        }
+
+        // Build the reply: original header+question, then a single A answer pointing at the AP IP.
+        memcpy(tx, rx, q_end);
+        captive_dns_header_t *rh = (captive_dns_header_t *)tx;
+        rh->flags    = htons(0x8180);   // QR=1, RD copied, RA=1, RCODE=0
+        rh->an_count = htons(1);
+        rh->ns_count = 0;
+        rh->ar_count = 0;
+
+        int w = q_end;
+        tx[w++] = 0xC0; tx[w++] = 0x0C;                 // NAME -> pointer to the question at offset 12
+        tx[w++] = 0x00; tx[w++] = 0x01;                 // TYPE  = A
+        tx[w++] = 0x00; tx[w++] = 0x01;                 // CLASS = IN
+        tx[w++] = 0x00; tx[w++] = 0x00; tx[w++] = 0x00; tx[w++] = 0x0A;   // TTL = 10s
+        tx[w++] = 0x00; tx[w++] = 0x04;                 // RDLENGTH = 4
+        memcpy(tx + w, &ap_ip, 4); w += 4;              // RDATA = AP IP (network byte order)
+
+        sendto(sock, tx, w, 0, (struct sockaddr *)&client, clen);
+    }
+
+    close(sock);
+    ESP_LOGW(TAG, "Captive DNS server stopped");
+    vTaskDelete(NULL);
+}
+
+static void start_captive_dns(void)
+{
+    xTaskCreate(captive_dns_task, "captive_dns", 4096, NULL, 5, NULL);
 }
 
 
@@ -199,6 +323,20 @@ void SendHTTPResponse(httpd_req_t *req)
 
 esp_err_t test_handler(httpd_req_t *req)
 {
+    // Captive portal, part 3: the OS connectivity probes (Android /generate_204, Apple
+    // /hotspot-detect.html, Windows /ncsi.txt, ...) land here via the DNS hijack. Answering anything
+    // other than their expected body makes the OS conclude it's behind a captive portal and open the
+    // sign-in page. We 302-redirect every path except the portal root itself to http://192.168.4.1/,
+    // so that sign-in page is our setup form. (The page's own /config, /reboot and /upload calls are
+    // registered separately and never reach this catch-all.)
+    if (strcmp(req->uri, "/") != 0 && strcmp(req->uri, "/test") != 0 &&
+        strncmp(req->uri, "/index", 6) != 0) {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
+
     SendHTTPResponse(req);
     httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
@@ -544,6 +682,7 @@ void StartAPModeAndWait(bool forcedReconfig)
     driveSystemStatusWs281x(0, 0, 60);   // RGB blue = AP setup / reconfiguration mode
     wifi_init_softAP();
     start_webserverAP();
+    start_captive_dns();   // hijack DNS so the OS shows the setup page as a captive portal
 
     // If we reached AP mode on a freshly-OTA'd *trial* image, confirm it now. The normal post-init
     // confirmation (main, after the STA web server is up) never runs in AP mode, so without this a

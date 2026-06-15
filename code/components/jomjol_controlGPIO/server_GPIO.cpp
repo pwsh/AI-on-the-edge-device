@@ -195,6 +195,12 @@ esp_err_t callHandleHttpRequest(httpd_req_t *req)
     return gpioHandler->handleHttpRequest(req);
 }
 
+esp_err_t callHandleLedBrightness(httpd_req_t *req)
+{
+    GpioHandler *gpioHandler = (GpioHandler*)req->user_ctx;
+    return gpioHandler->handleLedBrightnessRequest(req);
+}
+
 void taskGpioHandler(void *pvParameter)
 {
     ESP_LOGD(TAG,"taskGpioHandler");
@@ -308,7 +314,30 @@ void GpioHandler::gpioInterrupt(GpioResult* gpioResult) {
     }
 }
 
-bool GpioHandler::readConfig() 
+// True if a GPIO is wired to the camera (DVP data/clock/I2C) or the SD card on this board. Driving
+// such a pin as an LED reconfigures it away from the camera/SD, which breaks image capture (the
+// camera-failure watchdog then reboots the device) - so we refuse to use these for flash/LED output.
+static bool isReservedCameraSdPin(gpio_num_t g)
+{
+    if (g == GPIO_NUM_NC) return false;
+    static const gpio_num_t reserved[] = {
+#ifdef CAM_PIN_XCLK
+        CAM_PIN_XCLK, CAM_PIN_SIOD, CAM_PIN_SIOC,
+        CAM_PIN_D0, CAM_PIN_D1, CAM_PIN_D2, CAM_PIN_D3,
+        CAM_PIN_D4, CAM_PIN_D5, CAM_PIN_D6, CAM_PIN_D7,
+        CAM_PIN_VSYNC, CAM_PIN_HREF, CAM_PIN_PCLK,
+#endif
+#ifdef GPIO_SDCARD_CLK
+        GPIO_SDCARD_CLK, GPIO_SDCARD_CMD, GPIO_SDCARD_D0,
+#endif
+    };
+    for (unsigned i = 0; i < sizeof(reserved) / sizeof(reserved[0]); ++i) {
+        if (reserved[i] != GPIO_NUM_NC && reserved[i] == g) return true;
+    }
+    return false;
+}
+
+bool GpioHandler::readConfig()
 {
     if (!gpioMap->empty())
         clear();
@@ -382,6 +411,17 @@ bool GpioHandler::readConfig()
 #else // ENABLE_MQTT
             std::string mqttTopic = "";
 #endif // ENABLE_MQTT
+            // Safety: an LED/flash pin must not be a camera or SD pin, or driving it breaks capture
+            // and the device crash-loops. Refuse and warn instead of bricking the device.
+            if ((pinMode == GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X || pinMode == GPIO_PIN_MODE_BUILT_IN_FLASH_LED)
+                && isReservedCameraSdPin(gpioNr))
+            {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "GPIO" + std::to_string((int)gpioNr) +
+                    " is a camera/SD pin and cannot be used for an LED/flash - skipping it (driving it "
+                    "would break the camera and reboot the device). Move the LED to a free GPIO.");
+                continue;
+            }
+
             GpioPin* gpioPin = new GpioPin(gpioNr, gpioName, pinMode, intType,dutyResolution, mqttTopic, httpEnabled);
             (*gpioMap)[gpioNr] = gpioPin;
 
@@ -398,6 +438,13 @@ bool GpioHandler::readConfig()
         if (toUpper(splitted[0]) == "LEDNUMBERS")
         {
             LEDNumbers = stoi(splitted[1]);
+        }
+        // External WS281x data pin (the simple way to place the strip on any free GPIO, instead of an
+        // IOxx=external-flash-ws281x line). Set up after the loop so it can see whether an IOxx already
+        // claimed the WS281x role.
+        if (toUpper(splitted[0]) == "LEDPIN" && splitted.size() > 1)
+        {
+            ledPin = stoi(splitted[1]);
         }
         if (toUpper(splitted[0]) == "LEDCOLOR")
         {
@@ -418,6 +465,31 @@ bool GpioHandler::readConfig()
                 LEDType = LED_SK6812;
             if (splitted[1] == "WS2813")
                 LEDType = LED_WS2813;
+        }
+        // External LED master enable/disable.
+        if (toUpper(splitted[0]) == "EXTERNALLED" && splitted.size() > 1)
+        {
+            externalLedEnabled = alphanumericToBoolean(splitted[1]);
+        }
+        // External LED output % (0-100), clamped to the 5V current budget below.
+        if (toUpper(splitted[0]) == "LEDBRIGHTNESS" && splitted.size() > 1)
+        {
+            externalLedBrightnessPct = std::min(std::max(stoi(splitted[1]), 0), 100);
+        }
+        // External 5V power injection: when on, use LEDMaxCurrent as the budget instead of the board default.
+        if (toUpper(splitted[0]) == "LEDPOWERINJECTION" && splitted.size() > 1)
+        {
+            externalPowerInjection = alphanumericToBoolean(splitted[1]);
+        }
+        // Injected supply current budget in mA (only honoured when LEDPowerInjection is true).
+        if (toUpper(splitted[0]) == "LEDMAXCURRENT" && splitted.size() > 1)
+        {
+            externalMaxCurrentMa = std::max(stoi(splitted[1]), 0);
+        }
+        // Onboard status RGB (S3 GPIO48) on/off.
+        if (toUpper(splitted[0]) == "ONBOARDLED" && splitted.size() > 1)
+        {
+            onboardLedEnabled = alphanumericToBoolean(splitted[1]);
         }
         // ---- Status LED: per-stage colours (show current processing step) ----
         if (toUpper(splitted[0]) == "STATUSLED" && splitted.size() > 1)
@@ -447,10 +519,32 @@ bool GpioHandler::readConfig()
         }
     }
 
+    // LEDPin: configure the external WS281x strip on the given GPIO, unless an IOxx line already
+    // claimed the WS281x role (gpioExtLED set). Reject camera/SD pins (would break capture + reboot).
+    if (ledPin > 0 && gpioExtLED == 0 && externalLedEnabled)
+    {
+        if (isReservedCameraSdPin((gpio_num_t)ledPin)) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "LEDPin " + std::to_string(ledPin) +
+                " is a camera/SD pin and cannot drive the LED - ignored. Pick a free GPIO "
+                "(ESP32-S3: e.g. 21 or 47; never 4/12/13).");
+        } else {
+            GpioPin* ledGpio = new GpioPin((gpio_num_t)ledPin, "ExternalLED",
+                GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X, GPIO_INTR_DISABLE, 10, "", false);
+            (*gpioMap)[(gpio_num_t)ledPin] = ledGpio;
+            gpioExtLED = (gpio_num_t)ledPin;
+            ESP_LOGI(TAG, "External WS281x strip configured on GPIO%d via LEDPin", ledPin);
+        }
+    }
+
     if (registerISR) {
         //install gpio isr service
         gpio_install_isr_service(ESP_INTR_FLAG_LOWMED | ESP_INTR_FLAG_IRAM);
     }
+
+    // Apply the configured external-LED brightness to the onboard status WS2812 (S3) - it isn't a
+    // configurable GPIO pin, so this is the only way the brightness reaches it. Re-draws immediately.
+    setSystemStatusLedBrightness(externalLedBrightnessPct);
+    setOnboardLedEnabled(onboardLedEnabled);   // apply the on/off toggle for the onboard RGB
 
     if (gpioExtLED > 0)
     {
@@ -494,8 +588,17 @@ void GpioHandler::registerGpioUri()
     camuri.method    = HTTP_GET;
     camuri.uri       = "/GPIO";
     camuri.handler   = APPLY_BASIC_AUTH_FILTER(callHandleHttpRequest);
-    camuri.user_ctx  = (void*)this;    
+    camuri.user_ctx  = (void*)this;
     httpd_register_uri_handler(_httpServer, &camuri);
+
+    // Live external-LED brightness: GET /ledbrightness?value=0..100 - applies immediately (no reboot)
+    // so the config page can preview the strip dimming as the slider moves.
+    httpd_uri_t leduri = { };
+    leduri.method    = HTTP_GET;
+    leduri.uri       = "/ledbrightness";
+    leduri.handler   = APPLY_BASIC_AUTH_FILTER(callHandleLedBrightness);
+    leduri.user_ctx  = (void*)this;
+    httpd_register_uri_handler(_httpServer, &leduri);
 }
 
 esp_err_t GpioHandler::handleHttpRequest(httpd_req_t *req)
@@ -605,12 +708,58 @@ void GpioHandler::initStatusLedDefaults()
     statusLedColors[PROC_STAGE_ERROR]     = Rgb{ 120,   0,   0 };   // red        : error / retry
 }
 
+// Apply the external-LED output % (optional) and clamp the colour so the whole WS281x chain's
+// estimated 5V draw stays under the active budget. The estimate uses LED_MA_PER_CHANNEL_FULL mA per
+// colour channel at value 255 (~60 mA/pixel at full white). Budget = the user's injected-supply limit
+// when external power injection is enabled, else the board default EXTERNAL_LED_5V_BUDGET_MA. This is
+// the single guard that keeps a long/bright chain from browning out the board.
+Rgb GpioHandler::scaleExtLedColor(Rgb base, bool applyBrightness)
+{
+    float r = base.r, g = base.g, b = base.b;
+
+    if (applyBrightness) {
+        // Gamma ~2 so the percentage tracks *perceived* brightness. WS2812 light output is very
+        // non-linear: 20% linear PWM still looks bright, which makes a linear scale feel like it
+        // "does nothing". Squaring maps e.g. 20% -> 4% of full, 50% -> 25%, 100% -> full.
+        float p = (float)externalLedBrightnessPct * externalLedBrightnessPct / 10000.0f;
+        r *= p; g *= p; b *= p;
+    }
+
+    int budget = externalPowerInjection ? externalMaxCurrentMa : EXTERNAL_LED_5V_BUDGET_MA;
+    float sumChannels = r + g + b;
+    // Log only on the rising edge so a static bright config doesn't spam the log every round.
+    static bool wasClamped = false;
+    if (LEDNumbers > 0 && sumChannels > 0.0f && budget > 0) {
+        float estimate_mA = (float)LEDNumbers * sumChannels * LED_MA_PER_CHANNEL_FULL / 255.0f;
+        if (estimate_mA > (float)budget) {
+            float factor = (float)budget / estimate_mA;
+            r *= factor; g *= factor; b *= factor;
+            if (!wasClamped) {
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG,
+                    "External LED draw ~" + std::to_string((int)estimate_mA) + " mA exceeds the " +
+                    std::to_string(budget) + " mA budget" +
+                    (externalPowerInjection ? " (injected supply)" : " (board default)") +
+                    "; dimming to fit. Reduce LED count/brightness or enable power injection.");
+                wasClamped = true;
+            }
+        } else {
+            wasClamped = false;
+        }
+    }
+
+    return Rgb{ (uint8_t)(r + 0.5f), (uint8_t)(g + 0.5f), (uint8_t)(b + 0.5f) };
+}
+
 // Low-level: write a single colour to all pixels of the configured WS281x LED.
 void GpioHandler::driveWs281x(Rgb color)
 {
-    if (gpioMap == NULL) {
+    if (gpioMap == NULL || !externalLedEnabled) {
         return;
     }
+    lastStripRaw = color;   // remember the unscaled colour so a live brightness change can re-draw it
+    // The external LED brightness % is a master dimmer for the whole strip, so apply it to the
+    // status-stage colours too (not just the capture flash) - and clamp to the 5V budget.
+    color = scaleExtLedColor(color, /*applyBrightness=*/true);
     for (std::map<gpio_num_t, GpioPin*>::iterator it = gpioMap->begin(); it != gpioMap->end(); ++it) {
         if (it->second->getMode() != GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X) {
             continue;
@@ -648,21 +797,48 @@ void GpioHandler::setStatusStageLED(int stage)
     driveWs281x(statusLedColors[stage]);
 }
 
+// The onboard WS2812 (S3) is driven only through driveSystemStatusWs281x() - it is NOT a configurable
+// GPIO pin, so flashLightEnable()/driveWs281x() never touch it. To make the "External LED brightness"
+// setting actually dim this LED, we mirror the configured brightness into this file-scope value and
+// apply it here. Defaults to 100 % so behaviour before config load is unchanged.
+static int s_sysLedBrightnessPct = 100;
+static uint8_t s_sysLedRaw[3] = { 0, 0, 0 };   // last colour requested, unscaled (for re-drive)
+static bool s_onboardLedEnabled = true;        // user toggle for the onboard status RGB (S3 GPIO48)
+
 // Standalone WS2812 (RGB) write, independent of the GpioHandler instance/config - used to signal
 // Wi-Fi status during boot and AP mode, before the GPIO handler is initialised (it never is in AP
 // mode). Transient SmartLed so the RMT channel is freed immediately, leaving it for the handler's
 // processing-stage LED once it comes up. Gated to the S3 (its onboard RGB is a WS2812 on FLASH_GPIO);
-// a no-op elsewhere so it never pulses the ESP32-CAM's plain flash LED.
+// a no-op elsewhere so it never pulses the ESP32-CAM's plain flash LED. The colour is scaled by the
+// configured external-LED brightness %.
 void driveSystemStatusWs281x(uint8_t r, uint8_t g, uint8_t b)
 {
+    s_sysLedRaw[0] = r; s_sysLedRaw[1] = g; s_sysLedRaw[2] = b;
 #if defined(BOARD_ESP32S3_CAM) && defined(FLASH_GPIO)
+    if (!s_onboardLedEnabled) { r = g = b = 0; }   // user disabled the onboard LED -> keep it dark
+    int p = s_sysLedBrightnessPct;   // gamma ~2 (square), matching scaleExtLedColor() perceptual scale
     SmartLed leds(LED_WS2812, 1, (int)FLASH_GPIO, 0, DoubleBuffer);
-    leds[0] = Rgb{ r, g, b };
+    leds[0] = Rgb{ (uint8_t)(r * p * p / 10000), (uint8_t)(g * p * p / 10000), (uint8_t)(b * p * p / 10000) };
     leds.show();
     leds.wait();
 #else
     (void)r; (void)g; (void)b;
 #endif
+}
+
+// Set the brightness % applied to the onboard status WS2812 and immediately re-draw the current colour
+// so a change takes effect without waiting for the next Wi-Fi/AP status transition.
+void setSystemStatusLedBrightness(int pct)
+{
+    s_sysLedBrightnessPct = (pct < 0) ? 0 : (pct > 100 ? 100 : pct);
+    driveSystemStatusWs281x(s_sysLedRaw[0], s_sysLedRaw[1], s_sysLedRaw[2]);
+}
+
+// Enable/disable the onboard status RGB (S3 GPIO48) and re-draw immediately (off, or the last colour).
+void setOnboardLedEnabled(bool enabled)
+{
+    s_onboardLedEnabled = enabled;
+    driveSystemStatusWs281x(s_sysLedRaw[0], s_sysLedRaw[1], s_sysLedRaw[2]);
 }
 
 // Free-function trampoline registered with jomjol_helper so the flow can signal stages
@@ -694,7 +870,7 @@ void GpioHandler::flashLightEnable(bool value)
                 }
             } else 
                 {
-                    if (it->second->getMode() == GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X)
+                    if (it->second->getMode() == GPIO_PIN_MODE_EXTERNAL_FLASH_WS281X && externalLedEnabled)
                     {
 #ifdef __LEDGLOBAL
                         if (leds_global == NULL) {
@@ -708,13 +884,16 @@ void GpioHandler::flashLightEnable(bool value)
                         SmartLed leds( LEDType, LEDNumbers, it->second->getGPIO(), 0, DoubleBuffer );
 #endif
   
+                        lastStripRaw = value ? LEDColor : Rgb{0, 0, 0};   // for live brightness re-draw
                         if (value)
                         {
+                            // Apply the external output % and clamp to the 5V current budget.
+                            Rgb flashColor = scaleExtLedColor(LEDColor, /*applyBrightness=*/true);
                             for (int i = 0; i < LEDNumbers; ++i)
 #ifdef __LEDGLOBAL
-                                (*leds_global)[i] = LEDColor;
+                                (*leds_global)[i] = flashColor;
 #else
-                                leds[i] = LEDColor;
+                                leds[i] = flashColor;
 #endif
                         }
                         else
@@ -727,17 +906,53 @@ void GpioHandler::flashLightEnable(bool value)
 #endif
                         }
 #ifdef __LEDGLOBAL
-                        leds_global->show(); 
+                        leds_global->show();
 #else
-                        leds.show(); 
-#endif 
+                        leds.show();
+#endif
                     }
                 }
         }
     }
 }
 
-gpio_num_t GpioHandler::resolvePinNr(uint8_t pinNr) 
+// Apply the external-LED brightness % immediately, without a reboot/config reload, and re-draw the
+// LEDs so the change is visible right away. Covers every WS281x path: the configurable strip (re-draw
+// its last colour through driveWs281x) and the S3 onboard status RGB (via setSystemStatusLedBrightness).
+void GpioHandler::setExternalLedBrightnessLive(int pct)
+{
+    externalLedBrightnessPct = (pct < 0) ? 0 : (pct > 100 ? 100 : pct);
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "External LED brightness set live to " +
+                        std::to_string(externalLedBrightnessPct) + "%");
+    setSystemStatusLedBrightness(externalLedBrightnessPct);   // onboard status RGB (S3) + re-draw
+    // Re-draw the configurable strip so the change is visible immediately. If something is already
+    // showing (status LED), re-draw that colour; otherwise light it at the flash colour as a preview
+    // (when the status LED is off the strip is normally dark, so there'd be nothing to see).
+    bool lit = lastStripRaw.r || lastStripRaw.g || lastStripRaw.b;
+    driveWs281x(lit ? lastStripRaw : LEDColor);
+}
+
+esp_err_t GpioHandler::handleLedBrightnessRequest(httpd_req_t *req)
+{
+    char query[64];
+    char val[8];
+    int pct = -1;
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK &&
+        httpd_query_key_value(query, "value", val, sizeof(val)) == ESP_OK) {
+        pct = atoi(val);
+    }
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    if (pct < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing/invalid 'value' (0..100)");
+        return ESP_OK;
+    }
+    setExternalLedBrightnessLive(pct);
+    std::string resp = "external LED brightness = " + std::to_string(externalLedBrightnessPct) + "%";
+    httpd_resp_send(req, resp.c_str(), resp.length());
+    return ESP_OK;
+}
+
+gpio_num_t GpioHandler::resolvePinNr(uint8_t pinNr)
 {
     switch(pinNr)  {
         case 0:
