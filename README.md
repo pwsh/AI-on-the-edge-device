@@ -169,17 +169,20 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - **Changed-digit highlighting** on the overview, a **Pause processing** control, and an auto-tailing live log viewer.
 - **Keyboard nudging** in the ROI editors and faster **WebGL** data graphs.
 - **Apply the interval live** (no reboot) and a **one-click migration** prompt when the firmware and web-UI versions differ.
+- **Download a folder as a ZIP** – the web file server can grab a whole directory (with sub-folders) as one archive: a *Download folder as ZIP* button in the listing header and a per-folder download icon on each sub-folder row.
 
 ### 🔁 Reliability
 - **Camera auto-recovery** – a stuck OV2640 is now power-cycled in firmware over its power-down line before each init attempt (with escalating drains), so a sensor wedged by a software reset recovers on its own instead of needing a physical unplug. *(Fixes a long-standing bug where the reset was silently compiled out on every board.)*
 - **OTA rollback** – a crash-looping update is automatically rolled back to the last working firmware.
 - **Crash dumps are saved to the SD card** for later retrieval.
 - **Wi-Fi resilience** – exponential-backoff reconnect, automatic fall-back to the setup access point after repeated failures (now **including an empty/corrupt Wi-Fi config**, so the device can always be reconfigured from its portal — no SD pull needed), fast wrong-password detection, atomic `wlan.ini` writes, and a 3×-reset Wi-Fi factory reset.
+- **A stuck SD card can't wedge a reboot** – if a round blocks on a slow/failing SD write while holding the SD lock, a reboot **failsafe** still forces the restart after a short timeout, so a watchdog/software reboot always completes instead of leaving the device frozen until a manual power-cycle.
 - RGB status LED (ESP32-S3) reflects the Wi-Fi / processing state.
 
 ### 🔒 Connectivity & security
 - **Data Publishing page** – a per-platform matrix to pick exactly **which parameters** are sent to **MQTT, InfluxDB and Home Assistant**, including values the device gathers but didn't previously send (*previous value*, *recognition confidence*, plus *raw/rate* for InfluxDB). The bulky **raw** and **JSON** topics are now **off by default**. An **"only send changed readings"** mode skips a sequence's reading topics while its value is unchanged (diagnostics & leak state still send), cutting traffic. Home Assistant entities (now also covering confidence, previous value and the round diagnostics) carry proper units/device-classes — e.g. free memory converts between B/kB/MB — and a disabled entity is removed via an empty retained discovery message.
 - **Verified MQTTS / HTTPS out of the box** via a built-in Mozilla CA bundle — connect to public TLS brokers (e.g. HiveMQ Cloud) and InfluxDB Cloud **without uploading a certificate**.
+- **Captive portal in setup mode** – joining the device's `AI-on-the-Edge` setup access point pops the phone/laptop "Sign in to network" page straight onto the Wi-Fi setup form (normal STA operation is unaffected).
 - Default hostname `edgeai-<mac>` so multiple devices don't clash on the network.
 
 ---

@@ -39,6 +39,20 @@
 - **Safer Save**: a setting whose stored value is no longer a valid option is no longer nagged on every
   load; instead Save warns once and **comments it out** (keeping the old value) so it can't break the
   config. A stale-cache "unknown parameter" is a quiet console note, not a red alert.
+- **Download a folder as a ZIP**: the web **file server** can now download a whole directory (including
+  its sub-folders) as a single ZIP — a **"Download folder as ZIP"** button in the listing header, and a
+  per-folder download icon on each sub-folder row (`GET /fileserver/<dir>/?zip=1`). The archive is built
+  on-device with the existing miniz writer and streamed as `<foldername>.zip`; `wlan.ini` is always
+  excluded.
+
+### Reliability
+
+- **A stuck SD card can no longer wedge a reboot**: if a round blocks on a slow/failing SD write while
+  holding the SD lock, the reboot path used to block too — it writes a `reboot.txt` marker and flushes
+  the log to the card *before* `esp_restart()`, so those calls hung on the held lock and the device
+  stayed frozen until it was physically power-cycled. A reboot **failsafe** now forces the restart after
+  a hard timeout regardless of what the reboot path is blocked on, so a watchdog/software reboot always
+  completes and a marginal SD degrades into an auto-recovering reboot instead of a brick.
 
 # [17.0.0] - 2026-06-06
 

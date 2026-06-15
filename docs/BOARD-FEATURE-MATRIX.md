@@ -50,4 +50,4 @@ highlight · pause-processing menu · scheduling · FastRead · dark mode · the
 - Any new `#if defined(BOARD_ESP32S3_CAM)` / `USE_FLASH_FS` / `CONFIG_IDF_TARGET_ESP32S3` gate is, by
   definition, board drift → **add/refresh a row here in the same change.**
 
-_Last updated: 2026-06-01._
+_Last updated: 2026-06-15._

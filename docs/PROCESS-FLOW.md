@@ -22,7 +22,7 @@ flowchart TD
     A[Boot] --> B[doInit: parse config.ini,<br/>build flow pipeline, start MQTT/GPIO]
     B --> C{Autostart<br/>enabled?}
     C -- no --> Z[Idle / Setup mode]
-    C -- yes --> D[Wait 10s: stabilise after boot]
+    C -- yes --> D[Wait 3s: stabilise after boot]
     D --> E[setSystemReady → serve full Web UI]
     E --> L{Round loop}
     L --> P{Paused?}
@@ -47,7 +47,7 @@ flowchart TD
 | Condition | Behaviour |
 |-----------|-----------|
 | Last reset was a panic (and not a planned reboot) | Wait **5 minutes** before the first round, leaving a window to OTA‑update or pull logs ([MainFlowControl.cpp:1922](../code/components/jomjol_flowcontroll/MainFlowControl.cpp#L1922)). |
-| Normal autostart | Wait **10 s** to let Wi‑Fi associate, the camera warm up, and power settle ([:1949](../code/components/jomjol_flowcontroll/MainFlowControl.cpp#L1949)). |
+| Normal autostart | Wait **3 s** to let Wi‑Fi associate, the camera warm up, and power settle ([:2026](../code/components/jomjol_flowcontroll/MainFlowControl.cpp#L2026)). |
 | Setup mode active | Do not autostart; the UI drives capture/reference manually. |
 
 ### Round cadence
