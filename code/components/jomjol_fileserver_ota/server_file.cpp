@@ -228,7 +228,11 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
                                   "<button id=\"upload\" type=\"button\" class=\"button\" onclick=\"upload()\">Upload</button></td></tr>"
                                   "</table></td></tr><tr></tr><tr><td colspan=\"2\">"
                                   "<button style=\"font-size:16px; padding: 5px 10px\" id=\"dirup\" type=\"button\" onclick=\"dirup()\""
-                                  "disabled>&#129145; Directory up</button><span style=\"padding-left:15px\" id=\"currentpath\">"
+                                  "disabled>&#129145; Directory up</button>"
+                                  "<button style=\"font-size:16px; padding: 5px 10px; margin-left:8px\" type=\"button\" "
+                                  "title=\"Download this folder (incl. subfolders) as a ZIP\" "
+                                  "onclick=\"window.location.href=window.location.pathname+'?zip=1'\">&#128229; Download folder as ZIP</button>"
+                                  "<span style=\"padding-left:15px\" id=\"currentpath\">"
                                   "</span></td></tr>");
     httpd_resp_sendstr_chunk(req, "</table>");
 
@@ -292,7 +296,17 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
 
             httpd_resp_sendstr_chunk(req, "\">");
             httpd_resp_sendstr_chunk(req, entry->d_name);
-            httpd_resp_sendstr_chunk(req, "</a></td><td>");
+            httpd_resp_sendstr_chunk(req, "</a>");
+
+            // For sub-directories, offer a one-click "download as ZIP" link (recursive).
+            if (entry->d_type == DT_DIR) {
+                httpd_resp_sendstr_chunk(req, " <a style=\"text-decoration:none\" title=\"Download this folder (incl. subfolders) as a ZIP\" href=\"/fileserver");
+                httpd_resp_sendstr_chunk(req, uripath);
+                httpd_resp_sendstr_chunk(req, entry->d_name);
+                httpd_resp_sendstr_chunk(req, "/?zip=1\">&#128229;</a>");
+            }
+
+            httpd_resp_sendstr_chunk(req, "</td><td>");
             httpd_resp_sendstr_chunk(req, entrytype);
             httpd_resp_sendstr_chunk(req, "</td><td>");
             httpd_resp_sendstr_chunk(req, entrysize);
@@ -320,6 +334,107 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
     // Send empty chunk to signal HTTP response completion
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
+}
+
+// ---- Download a directory (recursively) as a streamed ZIP ------------------
+// Triggered from the file-server directory listing ("Download folder as ZIP" button / per-folder
+// link -> GET /fileserver/<dir>/?zip=1). Reuses miniz (already linked for the OTA/backup paths): the
+// archive is built to a temp file on the SD card, streamed to the client as an attachment, then
+// removed - the same approach as the config backup (server_backup.cpp).
+#define ZIPDIR_TMP "/sdcard/ziptmp_dl.zip"
+
+// Recursively add every file under fsDir into the archive under arcPrefix. wlan.ini (Wi-Fi
+// credentials) and our own in-progress temp archive are skipped; a missing dir adds nothing (not an
+// error). Returns false only on a real write failure.
+static bool zipdir_add_recursive(mz_zip_archive *zip, const std::string &fsDir, const std::string &arcPrefix)
+{
+    DIR *d = opendir(fsDir.c_str());
+    if (!d) return true;
+    bool ok = true;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        std::string name = e->d_name;
+        if (name == "." || name == "..") continue;
+        if (name == "wlan.ini") continue;                       // never expose Wi-Fi credentials
+        std::string src = fsDir + "/" + name;
+        if (src == ZIPDIR_TMP) continue;                        // don't archive our own temp file
+        struct stat st;
+        if (stat(src.c_str(), &st) != 0) continue;
+        std::string arc = arcPrefix + name;
+        if (S_ISDIR(st.st_mode)) {
+            if (!zipdir_add_recursive(zip, src, arc + "/")) { ok = false; break; }
+        } else {
+            if (!mz_zip_writer_add_file(zip, arc.c_str(), src.c_str(), NULL, 0, MZ_BEST_SPEED)) {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "zipdir: failed to add " + src);
+                ok = false; break;
+            }
+        }
+    }
+    closedir(d);
+    return ok;
+}
+
+// Build a zip of dirpath (recursively, incl. subfolders) and stream it as "<foldername>.zip".
+static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const char *uripath)
+{
+    // Download name from the last path segment: "/log/data/" -> "data.zip"; root "/" -> "sdcard.zip".
+    std::string up = uripath ? uripath : "/";
+    while (up.size() > 1 && up.back() == '/') up.pop_back();
+    size_t slash = up.find_last_of('/');
+    std::string base = (slash == std::string::npos) ? up : up.substr(slash + 1);
+    if (base.empty()) base = "sdcard";
+    std::string zipname = base + ".zip";
+
+    // dirpath has a trailing '/'; strip it for the walk root.
+    std::string root = dirpath;
+    while (root.size() > 1 && root.back() == '/') root.pop_back();
+
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: building " + zipname + " from " + root);
+
+    mz_zip_archive zip;
+    memset(&zip, 0, sizeof(zip));
+    remove(ZIPDIR_TMP);
+    if (!mz_zip_writer_init_file(&zip, ZIPDIR_TMP, 0)) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not create zip on SD card");
+        return ESP_FAIL;
+    }
+    bool ok = zipdir_add_recursive(&zip, root, "");
+    if (ok) ok = mz_zip_writer_finalize_archive(&zip);
+    mz_zip_writer_end(&zip);
+    if (!ok) {
+        remove(ZIPDIR_TMP);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build zip");
+        return ESP_FAIL;
+    }
+
+    char dispo[160];
+    snprintf(dispo, sizeof(dispo), "attachment; filename=\"%s\"", zipname.c_str());
+    httpd_resp_set_type(req, "application/zip");
+    httpd_resp_set_hdr(req, "Content-Disposition", dispo);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+    FILE *f = fopen(ZIPDIR_TMP, "rb");
+    if (!f) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Zip open failed");
+        return ESP_FAIL;
+    }
+    char *buf = (char *) malloc(8192);
+    esp_err_t res = ESP_OK;
+    if (!buf) {
+        res = ESP_FAIL;
+    } else {
+        size_t n;
+        while ((n = fread(buf, 1, 8192, f)) > 0) {
+            if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) { res = ESP_FAIL; break; }
+        }
+        free(buf);
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, NULL, 0);   // signal end of response
+    remove(ZIPDIR_TMP);
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: sent " + zipname);
+    return res;
 }
 
 static esp_err_t logfileact_get_full_handler(httpd_req_t *req) {
@@ -542,6 +657,10 @@ static esp_err_t download_get_handler(httpd_req_t *req)
                 if (httpd_query_key_value(buf, "readonly", param, sizeof(param)) == ESP_OK) {
                     ESP_LOGI(TAG, "Found URL query parameter => readonly=%s", param);
                     readonly = (strcmp(param,"true") == 0);
+                }
+                // ?zip[=1] -> stream this directory (recursively) as a downloadable ZIP instead of listing it
+                if (httpd_query_key_value(buf, "zip", param, sizeof(param)) == ESP_OK) {
+                    return zip_dir_and_stream(req, filepath, filename);
                 }
             }
         }
