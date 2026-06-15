@@ -599,13 +599,40 @@ void hard_restart()
 }
 
 
+// Failsafe so a stuck reboot can never wedge the device: a hung flow task can hold the SD lock, which
+// makes the fopen("/sdcard/reboot.txt") and log-flush in the reboot path below block forever, so
+// esp_restart() is never reached and the board hangs until it is physically power-cycled. This
+// independent task forces the restart after a hard timeout regardless of what the reboot path is
+// blocked on. esp_restart() is a hardware reset that does not touch the SD/VFS locks; hard_restart()
+// (watchdog panic) is the backstop in the unlikely event esp_restart() itself stalls.
+static void reboot_failsafe_task(void *arg)
+{
+    const int timeout_ms = (int)(intptr_t)arg;
+    vTaskDelay(timeout_ms / portTICK_PERIOD_MS);
+    ESP_LOGE(TAG, "Reboot failsafe (%d ms) fired - forcing restart (reboot path likely blocked on SD lock)", timeout_ms);
+    esp_restart();
+    hard_restart();
+}
+
+// Start the reboot failsafe (call at the top of any reboot path that touches the SD card before resetting).
+static void start_reboot_failsafe(int timeout_ms)
+{
+    xTaskCreate(&reboot_failsafe_task, "reboot_failsafe", configMINIMAL_STACK_SIZE * 2,
+                (void*)(intptr_t)timeout_ms, configMAX_PRIORITIES - 2, NULL);
+}
+
 void task_reboot(void *DeleteMainFlow)
 {
+    // Guarantee a restart even if the cleanup below blocks on a held SD lock (see reboot_failsafe_task).
+    start_reboot_failsafe(10000);
+
     // write a reboot, to identify a reboot by purpouse
     FILE* pfile = fopen("/sdcard/reboot.txt", "w");
-    std::string _s_zw= "reboot";
-    fwrite(_s_zw.c_str(), strlen(_s_zw.c_str()), 1, pfile);
-    fclose(pfile);
+    if (pfile != NULL) {
+        std::string _s_zw= "reboot";
+        fwrite(_s_zw.c_str(), strlen(_s_zw.c_str()), 1, pfile);
+        fclose(pfile);
+    }
 
     vTaskDelay(3000 / portTICK_PERIOD_MS);
 
@@ -655,6 +682,9 @@ void doReboot()
 
 void doRebootOTA()
 {
+    // Guarantee a restart even if the log flush below blocks on a held SD lock (see reboot_failsafe_task).
+    start_reboot_failsafe(10000);
+
     LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Reboot in 5sec");
 
     Camera.LightOnOff(false);
