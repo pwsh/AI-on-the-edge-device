@@ -2739,6 +2739,22 @@ function UpdateInputIndividual(sel) {
         // ReadParameter(param, "PostProcessing", "IgnoreAllNaN", false, NUNBERSAkt);
         ReadParameter(param, "PostProcessing", "AllowNegativeRates", false, NUNBERSAkt);
         ReadParameter(param, "PostProcessing", "CheckDigitIncreaseConsistency", false, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "Utility", false, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "LeakDetection", false, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "LeakThreshold", true, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "WaterPipeDiameterMm", true, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "GasPipeDiameterMm", true, NUNBERSAkt);
+        ReadParameter(param, "PostProcessing", "ServiceAmps", true, NUNBERSAkt);
+        // Utility and Leak Detection have no enable checkbox, so ReadParameter cannot derive their
+        // enabled state. Persist them uncommented (else WriteConfigININew comments them out and the
+        // firmware ignores the choice): Leak Detection always; Utility only once a meter type is set.
+        var _pp = NUMBERS[NUNBERSAkt] ? NUMBERS[NUNBERSAkt]["PostProcessing"] : null;
+        if (_pp && _pp["LeakDetection"]) {
+            _pp["LeakDetection"]["enabled"] = true;
+        }
+        if (_pp && _pp["Utility"]) {
+            _pp["Utility"]["enabled"] = ((_pp["Utility"]["value1"] || "") !== "");
+        }
         ReadParameter(param, "InfluxDB", "Field", true, NUNBERSAkt);
         ReadParameter(param, "InfluxDBv2", "Field", true, NUNBERSAkt);
         ReadParameter(param, "InfluxDB", "Measurement", true, NUNBERSAkt);
@@ -2759,6 +2775,12 @@ function UpdateInputIndividual(sel) {
     // WriteParameter(param, category, "PostProcessing", "IgnoreAllNaN", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "AllowNegativeRates", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "CheckDigitIncreaseConsistency", false, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "Utility", false, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "LeakDetection", false, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "LeakThreshold", true, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "WaterPipeDiameterMm", true, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "GasPipeDiameterMm", true, NUNBERSAkt);
+    WriteParameter(param, category, "PostProcessing", "ServiceAmps", true, NUNBERSAkt);
     WriteParameter(param, category, "InfluxDB", "Field", true, NUNBERSAkt);
     WriteParameter(param, category, "InfluxDBv2", "Field", true, NUNBERSAkt);
     WriteParameter(param, category, "InfluxDB", "Measurement", true, NUNBERSAkt);
@@ -2843,9 +2865,10 @@ function UpdateInput() {
     WriteParameter(param, category, "Analog", "ROIImagesLocation", true);		
     WriteParameter(param, category, "Analog", "ROIImagesRetention", true);		
     
-    WriteParameter(param, category, "PostProcessing", "PreValueUse", false);		
-    WriteParameter(param, category, "PostProcessing", "PreValueAgeStartup", true);		
+    WriteParameter(param, category, "PostProcessing", "PreValueUse", false);
+    WriteParameter(param, category, "PostProcessing", "PreValueAgeStartup", true);
     WriteParameter(param, category, "PostProcessing", "ErrorMessage", false);
+    WriteParameter(param, category, "PostProcessing", "ConfidenceVotes", false);
     // WriteParameter(param, category, "PostProcessing", "CheckDigitIncreaseConsistency", false);
 
     WriteParameter(param, category, "MQTT", "Uri", true);	
@@ -3201,7 +3224,12 @@ function ReadParameterAll() {
     ReadParameter(param, "PostProcessing", "PreValueUse", false);
     ReadParameter(param, "PostProcessing", "PreValueAgeStartup", true);
     ReadParameter(param, "PostProcessing", "ErrorMessage", false);
-    // ReadParameter(param, "PostProcessing", "CheckDigitIncreaseConsistency", false);	
+    ReadParameter(param, "PostProcessing", "ConfidenceVotes", false);
+    // ConfidenceVotes has no enable checkbox; keep it written (uncommented) so the global value
+    // (0 = off, default 3) always reaches the firmware instead of being dropped on save.
+    param["PostProcessing"]["ConfidenceVotes"]["found"] = true;
+    param["PostProcessing"]["ConfidenceVotes"]["enabled"] = true;
+    // ReadParameter(param, "PostProcessing", "CheckDigitIncreaseConsistency", false);
 
     ReadParameter(param, "MQTT", "Uri", true);
     ReadParameter(param, "MQTT", "MainTopic", true);
