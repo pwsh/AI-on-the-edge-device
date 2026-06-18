@@ -341,7 +341,8 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
 // link -> GET /fileserver/<dir>/?zip=1). Reuses miniz (already linked for the OTA/backup paths): the
 // archive is built to a temp file on the SD card, streamed to the client as an attachment, then
 // removed - the same approach as the config backup (server_backup.cpp).
-#define ZIPDIR_TMP "/sdcard/ziptmp_dl.zip"
+#define ZIPDIR_TMP_PREFIX "/sdcard/ziptmp_dl"   // + "<seq>.zip" per request (unique so concurrent downloads don't collide)
+static uint32_t s_zipSeq = 0;
 
 // Recursively add every file under fsDir into the archive under arcPrefix. wlan.ini (Wi-Fi
 // credentials) and our own in-progress temp archive are skipped; a missing dir adds nothing (not an
@@ -355,9 +356,9 @@ static bool zipdir_add_recursive(mz_zip_archive *zip, const std::string &fsDir, 
     while ((e = readdir(d)) != NULL) {
         std::string name = e->d_name;
         if (name == "." || name == "..") continue;
-        if (name == "wlan.ini") continue;                       // never expose Wi-Fi credentials
+        if (toUpper(name) == "WLAN.INI") continue;              // never expose Wi-Fi credentials (any case)
+        if (name.rfind("ziptmp_dl", 0) == 0) continue;          // don't archive any in-progress temp archive
         std::string src = fsDir + "/" + name;
-        if (src == ZIPDIR_TMP) continue;                        // don't archive our own temp file
         struct stat st;
         if (stat(src.c_str(), &st) != 0) continue;
         std::string arc = arcPrefix + name;
@@ -391,10 +392,15 @@ static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const
 
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: building " + zipname + " from " + root);
 
+    // Per-request temp file so two concurrent downloads can't clobber each other's archive (the walk
+    // skips any "ziptmp_dl*" entry, so a temp left under the zipped tree is never archived).
+    std::string tmpPath = std::string(ZIPDIR_TMP_PREFIX) +
+                          std::to_string((unsigned)__atomic_fetch_add(&s_zipSeq, 1, __ATOMIC_RELAXED)) + ".zip";
+
     mz_zip_archive zip;
     memset(&zip, 0, sizeof(zip));
-    remove(ZIPDIR_TMP);
-    if (!mz_zip_writer_init_file(&zip, ZIPDIR_TMP, 0)) {
+    remove(tmpPath.c_str());
+    if (!mz_zip_writer_init_file(&zip, tmpPath.c_str(), 0)) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not create zip on SD card");
         return ESP_FAIL;
     }
@@ -402,8 +408,20 @@ static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const
     if (ok) ok = mz_zip_writer_finalize_archive(&zip);
     mz_zip_writer_end(&zip);
     if (!ok) {
-        remove(ZIPDIR_TMP);
+        remove(tmpPath.c_str());
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build zip");
+        return ESP_FAIL;
+    }
+
+    // Allocate the stream buffer and open the file BEFORE staging any response header, so a failure
+    // here returns a real 500 instead of a 200 with zip headers and an empty body.
+    char *buf = (char *) malloc(8192);
+    FILE *f = buf ? fopen(tmpPath.c_str(), "rb") : NULL;
+    if (!buf || !f) {
+        if (buf) free(buf);
+        if (f) fclose(f);
+        remove(tmpPath.c_str());
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Zip open failed");
         return ESP_FAIL;
     }
 
@@ -414,25 +432,15 @@ static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
-    FILE *f = fopen(ZIPDIR_TMP, "rb");
-    if (!f) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Zip open failed");
-        return ESP_FAIL;
-    }
-    char *buf = (char *) malloc(8192);
     esp_err_t res = ESP_OK;
-    if (!buf) {
-        res = ESP_FAIL;
-    } else {
-        size_t n;
-        while ((n = fread(buf, 1, 8192, f)) > 0) {
-            if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) { res = ESP_FAIL; break; }
-        }
-        free(buf);
+    size_t n;
+    while ((n = fread(buf, 1, 8192, f)) > 0) {
+        if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) { res = ESP_FAIL; break; }
     }
+    free(buf);
     fclose(f);
     httpd_resp_send_chunk(req, NULL, 0);   // signal end of response
-    remove(ZIPDIR_TMP);
+    remove(tmpPath.c_str());
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: sent " + zipname);
     return res;
 }

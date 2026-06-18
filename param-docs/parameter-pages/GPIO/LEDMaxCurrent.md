@@ -1,5 +1,5 @@
 # Parameter `LEDMaxCurrent`
-Default Value: `1000`
+Default Value: `500`
 
 Maximum current (in **mA**) available to the **external** LED strip from your injected 5V supply. Only
 used when `LEDPowerInjection` is **enabled**; ignored otherwise (the board default of `500 mA` applies).

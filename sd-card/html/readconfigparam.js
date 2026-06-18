@@ -263,6 +263,10 @@ function ParseConfig() {
     ParamAddValue(param, catname, "IO1", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO3", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO4", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
+    // IO12 has no UI row anymore (removed: it's an SD/strapping pin), but keep it registered so an
+    // existing "IO12 = ..." line survives a save instead of being silently dropped, and so a legacy
+    // "IO12 = external-flash-ws281x" can be migrated to LEDPin below.
+    ParamAddValue(param, catname, "IO12", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "IO13", 6, false, "",  [null, null, /^[0-9]*$/, null, null, /^[a-zA-Z0-9_-]*$/]);
     ParamAddValue(param, catname, "LEDType");
     ParamAddValue(param, catname, "LEDNumbers");
@@ -273,7 +277,7 @@ function ParseConfig() {
     // External LED output % + 5V current budgeting (global GPIO params, not per-number).
     ParamAddValue(param, catname, "LEDBrightness", 1, false, "100");
     ParamAddValue(param, catname, "LEDPowerInjection", 1, false, "false");
-    ParamAddValue(param, catname, "LEDMaxCurrent", 1, false, "1000");
+    ParamAddValue(param, catname, "LEDMaxCurrent", 1, false, "500");
      // Default Values, um abwärtskompatiblität zu gewährleisten
     param[catname]["LEDType"]["value1"] = "WS2812";
     param[catname]["LEDNumbers"]["value1"] = "2";
@@ -283,7 +287,7 @@ function ParseConfig() {
     param[catname]["LEDColor"]["value3"] = "50";
     param[catname]["LEDBrightness"]["value1"] = "100";
     param[catname]["LEDPowerInjection"]["value1"] = "false";
-    param[catname]["LEDMaxCurrent"]["value1"] = "1000";
+    param[catname]["LEDMaxCurrent"]["value1"] = "500";
     // Status LED: show the current processing stage as a colour (defaults match the firmware).
     // Global GPIO param (NOT per-number) -> _isNUMBER must be false, otherwise it gets written
     // as "main.StatusLED"/"rate.StatusLED" instead of a single "StatusLED" line.
@@ -769,7 +773,7 @@ function getCamConfig() {
     // "invalid value" warning and the LED keeps working on the same pin.
     // Just clear the legacy LED mode off the pin; LEDPin keeps its own value (default 21), so the LED
     // lands on the recommended pin rather than the old camera pin.
-    ["IO0", "IO1", "IO3", "IO4", "IO13"].forEach(function (io) {
+    ["IO0", "IO1", "IO3", "IO4", "IO12", "IO13"].forEach(function (io) {
         var p = param["GPIO"][io];
         if (p && p["found"] && p["value1"] === "external-flash-ws281x") {
             p["value1"] = "input";
@@ -781,7 +785,7 @@ function getCamConfig() {
     // on the ESP32-CAM, so a single shared default would be wrong there.
     try { window._ledPinFromConfig = !!(param["GPIO"]["LEDPin"] && param["GPIO"]["LEDPin"]["found"]); } catch (e) {}
 
-    var _extLedDefaults = { LEDBrightness: "100", LEDPowerInjection: "false", LEDMaxCurrent: "1000", LEDPin: "21", ExternalLED: "true" };
+    var _extLedDefaults = { LEDBrightness: "100", LEDPowerInjection: "false", LEDMaxCurrent: "500", LEDPin: "21", ExternalLED: "true" };
     for (var _extKey in _extLedDefaults) {
         if (param["GPIO"][_extKey]) {
             param["GPIO"][_extKey]["enabled"] = true;

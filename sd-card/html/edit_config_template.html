@@ -2594,22 +2594,26 @@ var canvas = document.getElementById('canvas'),
 // Detect the SoC so the page can show board-appropriate rows (e.g. the onboard-LED toggle on the
 // ESP32-S3, whose onboard RGB is GPIO48, vs the GPIO4 flash-LED block on the ESP32-CAM).
 (function detectBoard() {
+    // External-LED default data pin differs by board (ESP32-S3 -> 21; ESP32-CAM -> 12, since GPIO21 is a
+    // camera data line there). Only fill it when the config had none. If the board can't be determined,
+    // fall back to 0 (LEDPin disabled) rather than guessing a pin that may be a camera line on the real
+    // board and silently breaking capture / the LED.
+    function applyLedPinDefault(rec) {
+        if (window._ledPinFromConfig) return;
+        var el = document.getElementById('GPIO_LEDPin_value1');
+        if (el) el.value = rec;
+        try { if (param && param['GPIO'] && param['GPIO']['LEDPin']) param['GPIO']['LEDPin'].value1 = rec; } catch (e) {}
+    }
     try {
         fetch(getDomainname() + '/info?type=ChipModel', { cache: 'no-store' })
-            .then(function (r) { return r.text(); })
+            .then(function (r) { return r.ok ? r.text() : ''; })
             .then(function (m) {
-                var isS3 = m && m.indexOf('S3') !== -1;
+                if (!m) { applyLedPinDefault('0'); return; }   // unknown board -> disable, don't guess a pin
+                var isS3 = m.indexOf('S3') !== -1;
                 if (isS3) document.body.classList.add('is-s3');
-                // External-LED default data pin differs by board (ESP32-S3 -> 21; ESP32-CAM -> 12,
-                // since GPIO21 there is a camera data line). Only fill it when the config had none.
-                if (!window._ledPinFromConfig) {
-                    var rec = isS3 ? '21' : '12';
-                    var el = document.getElementById('GPIO_LEDPin_value1');
-                    if (el) el.value = rec;
-                    try { if (param && param['GPIO'] && param['GPIO']['LEDPin']) param['GPIO']['LEDPin'].value1 = rec; } catch (e) {}
-                }
+                applyLedPinDefault(isS3 ? '21' : '12');
             })
-            .catch(function () {});
+            .catch(function () { applyLedPinDefault('0'); });
     } catch (e) {}
 })();
 
@@ -3412,7 +3416,30 @@ function collectInvalidSettings() {
             if (param[cat][name]["Numbers"]) continue;
             var el = document.getElementById(cat + "_" + name + "_value1");
             if (el && el.tagName && el.tagName.toLowerCase() === "select" && el.selectedIndex === -1) {
-                out.push({ cat: cat, name: name, value: param[cat][name]["_invalidValue"] || "(unset)" });
+                out.push({ label: "[" + cat + "] " + name, ref: param[cat][name],
+                           value: param[cat][name]["_invalidValue"] || "(unset)" });
+            }
+        }
+    }
+    // Per-ROI (per-number) params record an invalid stored value on NUMBERS[i][cat][name]._invalidValue
+    // (cleared again when a valid option is found). The loop above only sees the global param[] object and
+    // skips Numbers params, so surface these too - otherwise a removed dropdown option in a per-ROI setting
+    // is silently blanked on save instead of being warned about + commented out.
+    if (typeof NUMBERS !== "undefined" && NUMBERS) {
+        for (var i = 0; i < NUMBERS.length; ++i) {
+            var num = NUMBERS[i];
+            if (!num || !num["name"]) continue;
+            for (var c in num) {
+                if (c === "name" || c === "digit" || c === "analog") continue;
+                var catObj = num[c];
+                if (!catObj || typeof catObj !== "object") continue;
+                for (var nm in catObj) {
+                    var po = catObj[nm];
+                    if (po && typeof po === "object" && po["_invalidValue"] !== undefined) {
+                        out.push({ label: "[" + num["name"] + "." + c + "] " + nm, ref: po,
+                                   value: po["_invalidValue"] || "(unset)" });
+                    }
+                }
             }
         }
     }
@@ -3435,12 +3462,12 @@ function saveTextAsFile() {
     if (_invalidCfg.length > 0) {
         var _m = "The following setting(s) have a value that is no longer a valid option and will be "
                + "commented out (disabled) in the saved configuration:\n\n";
-        _invalidCfg.forEach(function (x) { _m += "  • [" + x.cat + "] " + x.name + " = " + x.value + "\n"; });
+        _invalidCfg.forEach(function (x) { _m += "  • " + x.label + " = " + x.value + "\n"; });
         _m += "\nOK = save with these commented out.   Cancel = go back and fix them first.";
         if (!confirm(_m)) return;
         _invalidCfg.forEach(function (x) {
-            param[x.cat][x.name]["enabled"] = false;                                  // -> line written as ';...'
-            if (x.value !== "(unset)") param[x.cat][x.name]["value1"] = x.value;       // keep the old value visible
+            x.ref["enabled"] = false;                              // -> line written as ';...'
+            if (x.value !== "(unset)") x.ref["value1"] = x.value;  // keep the old value visible
         });
     }
 
@@ -4080,6 +4107,8 @@ function WriteParameter(_param, _category, _cat, _name, _optional, _number = -1)
 				
                 if (!_isFound) {
                     NUMBERS[_number][_cat][_name]["_invalidValue"] = textToFind;   // record for the Save-time prompt
+                } else {
+                    delete NUMBERS[_number][_cat][_name]["_invalidValue"];          // valid again -> don't flag on save
                 }
             }
             else if ((element.getAttribute("type") != null) && (element.getAttribute("type").toLowerCase() == "checkbox")) {

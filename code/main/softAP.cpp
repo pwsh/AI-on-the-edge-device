@@ -179,8 +179,13 @@ static void captive_dns_task(void *pvParameters)
         struct sockaddr_in client;
         socklen_t clen = sizeof(client);
         int len = recvfrom(sock, rx, sizeof(rx), 0, (struct sockaddr *)&client, &clen);
+        if (len < 0) {
+            // Transient socket error (e.g. a Wi-Fi blip): back off briefly and keep serving rather than
+            // killing the captive responder for the rest of the AP session.
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            continue;
+        }
         if (len < (int)sizeof(captive_dns_header_t)) {
-            if (len < 0) break;   // socket error -> stop
             continue;
         }
 

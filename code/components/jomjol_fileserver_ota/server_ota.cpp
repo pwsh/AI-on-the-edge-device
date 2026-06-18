@@ -618,8 +618,13 @@ static void reboot_failsafe_task(void *arg)
 // Start the reboot failsafe (call at the top of any reboot path that touches the SD card before resetting).
 static void start_reboot_failsafe(int timeout_ms)
 {
-    xTaskCreate(&reboot_failsafe_task, "reboot_failsafe", configMINIMAL_STACK_SIZE * 2,
-                (void*)(intptr_t)timeout_ms, configMAX_PRIORITIES - 2, NULL);
+    BaseType_t created = xTaskCreate(&reboot_failsafe_task, "reboot_failsafe", configMINIMAL_STACK_SIZE * 2,
+                                     (void*)(intptr_t)timeout_ms, configMAX_PRIORITIES - 2, NULL);
+    if (created != pdPASS) {
+        // Heap exhaustion (often the very wedge state this guards) can stop the task being created;
+        // log it so a never-completing reboot can be diagnosed instead of failing silently.
+        ESP_LOGE(TAG, "Reboot failsafe task could not be created - a stuck reboot may not self-recover");
+    }
 }
 
 void task_reboot(void *DeleteMainFlow)
@@ -718,6 +723,11 @@ esp_err_t handler_reboot(httpd_req_t *req)
     std::string _est   = _isS3 ? "about 20 seconds" : "about 25-40 seconds";
     std::string _first = _isS3 ? "2500" : "6000";   // ms before the first heartbeat poll
     std::string _ivl   = _isS3 ? "1000" : "1500";   // ms between polls
+    // ms before assuming the device has gone down (safety net for polls that miss the brief offline
+    // window). Must be comfortably AFTER the device actually stops serving - task_reboot delays
+    // 3s + teardown + 3s before esp_restart() - or a still-up device gets flagged down and the next OK
+    // poll navigates away into a reset mid-load. Kept well past that worst case.
+    std::string _downMs = _isS3 ? "11000" : "14000";
 
     std::string response =
         "<!DOCTYPE html><html lang='en'><head>"
@@ -754,9 +764,10 @@ esp_err_t handler_reboot(httpd_req_t *req)
                     ".catch(function(){down=true;again();});}"
                 "function again(){if(n<120){setTimeout(ping," + _ivl + ");}else{"
                     "document.getElementById('msg').textContent='Still waiting - try reloading manually.';}}"
-                // The device is definitely restarting a few seconds in, so flag it 'down' even if our
-                // polls happened to miss the brief offline window - the next OK then reloads (no stall).
-                "setTimeout(function(){down=true;},8000);"
+                // The device is definitely offline by now, so flag it 'down' even if our polls happened to
+                // miss the brief offline window - the next OK then reloads (no stall). Fires only after the
+                // device has surely stopped serving, so it can't navigate away while it's still up.
+                "setTimeout(function(){down=true;}," + _downMs + ");"
                 "window.addEventListener('load',function(){setTimeout(ping," + _first + ");});"
             "</script>"
             "</head><body><div class='card'>"
