@@ -2746,14 +2746,16 @@ function UpdateInputIndividual(sel) {
         ReadParameter(param, "PostProcessing", "GasPipeDiameterMm", true, NUNBERSAkt);
         ReadParameter(param, "PostProcessing", "ServiceAmps", true, NUNBERSAkt);
         // Utility and Leak Detection have no enable checkbox, so ReadParameter cannot derive their
-        // enabled state. Persist them uncommented (else WriteConfigININew comments them out and the
-        // firmware ignores the choice): Leak Detection always; Utility only once a meter type is set.
+        // enabled state. Force them enabled here (the save side) so WriteConfigININew keeps them
+        // uncommented (else the choice is dropped). An unset Meter Type writes an empty Utility, which
+        // the firmware reads as 'Generic' - harmless. (The display side below force-enables them too so
+        // their value fields aren't greyed out on load.)
         var _pp = NUMBERS[NUNBERSAkt] ? NUMBERS[NUNBERSAkt]["PostProcessing"] : null;
         if (_pp && _pp["LeakDetection"]) {
             _pp["LeakDetection"]["enabled"] = true;
         }
         if (_pp && _pp["Utility"]) {
-            _pp["Utility"]["enabled"] = ((_pp["Utility"]["value1"] || "") !== "");
+            _pp["Utility"]["enabled"] = true;
         }
         ReadParameter(param, "InfluxDB", "Field", true, NUNBERSAkt);
         ReadParameter(param, "InfluxDBv2", "Field", true, NUNBERSAkt);
@@ -2764,6 +2766,14 @@ function UpdateInputIndividual(sel) {
 
     // var sel = document.getElementById("Numbers_value1");
     NUNBERSAkt = sel.selectedIndex;
+    // Display side: Utility / Leak Detection have no enable checkbox, so force them enabled for the
+    // number now being shown - otherwise EnDisableItem greys out their value fields and the Meter Type
+    // select is unselectable on initial load (this block always runs; the read-side copy above is
+    // skipped when NUNBERSAkt == -1). The save-side block keeps them uncommented in config.ini.
+    if (NUMBERS[NUNBERSAkt] && NUMBERS[NUNBERSAkt]["PostProcessing"]) {
+        if (NUMBERS[NUNBERSAkt]["PostProcessing"]["LeakDetection"]) { NUMBERS[NUNBERSAkt]["PostProcessing"]["LeakDetection"]["enabled"] = true; }
+        if (NUMBERS[NUNBERSAkt]["PostProcessing"]["Utility"]) { NUMBERS[NUNBERSAkt]["PostProcessing"]["Utility"]["enabled"] = true; }
+    }
     // WriteParameter(param, category, "PostProcessing", "PreValueUse", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "DecimalShift", true, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "AnalogToDigitTransitionStart", true, NUNBERSAkt);
