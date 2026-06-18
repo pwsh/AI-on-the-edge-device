@@ -14,6 +14,7 @@ https://docs.espressif.com/projects/esp-idf/en/latest/esp32/migration-guides/rel
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
+#include "esp_chip_info.h"
 #include "esp_log.h"
 #include <esp_ota_ops.h>
 #include "esp_http_client.h"
@@ -709,6 +710,15 @@ esp_err_t handler_reboot(httpd_req_t *req)
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "handler_reboot");
     LogFile.WriteToFile(ESP_LOG_INFO, TAG, "!!! System will restart within 5 sec!!!");
 
+    // Board-aware reboot estimate + poll cadence: the ESP32-S3 is back in ~10s, while the ESP32-CAM
+    // is slower (camera + SD init). Detect the chip at runtime so the "rebooting" page sets the right
+    // expectation and starts polling sooner on fast boards.
+    esp_chip_info_t _chip; esp_chip_info(&_chip);
+    bool _isS3 = (_chip.model == CHIP_ESP32S3);
+    std::string _est   = _isS3 ? "about 20 seconds" : "about 25-40 seconds";
+    std::string _first = _isS3 ? "2500" : "6000";   // ms before the first heartbeat poll
+    std::string _ivl   = _isS3 ? "1000" : "1500";   // ms between polls
+
     std::string response =
         "<!DOCTYPE html><html lang='en'><head>"
             "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
@@ -742,14 +752,17 @@ esp_err_t handler_reboot(httpd_req_t *req)
                     "fetch('reboot_page.html?_='+Date.now(),{cache:'no-store'})"
                     ".then(function(r){if(r&&r.ok){if(down){done();}else{again();}}else{down=true;again();}})"
                     ".catch(function(){down=true;again();});}"
-                "function again(){if(n<150){setTimeout(ping,2000);}else{"
+                "function again(){if(n<120){setTimeout(ping," + _ivl + ");}else{"
                     "document.getElementById('msg').textContent='Still waiting - try reloading manually.';}}"
-                "window.addEventListener('load',function(){setTimeout(ping,6000);});"
+                // The device is definitely restarting a few seconds in, so flag it 'down' even if our
+                // polls happened to miss the brief offline window - the next OK then reloads (no stall).
+                "setTimeout(function(){down=true;},8000);"
+                "window.addEventListener('load',function(){setTimeout(ping," + _first + ");});"
             "</script>"
             "</head><body><div class='card'>"
                 "<div class='spinner'></div>"
                 "<h3>Rebooting...</h3>"
-                "<p class='sub' id='msg'>This usually takes about 25-60 seconds.</p>"
+                "<p class='sub' id='msg'>This usually takes " + _est + ".</p>"
                 "<div class='bar'><i></i></div>"
             "</div></body></html>";
 
