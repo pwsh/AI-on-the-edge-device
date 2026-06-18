@@ -2771,8 +2771,14 @@ function UpdateInputIndividual(sel) {
     // select is unselectable on initial load (this block always runs; the read-side copy above is
     // skipped when NUNBERSAkt == -1). The save-side block keeps them uncommented in config.ini.
     if (NUMBERS[NUNBERSAkt] && NUMBERS[NUNBERSAkt]["PostProcessing"]) {
-        if (NUMBERS[NUNBERSAkt]["PostProcessing"]["LeakDetection"]) { NUMBERS[NUNBERSAkt]["PostProcessing"]["LeakDetection"]["enabled"] = true; }
-        if (NUMBERS[NUNBERSAkt]["PostProcessing"]["Utility"]) { NUMBERS[NUNBERSAkt]["PostProcessing"]["Utility"]["enabled"] = true; }
+        var _ppd = NUMBERS[NUNBERSAkt]["PostProcessing"];
+        if (_ppd["LeakDetection"]) { _ppd["LeakDetection"]["enabled"] = true; }
+        if (_ppd["Utility"]) { _ppd["Utility"]["enabled"] = true; }
+        // Auto-enable the Expert sub-field matching the saved Meter Type so it's editable on load
+        // (Water -> Water Pipe Diameter, Gas -> Gas pipe, Electricity -> Service A).
+        var _um = { water: "WaterPipeDiameterMm", gas: "GasPipeDiameterMm", electricity: "ServiceAmps" };
+        var _uv = _ppd["Utility"] ? (_ppd["Utility"]["value1"] || "") : "";
+        if (_um[_uv] && _ppd[_um[_uv]]) { _ppd[_um[_uv]]["enabled"] = true; }
     }
     // WriteParameter(param, category, "PostProcessing", "PreValueUse", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "DecimalShift", true, NUNBERSAkt);
@@ -3711,6 +3717,12 @@ function populateMaxRateFromUtility() {
     var uEl = document.getElementById("PostProcessing_Utility_value1");
     if (!uEl) return;
     var u = uEl.value;
+    // Auto-enable (tick) the Expert sub-field matching the chosen Meter Type so it becomes editable.
+    var _subMap = { water: "WaterPipeDiameterMm", gas: "GasPipeDiameterMm", electricity: "ServiceAmps" };
+    if (_subMap[u]) {
+        var _scb = document.getElementById("PostProcessing_" + _subMap[u] + "_enabled");
+        if (_scb && !_scb.checked) { _scb.checked = true; InvertEnableItem("PostProcessing", _subMap[u]); }
+    }
     var rate = null;
     if (u === "water") {
         var dwin = (parseFloat(document.getElementById("PostProcessing_WaterPipeDiameterMm_value1").value) || 25.4) / 25.4;
