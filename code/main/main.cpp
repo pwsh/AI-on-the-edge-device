@@ -1218,18 +1218,18 @@ bool setCpuFrequency(void) {
         return false;
     }
 
-    while (configFile.getNextLine(&line, disabledLine, eof) && 
+    bool dfsEnabled = false;          // config "DynamicFrequencyScaling" ([System]); default off
+    while (configFile.getNextLine(&line, disabledLine, eof) &&
             !configFile.isNewParagraph(line)) {
+        if (disabledLine) { continue; }   // a commented (disabled) line -> keep the default
         splitted = ZerlegeZeile(line);
+        if (splitted.size() < 2) { continue; }
 
         if (toUpper(splitted[0]) == "CPUFREQUENCY") {
-            if (splitted.size() < 2) {
-                cpuFrequency = "160";
-            }
-            else {
-                cpuFrequency = splitted[1];
-            }
-            break;
+            cpuFrequency = splitted[1];
+        }
+        else if (toUpper(splitted[0]) == "DYNAMICFREQUENCYSCALING") {
+            dfsEnabled = alphanumericToBoolean(splitted[1]);
         }
     }
 
@@ -1237,11 +1237,6 @@ bool setCpuFrequency(void) {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to read CPU Frequency!");
         return false;
     }
-
-    // The chip's CURRENT (boot / sdkconfig-default) max frequency. This is NOT always 160: the
-    // ESP32-S3 boots at 240 (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240), so a configured "160" must still be
-    // applied. Captured before we overwrite pm_config.max_freq_mhz below.
-    int currentMaxFreq = pm_config.max_freq_mhz;
 
     int maxFreq;
     if (cpuFrequency == "80") {
@@ -1260,30 +1255,40 @@ bool setCpuFrequency(void) {
     }
 
     pm_config.max_freq_mhz = maxFreq;
-#ifdef ENABLE_DYNAMIC_FREQ_SCALING
-    // DFS (opt-in, see defines.h): let the CPU down-clock to 80 MHz when idle to save power between
-    // rounds. Light sleep is intentionally NOT enabled (web server / MQTT stay responsive).
-    // VALIDATE ON HARDWARE: DFS scales the APB clock and the camera XCLK (LEDC) can drift, which may
-    // cause image artifacts -> bad reads. Disable this if image quality degrades.
-    pm_config.min_freq_mhz = 80;
-    LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Dynamic Frequency Scaling ENABLED (min 80 MHz). "
-            "Verify camera image quality - DFS can affect the camera XCLK.");
-#else
-    pm_config.min_freq_mhz = maxFreq;   // fixed frequency (no scaling) - default behavior
+
+#if !defined(CONFIG_IDF_TARGET_ESP32S3)
+    // DFS is only feasible on the ESP32-S3: its LEDC can source the 20 MHz camera XCLK from the
+    // DFS-independent 40 MHz XTAL. On the classic ESP32 / ESP32-CAM the XCLK can only come from APB, so
+    // scaling APB corrupts captures - force DFS off there regardless of config.
+    if (dfsEnabled) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Dynamic Frequency Scaling is ESP32-S3 only (the camera "
+                "XCLK is sourced from APB on this chip) - ignoring it.");
+        dfsEnabled = false;
+    }
 #endif
 
-    // Apply whenever the requested config differs from the chip's CURRENT PM config (don't assume the
-    // boot default is 160 - it is 240 on the ESP32-S3, which made a configured 160 silently ignored so
-    // the device ran at 240 regardless of the setting).
-    if ((maxFreq != currentMaxFreq) || (pm_config.min_freq_mhz != maxFreq)) {
-        if (esp_pm_configure(&pm_config) != ESP_OK) {
-            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to set new CPU frequency / PM config!");
-            return false;
-        }
+    // Dynamic Frequency Scaling (config "DynamicFrequencyScaling"): when enabled the CPU down-clocks to
+    // 80 MHz when idle (between rounds) and scales back up under load; disabled = fixed at max. Was a
+    // compile-time flag, now runtime. VALIDATE ON HARDWARE: DFS scales the APB clock and the camera XCLK
+    // (LEDC) can drift -> possible image artifacts; disable if image quality degrades.
+    pm_config.min_freq_mhz = dfsEnabled ? 80 : maxFreq;
+    pm_config.light_sleep_enable = false;   // never: needs tickless idle, unavailable on dual-core SMP FreeRTOS
+
+    if (dfsEnabled) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Dynamic Frequency Scaling ENABLED (min 80 MHz). "
+                "Verify camera image quality - DFS can affect the camera XCLK.");
+    }
+
+    // Always apply: honours the configured frequency on every board (the S3 boots at 240, so a configured
+    // 160 must still be applied) and applies the DFS setting. esp_pm_configure is idempotent.
+    if (esp_pm_configure(&pm_config) != ESP_OK) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to set CPU frequency / PM config!");
+        return false;
     }
 
     if (esp_pm_get_configuration(&pm_config) == ESP_OK) {
-        LogFile.WriteToFile(ESP_LOG_INFO, TAG, string("CPU frequency: ") + to_string(pm_config.max_freq_mhz) + " MHz");
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, string("CPU frequency: ") + to_string(pm_config.max_freq_mhz) +
+                " MHz (DFS " + (dfsEnabled ? "on" : "off") + ")");
     }
 
     return true;

@@ -2513,6 +2513,20 @@
             <td>$TOOLTIP_System_CPUFrequency</td>
         </tr>
 
+        <tr class="expert" unused_id="System_DynamicFrequencyScaling">
+            <td class="indent1">
+                <input type="checkbox" id="System_DynamicFrequencyScaling_enabled" value="1"  onclick = 'InvertEnableItem("System", "DynamicFrequencyScaling")' unchecked >
+                <label for=System_DynamicFrequencyScaling_enabled><class id="System_DynamicFrequencyScaling_text" style="color:black;">Dynamic Frequency Scaling (ESP32-S3 only)</class></label>
+            </td>
+            <td>
+                <select id="System_DynamicFrequencyScaling_value1">
+                    <option value="true">Enabled</option>
+                    <option value="false" selected>Disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_System_DynamicFrequencyScaling</td>
+        </tr>
+
         <tr class="expert" unused_id="System_BackupInterval">
             <td class="indent1">
                 <input type="checkbox" id="System_BackupInterval_enabled" value="1"  onclick = 'InvertEnableItem("System", "BackupInterval")' unchecked >
@@ -3014,6 +3028,7 @@ function UpdateInput() {
     WriteParameter(param, category, "System", "TimeServer", true);
     WriteParameter(param, category, "System", "RSSIThreshold", true);
     WriteParameter(param, category, "System", "CPUFrequency", true);
+    WriteParameter(param, category, "System", "DynamicFrequencyScaling", true);
 
     WriteModelFiles();
 }
@@ -3388,6 +3403,7 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "TimeServer", true);
     ReadParameter(param, "System", "RSSIThreshold", true);
     ReadParameter(param, "System", "CPUFrequency", true);
+    ReadParameter(param, "System", "DynamicFrequencyScaling", true);
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);

@@ -358,6 +358,7 @@ function ParseConfig() {
     ParamAddValue(param, catname, "Hostname");   
     ParamAddValue(param, catname, "RSSIThreshold");   
     ParamAddValue(param, catname, "CPUFrequency");
+    ParamAddValue(param, catname, "DynamicFrequencyScaling");
     ParamAddValue(param, catname, "SetupMode");
     ParamAddValue(param, catname, "BackupInterval");
 
