@@ -11,6 +11,7 @@
 #include "ClassLogFile.h"
 #include "Helper.h"
 #include "esp_log.h"
+#include <esp_timer.h>   // esp_timer_get_time() for FastRead timing instrumentation
 #include "../../include/defines.h"
 
 static const char* TAG = "CNN";
@@ -713,7 +714,11 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
         return true;
     }
 
-    CAlignAndCutImage *caic = flowpostalignment->GetAlignAndCutImage();    
+    // Timing: the cut+resize of every ROI runs every round regardless of FastRead (FastRead only skips
+    // the CNN inference, not this step), so measure the cost FastRead can never avoid.
+    int64_t _acT0 = esp_timer_get_time();
+
+    CAlignAndCutImage *caic = flowpostalignment->GetAlignAndCutImage();
 
     for (int _ana = 0; _ana < GENERAL.size(); ++_ana) {
         for (int i = 0; i < GENERAL[_ana]->ROI.size(); ++i) {
@@ -741,8 +746,11 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
         }
     }
 
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "doAlignAndCut: cut+resize all ROIs in " +
+        std::to_string((int)((esp_timer_get_time() - _acT0) / 1000)) + " ms");
+
     return true;
-} 
+}
 
 void ClassFlowCNNGeneral::DrawROI(CImageBasis *_zw) {
     if (_zw->ImageOkay()) { 
@@ -847,6 +855,14 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         return true;
     }
 
+    // --- FastRead timing instrumentation (see the per-round summary at the end of this function) -------
+    int64_t _nnT0      = esp_timer_get_time();   // whole doNeuralNetwork
+    int64_t _nnModelUs = 0;                      // model LoadModel + MakeAllocate (paid every round)
+    int64_t _nnInferUs = 0;                      // accumulated CNN inference time
+    int64_t _nnDiffUs  = 0;                      // accumulated FastRead pixel-diff time
+    int     _nnInferCnt = 0;                     // inferences actually run this round
+    int     _nnDiffCnt  = 0;                     // FastRead diffs computed this round
+
     string logPath = CreateLogFolder(time);
 
     string zwcnn = "/sdcard" + cnnmodelfile;
@@ -860,6 +876,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
     // model's flatbuffer/arena, so the next inference dereferenced garbage in interpreter->input()
     // and panicked. Loading per cycle keeps the shared region correctly time-multiplexed. FastRead
     // still saves work by skipping the inference for unchanged digits.
+    int64_t _nnM0 = esp_timer_get_time();
     CTfLiteClass *tflite;
     tflite = new CTfLiteClass;
     if (!tflite->LoadModel(zwcnn)) {
@@ -874,6 +891,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
         delete tflite;
         return false;
     }
+    // Model load+allocate is paid every round even when FastRead reuses every digit (the arena lives in
+    // the shared PSRAM region and can't be kept resident) - this is the headline FastRead inefficiency.
+    _nnModelUs = esp_timer_get_time() - _nnM0;
 
     // Decide whether this cycle re-reads every digit (full validation) or may reuse the
     // FastRead cache. A full pass runs when FastRead is off, when externally triggered
@@ -919,7 +939,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         f1 = 0; f2 = 0;
 
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
+                        int64_t _ti = esp_timer_get_time();
                         tflite->Invoke();
+                        _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
                         LOGD(TAG, "After Invoke");
 
                         f1 = tflite->GetOutputValue(0);
@@ -957,19 +979,26 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         // FastRead gate: if this digit's pixels are unchanged vs the last real
                         // inference, reuse the cached class and skip the tflite Invoke entirely.
-                        if (FastReadEnabled && !forceAllThisCycle &&
-                            GENERAL[n]->ROI[roi]->fastCacheValid &&
-                            (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
-                            GENERAL[n]->ROI[roi]->result_klasse = GENERAL[n]->ROI[roi]->fastCacheClass;
-                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
-                                "' unchanged -> reuse class " + std::to_string(GENERAL[n]->ROI[roi]->result_klasse));
-                            break;
+                        if (FastReadEnabled && !forceAllThisCycle && GENERAL[n]->ROI[roi]->fastCacheValid) {
+                            int64_t _td = esp_timer_get_time();
+                            int _frDiff = fastReadMeanDiff(GENERAL[n]->ROI[roi]);
+                            _nnDiffUs += esp_timer_get_time() - _td; _nnDiffCnt++;
+                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name + "' meanDiff=" +
+                                std::to_string(_frDiff) + " (threshold " + std::to_string(FastReadDiffThreshold) + ")");
+                            if (_frDiff < FastReadDiffThreshold) {
+                                GENERAL[n]->ROI[roi]->result_klasse = GENERAL[n]->ROI[roi]->fastCacheClass;
+                                LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                                    "' unchanged -> reuse class " + std::to_string(GENERAL[n]->ROI[roi]->result_klasse));
+                                break;
+                            }
                         }
 
                         _digitsAnalyzed++;
                         float _digitConf = 1.0f;
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
+                        int64_t _ti = esp_timer_get_time();
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image, &_digitConf);
+                        _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
                         GENERAL[n]->ROI[roi]->result_confidence = _digitConf;
                         ESP_LOGD(TAG, "General result (Digit)%i: %d (conf %.2f)", roi, GENERAL[n]->ROI[roi]->result_klasse, _digitConf);
 
@@ -1006,7 +1035,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         float _result_save_file;
 
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
+                        int64_t _ti = esp_timer_get_time();
                         tflite->Invoke();
+                        _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
                         LOGD(TAG, "After Invoke");
 
                         _num = tflite->GetOutClassification(0, 9);
@@ -1081,20 +1112,28 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         }
                         // FastRead gate: only for the digital variant (Digit100), never for Analogue100.
                         if ((CNNType == Digit100) && FastReadEnabled && !forceAllThisCycle &&
-                            GENERAL[n]->ROI[roi]->fastCacheValid &&
-                            (fastReadMeanDiff(GENERAL[n]->ROI[roi]) < FastReadDiffThreshold)) {
-                            GENERAL[n]->ROI[roi]->result_float = GENERAL[n]->ROI[roi]->fastCacheFloat;
-                            GENERAL[n]->ROI[roi]->isReject = false;
-                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
-                                "' unchanged -> reuse value " + std::to_string(GENERAL[n]->ROI[roi]->result_float));
-                            break;
+                            GENERAL[n]->ROI[roi]->fastCacheValid) {
+                            int64_t _td = esp_timer_get_time();
+                            int _frDiff = fastReadMeanDiff(GENERAL[n]->ROI[roi]);
+                            _nnDiffUs += esp_timer_get_time() - _td; _nnDiffCnt++;
+                            LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name + "' meanDiff=" +
+                                std::to_string(_frDiff) + " (threshold " + std::to_string(FastReadDiffThreshold) + ")");
+                            if (_frDiff < FastReadDiffThreshold) {
+                                GENERAL[n]->ROI[roi]->result_float = GENERAL[n]->ROI[roi]->fastCacheFloat;
+                                GENERAL[n]->ROI[roi]->isReject = false;
+                                LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name +
+                                    "' unchanged -> reuse value " + std::to_string(GENERAL[n]->ROI[roi]->result_float));
+                                break;
+                            }
                         }
 
                         if (CNNType == Digit100) {
                             _digitsAnalyzed++;
                         }
+                        int64_t _ti = esp_timer_get_time();
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         tflite->Invoke();
+                        _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
 
                         _num = tflite->GetOutClassification();
 
@@ -1145,6 +1184,18 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
     // Free the model now: it lives in the shared PSRAM region that TakeImage reuses next round, so
     // it must not be kept resident across cycles (that is what corrupted it and crashed inference).
     delete tflite;
+
+    // FastRead timing summary for this round (digital CNN only). On a "fast" round, infer ~= 0 and
+    // total ~= modelLoad - i.e. the per-round model load is the cost FastRead cannot currently avoid.
+    if (isDigitalCNN()) {
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG,
+            "FastRead timing [" + std::string(forceAllThisCycle ? "FULL" : "fast") + "]: total=" +
+            std::to_string((int)((esp_timer_get_time() - _nnT0) / 1000)) + "ms, modelLoad=" +
+            std::to_string((int)(_nnModelUs / 1000)) + "ms, infer=" +
+            std::to_string((int)(_nnInferUs / 1000)) + "ms(" + std::to_string(_nnInferCnt) + "x), diff=" +
+            std::to_string((int)_nnDiffUs) + "us(" + std::to_string(_nnDiffCnt) + "x), digits=" +
+            std::to_string(_digitsAnalyzed) + "/" + std::to_string(_digitsTotal));
+    }
 
     return true;
 }
