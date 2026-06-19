@@ -1020,6 +1020,23 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             GENERAL[n]->ROI[roi]->hist.addConfident(GENERAL[n]->ROI[roi]->result_klasse);
                         }
 
+                        // 4.2: temporal voting. If this digit read IN-RANGE but BELOW the confidence floor,
+                        // and its recent history holds a strong majority (>half the samples agree -> the
+                        // digit has been stable), prefer that majority over the shaky single read. majority()
+                        // fails for a genuinely changing digit (mixed history), so a real roll keeps its fresh
+                        // read and is not masked. Only the reported value is changed; the low confidence still
+                        // blocks caching (4.1), so next round re-reads from the CNN.
+                        if ((_digitConf < DigitHistoryConfidenceFloor) &&
+                            (GENERAL[n]->ROI[roi]->result_klasse >= 0) && (GENERAL[n]->ROI[roi]->result_klasse < 10)) {
+                            int _maj;
+                            if (GENERAL[n]->ROI[roi]->hist.majority(_maj) && (_maj != GENERAL[n]->ROI[roi]->result_klasse)) {
+                                LOGD(TAG, "TemporalVote: ROI '" + GENERAL[n]->ROI[roi]->name + "' low-conf read " +
+                                    std::to_string(GENERAL[n]->ROI[roi]->result_klasse) + " (conf " + std::to_string(_digitConf) +
+                                    ") -> stable history majority " + std::to_string(_maj));
+                                GENERAL[n]->ROI[roi]->result_klasse = _maj;
+                            }
+                        }
+
                         if (FastReadEnabled || PredictiveReadEnabled) {
                             // 4.1: only cache CONFIDENT reads (same 0.70 floor used for the history matrix).
                             // A low-confidence read (glare/blur/partial roll) must not be cached, or FastRead
