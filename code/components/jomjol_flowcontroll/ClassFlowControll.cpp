@@ -566,6 +566,7 @@ bool ClassFlowControll::doFlow(string time)
 
     // Diagnostics: total round timing for performance monitoring (DEBUG level).
     int64_t round_start_us = esp_timer_get_time();
+    std::string _roundSteps = "";   // per-step ms, accumulated for the round-timing INFO summary
 
     for (int i = 0; i < FlowControll.size(); ++i) {
         zw_time = getCurrentTimeString("%H:%M:%S");
@@ -646,6 +647,13 @@ bool ClassFlowControll::doFlow(string time)
             " KB (d" + to_string(heap_delta) + "), psram " + to_string(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) +
             " KB (d" + to_string(psram_delta) + ")");
 
+        // Round-timing INFO breakdown: accumulate each step's ms (short name; "ClassFlow" prefix stripped).
+        {
+            std::string _sn = FlowControll[i]->name();
+            if (_sn.rfind("ClassFlow", 0) == 0) { _sn = _sn.substr(9); }
+            _roundSteps += (_roundSteps.empty() ? "" : " ") + _sn + "=" + to_string(step_ms) + "ms";
+        }
+
         #ifdef DEBUG_DETAIL_ON
             LogFile.WriteHeapInfo("ClassFlowControll::doFlow");
         #endif
@@ -653,6 +661,8 @@ bool ClassFlowControll::doFlow(string time)
 
     int64_t round_ms = (esp_timer_get_time() - round_start_us) / 1000;
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Diag: full flow round took " + to_string(round_ms) + " ms");
+    // Full-round breakdown at INFO (one line/round; the two CNNGeneral entries are digit then analog).
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Round timing: total=" + to_string(round_ms) + "ms [" + _roundSteps + "]");
 
     zw_time = getCurrentTimeString("%H:%M:%S");
     aktstatus = "Flow finished";
