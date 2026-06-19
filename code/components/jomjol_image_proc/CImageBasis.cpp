@@ -769,12 +769,38 @@ void CImageBasis::Resize(int _new_dx, int _new_dy, CImageBasis *_target)
     RGBImageLock();
 
     uint8_t* odata = _target->rgb_image;
-    // Fast resize kernel: bilinear (TRIANGLE) instead of stb's default high-quality Mitchell/cubic.
-    // This is the hot ROI-cut -> model-input downscale (measured ~15 ms/ROI, ~177 ms/round with the
-    // default filter); bilinear is far cheaper and accurate enough for the small digit/analog tiles the
-    // CNN reads. Swap STBIR_FILTER_TRIANGLE -> STBIR_FILTER_BOX for max speed if accuracy holds.
-    stbir_resize_uint8_generic(rgb_image, width, height, 0, odata, _new_dx, _new_dy, 0, channels,
-                               -1, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_TRIANGLE, STBIR_COLORSPACE_LINEAR, NULL);
+    // Purpose-built bilinear downscale for the hot ROI-cut -> model-input path. stb's generic resizer
+    // was overhead-bound for these tiny fixed-size tiles (~11-15 ms/ROI, ~131-177 ms/round - dominated
+    // by its per-call coefficient/buffer setup, not the filtering). This direct loop has no per-call
+    // allocation or setup, so it runs in microseconds per ROI. Pixel-center mapped, edge-clamped.
+    const uint8_t *src = rgb_image;
+    const int sw = width, sh = height, ch = channels;
+    const float scaleX = (float)sw / (float)_new_dx;
+    const float scaleY = (float)sh / (float)_new_dy;
+    for (int dy = 0; dy < _new_dy; ++dy) {
+        float sy = (dy + 0.5f) * scaleY - 0.5f;
+        int y0 = (int)floorf(sy);
+        float fy = sy - (float)y0;
+        int y0c = y0 < 0 ? 0 : (y0 >= sh ? sh - 1 : y0);
+        int y1c = (y0 + 1) < 0 ? 0 : ((y0 + 1) >= sh ? sh - 1 : (y0 + 1));
+        const uint8_t *row0 = src + (size_t)y0c * sw * ch;
+        const uint8_t *row1 = src + (size_t)y1c * sw * ch;
+        uint8_t *drow = odata + (size_t)dy * _new_dx * ch;
+        for (int dx = 0; dx < _new_dx; ++dx) {
+            float sx = (dx + 0.5f) * scaleX - 0.5f;
+            int x0 = (int)floorf(sx);
+            float fx = sx - (float)x0;
+            int x0c = x0 < 0 ? 0 : (x0 >= sw ? sw - 1 : x0);
+            int x1c = (x0 + 1) < 0 ? 0 : ((x0 + 1) >= sw ? sw - 1 : (x0 + 1));
+            for (int c = 0; c < ch; ++c) {
+                float p00 = row0[x0c * ch + c], p01 = row0[x1c * ch + c];
+                float p10 = row1[x0c * ch + c], p11 = row1[x1c * ch + c];
+                float top = p00 + (p01 - p00) * fx;
+                float bot = p10 + (p11 - p10) * fx;
+                drow[dx * ch + c] = (uint8_t)(top + (bot - top) * fy + 0.5f);
+            }
+        }
+    }
 
     RGBImageRelease();
 }
