@@ -4,7 +4,7 @@ Waiting time between switching the flash light (onboard LED) on and taking the p
 
 Unit: seconds
 
-Default Value: `5`
+Default Value: `2`
 
 !!! Warning
     This is an **Expert Parameter**! Only change it if you understand what it does!

@@ -19,8 +19,9 @@ Correctness safeguards:
 - A full re-read of every digit is forced periodically (see
   [FastReadFullInterval](FastReadFullInterval.md)) and whenever post-processing requests
   a full validation (e.g. on a consistency failure).
-- With FastRead the tflite model is kept loaded between cycles, which uses more heap but
-  removes the per-cycle model load/allocate overhead.
+- FastRead does not keep the model resident; the tflite model is still loaded and freed
+  each cycle. The saving comes purely from skipping the CNN inference on unchanged digits,
+  not from avoiding the model load.
 
 !!! Note
     This only affects digit ROIs (`Digit` and `dig-class100` models). Analog ROIs are

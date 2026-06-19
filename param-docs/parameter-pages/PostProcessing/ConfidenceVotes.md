@@ -1,7 +1,7 @@
 # Parameter `ConfidenceVotes`
 Default Value: `3`
 
-Range: `0` (off) .. `10`.
+Range: `0` (off) or any positive integer (number of confirming reads required).
 
 Confidence vote to recover from a value that got **stuck high**.
 

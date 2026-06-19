@@ -7,4 +7,4 @@ Default Value: `0.5`
 Threshold above which the classification should be to accept the value (only meaningful for digits).
 
 !!! Warning
-    This is only supported for the `dig-class100` models!
+    This is only used by the **continuous** `dig-cont` models; the `dig-class100` models ignore it.

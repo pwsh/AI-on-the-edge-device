@@ -2,7 +2,7 @@
 
 **Image-Contrast**
 
-Range (`-2` .. `2`)
+Range: `-2` .. `2` (OV2640) / `-3` .. `3` (OV3660, OV5640)
 
 Default Value: `0`
 

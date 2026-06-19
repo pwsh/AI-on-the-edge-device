@@ -7,4 +7,4 @@ Default Value: `0.5`
 Threshold above which the classification should be to accept the value (only meaningful for digits).
 
 !!! Warning
-    This is only supported for the `ana-class100` models!
+    This is only used by the **continuous** `ana-cont` model.
