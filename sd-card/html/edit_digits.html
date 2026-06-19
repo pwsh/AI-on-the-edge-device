@@ -156,7 +156,10 @@
                 (only based on order)
             </td>
             <td class="multiplier">Multiplier: <output type="text" id="multiplier_decshift" name="multiplier_decshift"></output><br>
-                (order + decimal shift: <output type="text" id="decimalShift" name="decimalShift"></output>)
+                (order + decimal shift:
+                <input type="number" id="decimalShift" name="decimalShift" step="1" style="width:4em;"
+                    title="Decimal Shift for this number sequence - applies immediately to the preview and is saved with the ROIs"
+                    oninput="decimalShiftChanged()">)
             </td>
             <td>
 				<input class="button" type="submit" id="movePrevious" onclick="movePrevious()" value="Move ROI Higher">
@@ -561,25 +564,51 @@
         firework.launch('Configuration saved. It will get applied after the next reboot!<br><br>\n<a id="reboot_button" onclick="doReboot()">reboot now</a>', 'success', 5000);
     }
 
+    // Per-number PostProcessing object for the currently-selected number sequence. getNUMBERInfo()
+    // returns NUMBERS by reference, so edits made through this persist into the saved config.
+    function getCurrentNumberPP() {
+        var sel = document.getElementById("Numbers_value1");
+        if (!sel || sel.selectedIndex < 0) { return null; }
+        var _number = sel.options[sel.selectedIndex].text;
+        var ni = getNUMBERInfo();
+        for (var i = 0; i < ni.length; ++i) {
+            if (ni[i]["name"] == _number && ni[i]["PostProcessing"]) { return ni[i]["PostProcessing"]; }
+        }
+        return null;
+    }
+
+    // User edited the Decimal Shift field in the ROI setup: store it on the current number sequence
+    // (enabled, so the firmware actually applies it and it is saved), refresh the live preview, and mark
+    // the config dirty. This is what makes the decimal shift apply from the ROI screen.
+    function decimalShiftChanged() {
+        var el = document.getElementById("decimalShift");
+        var pp = getCurrentNumberPP();
+        var v = parseInt(el.value);
+        if (pp && pp["DecimalShift"] && !isNaN(v)) {
+            pp["DecimalShift"]["value1"] = String(v);
+            pp["DecimalShift"]["enabled"] = true;
+            pp["DecimalShift"]["found"] = true;
+            var sv = document.getElementById("saveroi"); if (sv) { sv.disabled = false; }
+        }
+        ShowMultiplier();
+    }
+
     function ShowMultiplier() {
-        var decimalShift = 0;
         var multiplier;
         var multiplier_decshift;
         var fixedDecimals_decshift;
-        var NumberInfo = getNUMBERInfo();
 
-        var sel = document.getElementById("Numbers_value1");
-        var _number= sel.options[sel.selectedIndex].text;
-        document.getElementById("decimalShift").value = 0;
-        
-        for (var i = 0; i < NumberInfo.length; ++i) {
-            if (NumberInfo[i]["name"] == _number) {
-                if (NumberInfo[i]["PostProcessing"]["DecimalShift"]["enabled"]) {
-                    decimalShift = NumberInfo[i]["PostProcessing"]["DecimalShift"]["value1"];
-                    document.getElementById("decimalShift").value = decimalShift; 
-                }
-            }
+        // Effective decimal shift for this number sequence = the per-number value when enabled, else 0
+        // (matches the firmware, which ignores a disabled/commented DecimalShift). Editing the field
+        // below enables it. Don't clobber the field while the user is typing in it.
+        var decimalShift = 0;
+        var pp = getCurrentNumberPP();
+        if (pp && pp["DecimalShift"] && pp["DecimalShift"]["enabled"]) {
+            var _v = parseInt(pp["DecimalShift"]["value1"]);
+            if (!isNaN(_v)) { decimalShift = _v; }
         }
+        var dsEl = document.getElementById("decimalShift");
+        if (dsEl && document.activeElement !== dsEl) { dsEl.value = decimalShift; }
 
         multiplier = ROIInfo.length - 1 - aktindex;
         multiplier_decshift = fixedDecimals_decshift = multiplier + Number(decimalShift);
