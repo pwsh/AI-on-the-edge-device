@@ -1244,7 +1244,10 @@ bool setCpuFrequency(void) {
     int currentMaxFreq = pm_config.max_freq_mhz;
 
     int maxFreq;
-    if (cpuFrequency == "160") {
+    if (cpuFrequency == "80") {
+        maxFreq = 80;
+    }
+    else if (cpuFrequency == "160") {
         maxFreq = 160;
     }
     else if (cpuFrequency == "240") {
@@ -1252,7 +1255,7 @@ bool setCpuFrequency(void) {
     }
     else {
         LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Unknown CPU frequency: " + cpuFrequency + "! "
-                "It must be 160 or 240!");
+                "It must be 80, 160 or 240!");
         return false;
     }
 
