@@ -98,14 +98,25 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
         return false;
     }
 
+    // Tracks an explicit "RawImages = true/false" toggle so it wins regardless of line order; -1 = unset.
+    int rawImagesExplicit = -1;
+
     while (this->getNextLine(pfile, &aktparamgraph) && !this->isNewParagraph(aktparamgraph))
     {
         splitted = ZerlegeZeile(aktparamgraph);
 
-        if ((toUpper(splitted[0]) == "RAWIMAGESLOCATION") && (splitted.size() > 1))
+        if ((toUpper(splitted[0]) == "RAWIMAGES") && (splitted.size() > 1))
+        {
+            // Explicit master on/off for saving raw images. Wins over the legacy "a location implies on"
+            // behaviour below, regardless of line order. With no location set, images go to the default.
+            rawImagesExplicit = alphanumericToBoolean(splitted[1]) ? 1 : 0;
+            isLogImage = (rawImagesExplicit == 1);
+        }
+
+        else if ((toUpper(splitted[0]) == "RAWIMAGESLOCATION") && (splitted.size() > 1))
         {
             imagesLocation = "/sdcard" + splitted[1];
-            isLogImage = true;
+            if (rawImagesExplicit == -1) isLogImage = true;   // back-compat: a configured location enables saving unless RawImages overrides
         }
 
         else if ((toUpper(splitted[0]) == "RAWIMAGESRETENTION") && (splitted.size() > 1))

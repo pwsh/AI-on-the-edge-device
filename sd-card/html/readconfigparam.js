@@ -100,6 +100,7 @@ function ParseConfig() {
     category[catname]["enabled"] = false;
     category[catname]["found"] = false;
     param[catname] = new Object();
+    ParamAddValue(param, catname, "RawImages", 1, false, "false");   // master on/off for saving raw images
     ParamAddValue(param, catname, "RawImagesLocation");
     ParamAddValue(param, catname, "RawImagesRetention");
     ParamAddValue(param, catname, "WaitBeforeTakingPicture");
@@ -558,6 +559,7 @@ function getCamConfig() {
     param["System"]["Tooltip"]["enabled"] = true;
     param["Alignment"]["InitialRotate"]["enabled"] = true;
 			
+    param["TakeImage"]["RawImages"]["enabled"] = true;   // no enable checkbox - keep the select editable
     param["TakeImage"]["WaitBeforeTakingPicture"]["enabled"] = true;
     param["TakeImage"]["CamGainceiling"]["enabled"] = true;		// Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)
     param["TakeImage"]["CamQuality"]["enabled"] = true;    		// 0 - 63

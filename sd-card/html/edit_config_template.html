@@ -403,6 +403,19 @@
 
         <tr>
             <td class="indent1">
+                <label><class id="TakeImage_RawImages_text" style="color:black;">Save Raw Images</class></label>
+            </td>
+            <td>
+                <select id="TakeImage_RawImages_value1">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_TakeImage_RawImages</td>
+        </tr>
+
+        <tr>
+            <td class="indent1">
                 <input type="checkbox" id="TakeImage_RawImagesLocation_enabled" value="1" onclick='InvertEnableItem("TakeImage", "RawImagesLocation")' unchecked >
                 <label for=TakeImage_RawImagesLocation_enabled><class id="TakeImage_RawImagesLocation_text" style="color:black;">Raw Images Location</class></label>
             </td>
@@ -2853,6 +2866,7 @@ function UpdateInput() {
     document.getElementById("Category_Webhook_enabled").checked = category["Webhook"]["enabled"];
     setVisible("WebhookItem", category["Webhook"]["enabled"]);
 
+    WriteParameter(param, category, "TakeImage", "RawImages", false);
     WriteParameter(param, category, "TakeImage", "RawImagesLocation", true);
     WriteParameter(param, category, "TakeImage", "RawImagesRetention", true);
 
@@ -3208,6 +3222,7 @@ function ReadParameterAll() {
     category["Webhook"]["enabled"] = document.getElementById("Category_Webhook_enabled").checked;
     category["GPIO"]["enabled"] = document.getElementById("Category_GPIO_enabled").checked;
 
+    ReadParameter(param, "TakeImage", "RawImages", false);
     ReadParameter(param, "TakeImage", "RawImagesLocation", true);
     ReadParameter(param, "TakeImage", "RawImagesRetention", true);
     ReadParameter(param, "TakeImage", "WaitBeforeTakingPicture", false);
