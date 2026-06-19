@@ -88,6 +88,12 @@
 
 
 <div id="div1">
+    <p>
+        <label for="Analog_Model_value1" style="font-weight: bold;">Model:</label>
+        <select id="Analog_Model_value1" style="min-width:260px; max-width:90%;" onchange="modelChanged()"></select>
+        <span style="font-size:.85em; color:#888; margin-left:6px;">CNN model used to read the analog ROIs (applied after the next reboot)</span>
+    </p>
+
     <table>
         <colgroup>
             <col span="1" style="width: 22%;">
@@ -471,9 +477,50 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         UpdateROIs();
     }
 
+    // --- Model selection (the CNN model used to read the analog ROIs) --------------
+    function populateModelSelect() {
+        var sel = document.getElementById("Analog_Model_value1");
+        if (!sel || typeof getTFLITEList !== "function") { return; }
+        var list = getTFLITEList();
+        while (sel.length) { sel.remove(0); }
+        for (var i = 0; i < list.length; ++i) {
+            if (!list[i] || list[i].includes("/dig")) { continue; }   // analog + generic models only
+            var opt = document.createElement("option");
+            opt.text = list[i].replace("/config/", "");
+            opt.value = list[i];
+            sel.add(opt);
+        }
+        var cur = (param["Analog"] && param["Analog"]["Model"]) ? param["Analog"]["Model"]["value1"] : "";
+        if (cur) {
+            var has = false;
+            for (var j = 0; j < sel.options.length; ++j) { if (sel.options[j].value === cur) { has = true; break; } }
+            if (!has) {   // configured model not on the SD card (e.g. deleted) - keep it so saving doesn't drop it
+                var o = document.createElement("option");
+                o.text = cur.replace("/config/", "") + " (missing)";
+                o.value = cur;
+                sel.add(o);
+            }
+            sel.value = cur;
+        }
+    }
+
+    function syncModelToParam() {
+        var sel = document.getElementById("Analog_Model_value1");
+        if (sel && param["Analog"] && param["Analog"]["Model"]) {
+            param["Analog"]["Model"]["value1"] = sel.value;
+            param["Analog"]["Model"]["enabled"] = true;
+        }
+    }
+
+    function modelChanged() {
+        syncModelToParam();
+        var sv = document.getElementById("saveroi"); if (sv) { sv.disabled = false; }
+    }
+
     function SaveToConfig() {
         //_zwcat = getConfigCategory();
         cofcat["Analog"]["enabled"] = document.getElementById("Category_Analog_enabled").checked;
+        syncModelToParam();
         WriteConfigININew();
         SaveConfigToServer(domainname);
         UpdateROIs();
@@ -724,8 +771,9 @@ The following settings are only used for easier setup, they are <b>not</b> persi
 		}
 	
         ParseConfig();
-        param = getConfigParameters(); 
+        param = getConfigParameters();
         cofcat = getConfigCategory();
+        populateModelSelect();
 		
         canvas.addEventListener('mousedown', mouseDown, false);
         canvas.addEventListener('mouseup', mouseUp, false);
