@@ -565,6 +565,12 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
             }
         }
 
+        if ((toUpper(splitted[0]) == "DIGITCONFIDENCETHRESHOLD") && (splitted.size() > 1)) {   // 4.3
+            if (isStringNumeric(splitted[1])) {
+                DigitConfidenceThreshold = std::stof(splitted[1]);
+            }
+        }
+
         if ((toUpper(splitted[0]) == "PREDICTIVEREAD") && (splitted.size() > 1)) {
             PredictiveReadEnabled = alphanumericToBoolean(splitted[1]);
         }
@@ -1012,6 +1018,19 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
                         GENERAL[n]->ROI[roi]->result_confidence = _digitConf;
                         ESP_LOGD(TAG, "General result (Digit)%i: %d (conf %.2f)", roi, GENERAL[n]->ROI[roi]->result_klasse, _digitConf);
+
+                        // 4.3: confidence rejection. Below DigitConfidenceThreshold (config; 0 = off) the read
+                        // is too uncertain to commit, so mark it "N" (class 10) rather than guessing. getReadout
+                        // then resolves it from the confident history + carry physics (resolveUnknownDigit) -
+                        // the same principled path as a CNN "N", instead of trusting a coin-flip digit. Runs
+                        // before the history/vote/cache steps so a rejected read is treated as unknown by all.
+                        if ((DigitConfidenceThreshold > 0.0f) && (_digitConf < DigitConfidenceThreshold) &&
+                            (GENERAL[n]->ROI[roi]->result_klasse >= 0) && (GENERAL[n]->ROI[roi]->result_klasse < 10)) {
+                            LOGD(TAG, "ConfReject: ROI '" + GENERAL[n]->ROI[roi]->name + "' read " +
+                                std::to_string(GENERAL[n]->ROI[roi]->result_klasse) + " conf " + std::to_string(_digitConf) +
+                                " < " + std::to_string(DigitConfidenceThreshold) + " -> mark N");
+                            GENERAL[n]->ROI[roi]->result_klasse = 10;   // 10 = "N"/unknown for the 11-class Digit model
+                        }
 
                         // Record only confident, in-range reads into the per-digit matrix (never the
                         // inferred/"N" values), so it reflects what the CNN actually saw.

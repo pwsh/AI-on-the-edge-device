@@ -51,6 +51,7 @@ protected:
     // --- Unknown-digit resolution + per-digit confident-read matrix ---
     bool  ResolveUnknownEnabled = false;          // config "ResolveUnknownDigits"; default off
     float DigitHistoryConfidenceFloor = 0.70f;    // min normalised confidence to enter the matrix
+    float DigitConfidenceThreshold = 0.0f;        // 4.3: reject a Digit read below this conf -> mark "N" (resolved from history/physics); 0 = off
     // True if the less-significant neighbour of digit roi (index i+1) looks unchanged vs its history.
     bool  digitLowerNeighborStable(int _seq, int i);
 
