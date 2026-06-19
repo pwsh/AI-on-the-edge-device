@@ -426,11 +426,22 @@
         }
 
         if (ROIInfo.length > 0) {
-            if (ROIInfo.length > 1) {
-                space = ROIInfo[1].x - parseInt(ROIInfo[0].x) - parseInt(ROIInfo[0].dx);
+            var _selIdx = sel.selectedIndex;
+            // Auto-place the new ROI as a placeholder one slot to the right of the selected ROI, using
+            // the equidistant spacing of the existing ROIs. This is done regardless of the "Keep
+            // equidistance" checkbox: even when equidistance is off, the new ROI still gets a sensible
+            // starting position to drag/fine-tune instead of landing on top of another ROI or off-canvas.
+            var _gap = parseInt(space);
+            if (ROIInfo.length > 1) {   // gap between the first two ROIs = the typical digit spacing
+                _gap = parseInt(ROIInfo[1].x) - parseInt(ROIInfo[0].x) - parseInt(ROIInfo[0].dx);
             }
-            erg = CreateROI(_number, "digit", sel.selectedIndex, _roinew, parseInt(ROIInfo[sel.selectedIndex].x) + parseInt(ROIInfo[sel.selectedIndex].dx) + space,
-                parseInt(ROIInfo[sel.selectedIndex].y), ROIInfo[aktindex]["dx"], ROIInfo[aktindex]["dy"], 0);
+            if (isNaN(_gap) || _gap < 0) {   // safe positive fallback so the placeholder never overlaps
+                _gap = 3;
+            }
+            space = _gap;
+            erg = CreateROI(_number, "digit", _selIdx, _roinew,
+                parseInt(ROIInfo[_selIdx].x) + parseInt(ROIInfo[_selIdx].dx) + _gap,
+                parseInt(ROIInfo[_selIdx].y), ROIInfo[aktindex]["dx"], ROIInfo[aktindex]["dy"], 0);
         }
         else {
             erg = CreateROI(_number, "digit", sel.selectedIndex, _roinew, 15, 30, 30, 51, 0);

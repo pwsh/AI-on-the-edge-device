@@ -411,7 +411,20 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         }
 
         if (ROIInfo.length > 0) {
-            erg = CreateROI(_number, "analog", sel.selectedIndex, _roinew, 15, 30, ROIInfo[aktindex]["dx"], ROIInfo[aktindex]["dy"], ROIInfo[aktindex]["CCW"]=="true");
+            var _selIdx = sel.selectedIndex;
+            // Auto-place the new ROI as a placeholder one slot to the right of the selected ROI, using
+            // the equidistant spacing of the existing ROIs, so a new analog dial lands in a sensible
+            // starting position to drag/fine-tune instead of at a fixed corner on top of another ROI.
+            var _gap = 3;
+            if (ROIInfo.length > 1) {   // gap between the first two ROIs = the typical dial spacing
+                _gap = parseInt(ROIInfo[1].x) - parseInt(ROIInfo[0].x) - parseInt(ROIInfo[0].dx);
+            }
+            if (isNaN(_gap) || _gap < 0) {   // safe positive fallback so the placeholder never overlaps
+                _gap = 3;
+            }
+            erg = CreateROI(_number, "analog", _selIdx, _roinew,
+                parseInt(ROIInfo[_selIdx].x) + parseInt(ROIInfo[_selIdx].dx) + _gap,
+                parseInt(ROIInfo[_selIdx].y), ROIInfo[aktindex]["dx"], ROIInfo[aktindex]["dy"], ROIInfo[aktindex]["CCW"]=="true");
         }
         else {
             erg = CreateROI(_number, "analog", sel.selectedIndex, _roinew, 15, 30, 30, 30, false);
