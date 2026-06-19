@@ -1238,6 +1238,11 @@ bool setCpuFrequency(void) {
         return false;
     }
 
+    // The chip's CURRENT (boot / sdkconfig-default) max frequency. This is NOT always 160: the
+    // ESP32-S3 boots at 240 (CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240), so a configured "160" must still be
+    // applied. Captured before we overwrite pm_config.max_freq_mhz below.
+    int currentMaxFreq = pm_config.max_freq_mhz;
+
     int maxFreq;
     if (cpuFrequency == "160") {
         maxFreq = 160;
@@ -1264,8 +1269,10 @@ bool setCpuFrequency(void) {
     pm_config.min_freq_mhz = maxFreq;   // fixed frequency (no scaling) - default behavior
 #endif
 
-    // For 160 MHz fixed this matches the boot default; for 240 or DFS it applies the new config.
-    if ((maxFreq != 160) || (pm_config.min_freq_mhz != maxFreq)) {
+    // Apply whenever the requested config differs from the chip's CURRENT PM config (don't assume the
+    // boot default is 160 - it is 240 on the ESP32-S3, which made a configured 160 silently ignored so
+    // the device ran at 240 regardless of the setting).
+    if ((maxFreq != currentMaxFreq) || (pm_config.min_freq_mhz != maxFreq)) {
         if (esp_pm_configure(&pm_config) != ESP_OK) {
             LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to set new CPU frequency / PM config!");
             return false;
