@@ -465,12 +465,12 @@ void ClassFlowPostProcessing::handleLeakDetection(string _decsep, string _value)
 }
 
 void ClassFlowPostProcessing::handleLeakThreshold(string _decsep, string _value) {
-    // Config value is in HOURS (user-friendly); stored internally as seconds.
+    // Config value is in MINUTES (user-friendly); stored internally as seconds.
     string _digit;
     int _pospunkt = _decsep.find_first_of(".");
     _digit = (_pospunkt > -1) ? _decsep.substr(0, _pospunkt) : "default";
     if (!isStringNumeric(_value)) return;
-    long _sec = (long)(std::stof(_value) * 3600.0f);
+    long _sec = (long)(std::stof(_value) * 60.0f);
     if (_sec < 0) _sec = 0;
     for (int j = 0; j < NUMBERS.size(); ++j) {
         if ((_digit == "default") || (NUMBERS[j]->name == _digit)) {

@@ -1,14 +1,14 @@
 # Parameter `LeakThreshold`
-Default Value: `2` (hours)
+Default Value: `120` (minutes)
 
 How long the meter may advance **continuously** (without the value ever holding steady between two
 readings) before
 [Leak Detection](https://jomjol.github.io/AI-on-the-edge-device-docs/Parameters/#parameter-leakdetection)
-raises a potential-leak flag. In hours.
+raises a potential-leak flag. In minutes.
 
-The default of **2 hours** leaves room for legitimately long continuous use — watering the lawn, filling
-a pool, a long shower sequence — without false alarms, while still catching a leak that runs for hours.
-Lower it for a tighter watch, raise it if you regularly run water/gas continuously for longer.
+The default of **120 minutes (2 hours)** leaves room for legitimately long continuous use — watering the
+lawn, filling a pool, a long shower sequence — without false alarms, while still catching a leak that runs
+for hours. Lower it for a tighter watch, raise it if you regularly run water/gas continuously for longer.
 
 The elapsed continuous-usage time is published as `continuous_usage` (seconds) so you can see how close
 you are to the threshold at any moment.

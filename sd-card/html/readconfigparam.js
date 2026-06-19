@@ -195,9 +195,9 @@ function ParseConfig() {
     ParamAddValue(param, catname, "WaterPipeDiameterMm", 1, true, "25.4");
     ParamAddValue(param, catname, "GasPipeDiameterMm", 1, true, "38.1");
     ParamAddValue(param, catname, "ServiceAmps", 1, true, "200");
-    // Leak detection (defaults on for water/gas via the Meter Type selector); threshold in hours.
+    // Leak detection (defaults on for water/gas via the Meter Type selector); threshold in minutes.
     ParamAddValue(param, catname, "LeakDetection", 1, true, "false");
-    ParamAddValue(param, catname, "LeakThreshold", 1, true, "2");
+    ParamAddValue(param, catname, "LeakThreshold", 1, true, "120");
 
     var catname = "MQTT";
     category[catname] = new Object();

@@ -1203,10 +1203,10 @@
         <tr>
             <td class="indent2">
                 <input type="checkbox" id="PostProcessing_LeakThreshold_enabled" value="1" onclick='InvertEnableItem("PostProcessing", "LeakThreshold")' unchecked >
-                <label for=PostProcessing_LeakThreshold_enabled><class id="PostProcessing_LeakThreshold_text" style="color:black;">Leak Threshold (hours)</class></label>
+                <label for=PostProcessing_LeakThreshold_enabled><class id="PostProcessing_LeakThreshold_text" style="color:black;">Leak Threshold (minutes)</class></label>
             </td>
             <td>
-                <input type="number" id="PostProcessing_LeakThreshold_value1" size="13" min="0" step="any" value="2">
+                <input type="number" id="PostProcessing_LeakThreshold_value1" size="13" min="0" step="any" value="120">
             </td>
             <td>$TOOLTIP_PostProcessing_NUMBER.LeakThreshold</td>
         </tr>
@@ -2787,6 +2787,27 @@ function UpdateInputIndividual(sel) {
     // WriteParameter(param, category, "PostProcessing", "PreValueUse", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "DecimalShift", true, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "AnalogToDigitTransitionStart", true, NUNBERSAkt);
+    // "Analog to Digit Transition Start" only applies to a number sequence that mixes analog pointers
+    // with digits (it tunes when the last digit rolls relative to the analog dial). For a digit-only
+    // sequence it is meaningless, so disable the row and don't save it as active. It re-enables itself
+    // automatically for a sequence that has at least one analog ROI.
+    (function() {
+        var _num = NUMBERS[NUNBERSAkt];
+        var _hasAnalog = !!(_num && _num["analog"] && _num["analog"].length > 0);
+        var _chk = document.getElementById("PostProcessing_AnalogToDigitTransitionStart_enabled");
+        var _val = document.getElementById("PostProcessing_AnalogToDigitTransitionStart_value1");
+        var _txt = document.getElementById("PostProcessing_AnalogToDigitTransitionStart_text");
+        if (!_hasAnalog) {
+            if (_num && _num["PostProcessing"] && _num["PostProcessing"]["AnalogToDigitTransitionStart"]) {
+                _num["PostProcessing"]["AnalogToDigitTransitionStart"]["enabled"] = false;   // saved commented out
+            }
+            if (_chk) { _chk.checked = false; _chk.disabled = true; }
+            if (_val) { _val.disabled = true; }
+            if (_txt) { _txt.style.color = "lightgrey"; }
+        } else if (_chk) {
+            _chk.disabled = false;   // allow toggling again on a sequence that has analog ROIs
+        }
+    })();
     WriteParameter(param, category, "PostProcessing", "ChangeRateThreshold", true, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "MaxRateValue", true, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "MaxRateType", true, NUNBERSAkt);

@@ -3,11 +3,14 @@ Default Value: `2`
 
 Range: `0` .. `9`.
 
-Threshold parameter for change rate detection.<br>
-This parameter is intended to compensate for small reading fluctuations that occur when the meter does not change its value for a long time (e.g. at night) or slightly turns backwards. This can eg. happen on watermeters.
+Suppresses tiny flicker in the **last digit** so a stationary meter doesn't drift. If a new reading
+differs from the last accepted value by no more than this many counts of the **smallest digit**, the
+reading is treated as unchanged and the previous Value/PreValue is kept (no further calculation is done).
 
-It is only applied to the last digit of the read value (See example below).
-If the read value is within PreValue +/- Threshold, no further calculation is carried out and the Value/Prevalue remains at the old value.
+This compensates for small recognition fluctuations that happen when the meter sits still for a long time
+(e.g. overnight) or the last pointer/digit wobbles slightly backwards — common on water meters. It is
+applied **only to the last digit** of the read value (see the example below): if the value is within
+`PreValue ± Threshold`, the old value is held.
 
 !!! Note
     If you edit the config file manually, you must prefix this parameter with `<NUMBER>` followed by a dot (eg. `main.ChangeRateThreshold`). The reason is that this parameter is specific for each `<NUMBER>` (`<NUMBER>` is the name of the number sequence defined in the ROI's).
