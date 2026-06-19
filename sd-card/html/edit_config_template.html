@@ -954,6 +954,18 @@
             <td>$TOOLTIP_Digits_CNNGoodThreshold</td>
         </tr>
 
+        <tr class="DigitItem expert">
+            <td class="indent1">
+                <input type="checkbox" id="Digits_DigitConfidenceThreshold_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "DigitConfidenceThreshold")' unchecked >
+                <label for=Digits_DigitConfidenceThreshold_enabled><class id="Digits_DigitConfidenceThreshold_text" style="color:black;">Digit Confidence Threshold</class></label>
+            </td>
+            <td>
+                <input required type="number" id="Digits_DigitConfidenceThreshold_value1" min="0" max="1" step="0.05"
+                    oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=1));">
+            </td>
+            <td>$TOOLTIP_Digits_DigitConfidenceThreshold</td>
+        </tr>
+
         <tr class="DigitItem">
             <td class="indent1">
                 <input type="checkbox" id="Digits_FastRead_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "FastRead")' unchecked >
@@ -2914,6 +2926,7 @@ function UpdateInput() {
     WriteParameter(param, category, "Digits", "FastRead", true);
     WriteParameter(param, category, "Digits", "FastReadThreshold", true);
     WriteParameter(param, category, "Digits", "FastReadFullInterval", true);
+    WriteParameter(param, category, "Digits", "DigitConfidenceThreshold", true);
     WriteParameter(param, category, "Digits", "ROIImagesLocation", true);
     WriteParameter(param, category, "Digits", "ROIImagesRetention", true);
     
@@ -3270,6 +3283,7 @@ function ReadParameterAll() {
     ReadParameter(param, "Digits", "FastRead", true);
     ReadParameter(param, "Digits", "FastReadThreshold", true);
     ReadParameter(param, "Digits", "FastReadFullInterval", true);
+    ReadParameter(param, "Digits", "DigitConfidenceThreshold", true);
     ReadParameter(param, "Digits", "ROIImagesLocation", true);
     ReadParameter(param, "Digits", "ROIImagesRetention", true);
 
