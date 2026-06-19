@@ -769,7 +769,12 @@ void CImageBasis::Resize(int _new_dx, int _new_dy, CImageBasis *_target)
     RGBImageLock();
 
     uint8_t* odata = _target->rgb_image;
-    stbir_resize_uint8(rgb_image, width, height, 0, odata, _new_dx, _new_dy, 0, channels);
+    // Fast resize kernel: bilinear (TRIANGLE) instead of stb's default high-quality Mitchell/cubic.
+    // This is the hot ROI-cut -> model-input downscale (measured ~15 ms/ROI, ~177 ms/round with the
+    // default filter); bilinear is far cheaper and accurate enough for the small digit/analog tiles the
+    // CNN reads. Swap STBIR_FILTER_TRIANGLE -> STBIR_FILTER_BOX for max speed if accuracy holds.
+    stbir_resize_uint8_generic(rgb_image, width, height, 0, odata, _new_dx, _new_dy, 0, channels,
+                               -1, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_TRIANGLE, STBIR_COLORSPACE_LINEAR, NULL);
 
     RGBImageRelease();
 }
