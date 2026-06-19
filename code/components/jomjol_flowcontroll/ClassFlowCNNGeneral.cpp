@@ -717,6 +717,7 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
     // Timing: the cut+resize of every ROI runs every round regardless of FastRead (FastRead only skips
     // the CNN inference, not this step), so measure the cost FastRead can never avoid.
     int64_t _acT0 = esp_timer_get_time();
+    int64_t _acCutUs = 0, _acResizeUs = 0;   // split CutAndSave vs Resize, to target the cut cost (#2)
 
     CAlignAndCutImage *caic = flowpostalignment->GetAlignAndCutImage();
 
@@ -724,7 +725,9 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
         for (int i = 0; i < GENERAL[_ana]->ROI.size(); ++i) {
             ESP_LOGD(TAG, "General %d - Align&Cut", i);
             
+            int64_t _cs0 = esp_timer_get_time();
             caic->CutAndSave(GENERAL[_ana]->ROI[i]->posx, GENERAL[_ana]->ROI[i]->posy, GENERAL[_ana]->ROI[i]->deltax, GENERAL[_ana]->ROI[i]->deltay, GENERAL[_ana]->ROI[i]->image_org);
+            _acCutUs += esp_timer_get_time() - _cs0;
             if (SaveAllFiles) {
                 if (GENERAL[_ana]->name == "default") {
                     GENERAL[_ana]->ROI[i]->image_org->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->ROI[i]->name + ".jpg"));
@@ -734,7 +737,9 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
                 }
             } 
 
+            int64_t _rs0 = esp_timer_get_time();
             GENERAL[_ana]->ROI[i]->image_org->Resize(modelxsize, modelysize, GENERAL[_ana]->ROI[i]->image);
+            _acResizeUs += esp_timer_get_time() - _rs0;
             if (SaveAllFiles) {
                 if (GENERAL[_ana]->name == "default") {
                     GENERAL[_ana]->ROI[i]->image->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->ROI[i]->name + ".jpg"));
@@ -746,8 +751,10 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
         }
     }
 
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "doAlignAndCut: cut+resize all ROIs in " +
-        std::to_string((int)((esp_timer_get_time() - _acT0) / 1000)) + " ms");
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "doAlignAndCut: cut=" +
+        std::to_string((int)(_acCutUs / 1000)) + "ms + resize=" +
+        std::to_string((int)(_acResizeUs / 1000)) + "ms = total " +
+        std::to_string((int)((esp_timer_get_time() - _acT0) / 1000)) + "ms");
 
     return true;
 }
@@ -869,31 +876,33 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
     zwcnn = FormatFileName(zwcnn);
     ESP_LOGD(TAG, "%s", zwcnn.c_str());
 
-    // Model lifecycle: load + allocate the model each cycle, then free it at the end (see below).
-    // The tflite model and tensor arena live in the SHARED PSRAM region (psram_get_shared_*),
-    // which the TakeImage step reuses for the camera image every round. Keeping the model resident
-    // across cycles (an earlier FastRead optimisation) therefore let TakeImage clobber the resident
-    // model's flatbuffer/arena, so the next inference dereferenced garbage in interpreter->input()
-    // and panicked. Loading per cycle keeps the shared region correctly time-multiplexed. FastRead
-    // still saves work by skipping the inference for unchanged digits.
-    int64_t _nnM0 = esp_timer_get_time();
-    CTfLiteClass *tflite;
-    tflite = new CTfLiteClass;
-    if (!tflite->LoadModel(zwcnn)) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
-        LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
-        delete tflite;
-        return false;
-    }
-    if (!tflite->MakeAllocate()) {
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
-        LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
-        delete tflite;
-        return false;
-    }
-    // Model load+allocate is paid every round even when FastRead reuses every digit (the arena lives in
-    // the shared PSRAM region and can't be kept resident) - this is the headline FastRead inefficiency.
-    _nnModelUs = esp_timer_get_time() - _nnM0;
+    // Model lifecycle: LAZY load. The tflite model + tensor arena live in the SHARED PSRAM region
+    // (psram_get_shared_*) that TakeImage reuses each round, so the model can't stay resident across
+    // cycles (that corrupted it and crashed inference). But it also doesn't need loading at all on a
+    // round where FastRead/PredictiveRead reuse every digit - loading it then just wastes ~34ms AND a
+    // ~350 KB SD read (far worse on a slow/failing SD). So load it on first actual inference via
+    // ensureModel() below, and skip it entirely on a fully-cached round. Freed at the end of this function.
+    CTfLiteClass *tflite = NULL;
+    auto ensureModel = [&]() -> CTfLiteClass* {
+        if (tflite) return tflite;
+        int64_t _nnM0 = esp_timer_get_time();
+        CTfLiteClass *t = new CTfLiteClass;
+        if (!t->LoadModel(zwcnn)) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't load tflite model " + cnnmodelfile + " -> Exec aborted this round!");
+            LogFile.WriteHeapInfo("doNeuralNetwork-LoadModel");
+            delete t;
+            return NULL;
+        }
+        if (!t->MakeAllocate()) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Can't allocate tfilte model -> Exec aborted this round!");
+            LogFile.WriteHeapInfo("doNeuralNetwork-MakeAllocate");
+            delete t;
+            return NULL;
+        }
+        _nnModelUs = esp_timer_get_time() - _nnM0;   // counted once, on the round's first inference
+        tflite = t;
+        return tflite;
+    };
 
     // Decide whether this cycle re-reads every digit (full validation) or may reuse the
     // FastRead cache. A full pass runs when FastRead is off, when externally triggered
@@ -938,7 +947,8 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         float f1, f2;
                         f1 = 0; f2 = 0;
 
-                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
+                        if (!ensureModel()) return false;   // lazy model load (analog always infers)
+                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         int64_t _ti = esp_timer_get_time();
                         tflite->Invoke();
                         _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
@@ -996,6 +1006,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         _digitsAnalyzed++;
                         float _digitConf = 1.0f;
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
+                        if (!ensureModel()) return false;   // lazy model load: only here, when a digit actually needs inference
                         int64_t _ti = esp_timer_get_time();
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image, &_digitConf);
                         _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
@@ -1034,7 +1045,8 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         float _fit;
                         float _result_save_file;
 
-                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);        
+                        if (!ensureModel()) return false;   // lazy model load (DoubleHyprid10 always infers)
+                        tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         int64_t _ti = esp_timer_get_time();
                         tflite->Invoke();
                         _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
@@ -1130,6 +1142,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         if (CNNType == Digit100) {
                             _digitsAnalyzed++;
                         }
+                        if (!ensureModel()) return false;   // lazy model load: only here, when this ROI needs inference
                         int64_t _ti = esp_timer_get_time();
                         tflite->LoadInputImageBasis(GENERAL[n]->ROI[roi]->image);
                         tflite->Invoke();
