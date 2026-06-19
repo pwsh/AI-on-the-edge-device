@@ -1021,7 +1021,17 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         }
 
                         if (FastReadEnabled || PredictiveReadEnabled) {
-                            fastReadUpdateCache(GENERAL[n]->ROI[roi], GENERAL[n]->ROI[roi]->result_klasse, 0);
+                            // 4.1: only cache CONFIDENT reads (same 0.70 floor used for the history matrix).
+                            // A low-confidence read (glare/blur/partial roll) must not be cached, or FastRead
+                            // would reuse it and lock the error in for up to FastReadFullInterval rounds. Below
+                            // the floor we leave the cache untouched, so this digit is re-inferred next round
+                            // until it reads cleanly.
+                            if (_digitConf >= DigitHistoryConfidenceFloor) {
+                                fastReadUpdateCache(GENERAL[n]->ROI[roi], GENERAL[n]->ROI[roi]->result_klasse, 0);
+                            } else {
+                                LOGD(TAG, "FastRead: ROI '" + GENERAL[n]->ROI[roi]->name + "' low conf " +
+                                    std::to_string(_digitConf) + " -> not cached (will re-read)");
+                            }
                         }
 
                         if (isLogImage) {
