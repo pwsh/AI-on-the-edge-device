@@ -132,9 +132,9 @@
         </tr>
 		
         <tr>
-            <td><select id="index" name="index" onchange="ChangeSelection()" tabindex=1></select></td>
-            <td><input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI"></td>
-            <td><input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI"></td>	  
+            <td><select id="index" name="index" onchange="ChangeSelection()" tabindex=1 style="display:none;"></select><div id="roiTabs" style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:2px 0;"></div></td>
+            <td><input class="button" type="button" id="examineROIbtn" onclick="examineROI(true, document.getElementById('CCW').checked)" value="Examine ROI"><span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span></td>
+            <td><input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI"><input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;"></td>
             <td><input class="button" type="submit" id="deleteROI" name="deleteROI" onclick="deleteROI()" value="Delete ROI"></td>
         </tr>
 		
@@ -149,16 +149,6 @@
             <td><input class="button" type="submit" id="moveNext" onclick="moveNext()" value="Move ROI Lower"></td>
         </tr>
 
-        <tr>
-            <td colspan="2">
-                <input class="button" type="button" id="examineROIbtn" onclick="examineROI(true, document.getElementById('CCW').checked)" value="Examine ROI">
-                <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
-            </td>
-            <td colspan="2">
-                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull camera image">
-                <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
-            </td>
-        </tr>
     </table>
 
     <div id="examineResult" style="display:none; margin-top:6px; padding:8px; border:1px solid rgba(127,127,127,.35); border-radius:6px;">
@@ -208,9 +198,13 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         </colgroup>
 		
         <tr>
-            <td colspan="3" style="vertical-align: bottom;"><b>Reference Image:</b>
+            <td colspan="2" style="vertical-align: bottom;"><b>Reference Image:</b>
                 <span id="imgSourceLabel" style="font-weight:normal; font-size:.9em; color:#888;">showing: reference image</span>
                 <input class="button" type="button" id="showRefBtn" onclick="showReferenceImage()" value="Show reference image" style="display:none; margin-left:8px;">
+            </td>
+            <td>
+                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull camera image">
+                <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
             </td>
             <td>
 				<input style="font-weight:bold;" class="button" type="submit" id="saveroi" name="saveroi" onclick="SaveToConfig()" value="Save Config" tabindex=10>
@@ -404,7 +398,10 @@ The following settings are only used for easier setup, they are <b>not</b> persi
             _roialt = "ana";
         }
 
-        var _roinew = prompt("Please enter a name for the new ROI", _roialt);
+        // Auto-name: ROIs are renamed to <sequence><position> on save (autoNameROIs); here we only need a
+        // unique placeholder so CreateROI accepts it (the name is never shown - the chips show position).
+        var _roinew, _autoN = ROIInfo.length + 1;
+        do { _roinew = _number + _autoN; _autoN++; } while (ROIInfo.some(function(r){ return r.name === _roinew; }));
 	
         if (_roinew === null) {
             return; //break out of the function early because prompt was aborted
@@ -490,6 +487,45 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         UpdateROIs();
     }
 
+    // --- Numbered-chip ROI switcher + auto-naming -------------------------------------
+    function selectRoiTab(i) {
+        if (i < 0 || !ROIInfo || i >= ROIInfo.length) return;
+        aktindex = i;
+        document.getElementById("index").value = i;
+        UpdateROIs();
+    }
+
+    function buildRoiTabs() {
+        var c = document.getElementById("roiTabs");
+        if (!c) return;
+        c.innerHTML = "";
+        for (var i = 0; i < (ROIInfo ? ROIInfo.length : 0); ++i) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.textContent = (i + 1);
+            b.title = "Edit ROI " + (i + 1);
+            b.style.cssText = "min-width:2.2em;padding:3px 8px;cursor:pointer;border:1px solid #888;" +
+                "border-radius:4px;font-weight:bold;line-height:1.2;" +
+                (i === aktindex ? "background:#27ae60;color:#fff;border-color:#27ae60;"
+                                : "background:rgba(127,127,127,.18);color:inherit;");
+            (function(idx){ b.onclick = function(){ selectRoiTab(idx); }; })(i);
+            c.appendChild(b);
+        }
+    }
+
+    // Rename every analog ROI (all sequences) to <sequence><position> right before the config is written.
+    function autoNameROIs() {
+        if (typeof NUMBERS === 'undefined' || !NUMBERS) return;
+        for (var s = 0; s < NUMBERS.length; ++s) {
+            var seq = NUMBERS[s]["name"];
+            var ros = NUMBERS[s]["analog"];
+            if (!ros) continue;
+            for (var i = 0; i < ros.length; ++i) {
+                ros[i]["name"] = seq + (i + 1);
+            }
+        }
+    }
+
     // --- Model selection (the CNN model used to read the analog ROIs) --------------
     function populateModelSelect() {
         var sel = document.getElementById("Analog_Model_value1");
@@ -534,6 +570,7 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         //_zwcat = getConfigCategory();
         cofcat["Analog"]["enabled"] = document.getElementById("Category_Analog_enabled").checked;
         syncModelToParam();
+        autoNameROIs();
         WriteConfigININew();
         SaveConfigToServer(domainname);
         UpdateROIs();
@@ -614,6 +651,7 @@ The following settings are only used for easier setup, they are <b>not</b> persi
 
         if (ROIInfo.length == 0){
             firework.launch('No analog ROIs defined in selected number sequence', 'warning', 10000);
+        buildRoiTabs();
             document.getElementById("newROI").disabled = false;
             document.getElementById("deleteROI").disabled = true;
             document.getElementById("renameROI").disabled = true;
@@ -672,7 +710,8 @@ The following settings are only used for easier setup, they are <b>not</b> persi
             }
         }
 	
-        _index.selectedIndex = aktindex; 
+        _index.selectedIndex = aktindex;
+        buildRoiTabs();
 
         document.getElementById("movePrevious").disabled = false;
         if (aktindex == 0){
@@ -965,10 +1004,10 @@ The following settings are only used for easier setup, they are <b>not</b> persi
                         context.strokeRect(x0, y0, dx, dy);
 
                         if (ROIInfo[_nb]["CCW"] != "true") {
-                           drawTextBG(context, ROIInfo[_nb]["name"], x0+dx/2-0.5, y0-13, 5);
+                           drawTextBG(context, (_nb+1).toString(), x0+dx/2-0.5, y0-13, 5);
                         }
                         else {
-                           drawTextBG(context, ROIInfo[_nb]["name"]+" (CCW)", x0+dx/2-0.5, y0-13, 5);
+                           drawTextBG(context, (_nb+1)+" (CCW)", x0+dx/2-0.5, y0-13, 5);
                         }
 
                         // Dial guide = dashed circle filling the box (60% opacity)
@@ -1004,10 +1043,10 @@ The following settings are only used for easier setup, they are <b>not</b> persi
             context.strokeRect(x0, y0, dx, dy);
 
             if (ROIInfo[aktindex]["CCW"] != "true") {
-                drawTextBG(context, ROIInfo[aktindex]["name"], x0+dx/2, y0-11, 5);
+                drawTextBG(context, (aktindex+1).toString(), x0+dx/2, y0-11, 5);
             }
             else {
-                drawTextBG(context, ROIInfo[aktindex]["name"] + " (CCW)", x0+dx/2, y0-11, 5);
+                drawTextBG(context, (aktindex+1)+" (CCW)", x0+dx/2, y0-11, 5);
             }
 
             // Dial guide = dashed circle filling the box (60% opacity); not saved/analysed
