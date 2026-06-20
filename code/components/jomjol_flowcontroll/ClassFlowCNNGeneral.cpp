@@ -39,7 +39,7 @@ ClassFlowCNNGeneral::ClassFlowCNNGeneral(ClassFlowAlignment *_flowalign, t_CNNTy
     imagesRetention = 5;
 
     FastReadEnabled = false;
-    FastReadDiffThreshold = 8;   // mean abs per-pixel diff; tuned conservatively (false "changed" only costs an inference)
+    FastReadDiffThreshold = 5;   // mean abs per-pixel diff; default = High sensitivity (a false "changed" only costs one inference, so err sensitive to never miss a real change)
     FastReadFullInterval = 20;   // full re-read of all digits every 20 cycles as a drift backstop
     fastReadCycle = 0;
     forceFullEval = false;

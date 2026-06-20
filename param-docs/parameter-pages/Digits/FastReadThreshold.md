@@ -1,5 +1,5 @@
 # Parameter `FastReadThreshold`
-Default Value: `8` (Medium sensitivity)
+Default Value: `5` (High sensitivity)
 
 Only relevant when [FastRead](FastRead.md) is enabled.
 
@@ -18,8 +18,8 @@ So the value is really a **sensitivity** control:
 | Setting | Value | Behaviour |
 | --- | --- | --- |
 | Very high sensitivity | 3 | Re-reads on the slightest pixel change. Safest, fewest skips. |
-| High sensitivity | 5 | Re-reads on small changes. |
-| Medium sensitivity | 8 | Balanced default. |
+| High sensitivity | 5 | Re-reads on small changes. **Default** — errs toward never missing a change. |
+| Medium sensitivity | 8 | More skipping; tolerates minor noise. |
 | Lower sensitivity | 12 | Tolerates more change before re-reading. |
 | Low sensitivity | 20 | Skips unless the digit clearly changes. |
 | Very low sensitivity | 32 | Maximum skipping; only obvious changes trigger a re-read. |
@@ -32,7 +32,8 @@ So the value is really a **sensitivity** control:
   or partially-rolling digit may be missed until the periodic full re-read
   ([FastReadFullInterval](FastReadFullInterval.md)) forces a complete pass.
 
-**Choosing a value:** start with the **Medium** default. If image noise (flickering lighting, JPEG
+**Choosing a value:** start with the **High** default. If image noise (flickering lighting, JPEG
 artefacts) causes unnecessary re-reads, move toward lower sensitivity. If a digit occasionally
 changes without being picked up, move toward higher sensitivity. A wrong "changed" decision only
-ever costs one extra inference, so erring on the sensitive side is safe.
+ever costs one extra inference, so erring on the sensitive side is safe — which is why the default
+is High.

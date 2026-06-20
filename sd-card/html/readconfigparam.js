@@ -156,7 +156,7 @@ function ParseConfig() {
     ParamAddValue(param, catname, "Model");
     ParamAddValue(param, catname, "CNNGoodThreshold", 1);
     ParamAddValue(param, catname, "FastRead", 1, false, "false");
-    ParamAddValue(param, catname, "FastReadThreshold", 1, false, "8");
+    ParamAddValue(param, catname, "FastReadThreshold", 1, false, "5");
     ParamAddValue(param, catname, "FastReadFullInterval", 1, false, "20");
     ParamAddValue(param, catname, "DigitConfidenceThreshold", 1, false, "0.5");   // 4.3: reject reads below this conf (enable to use)
     ParamAddValue(param, catname, "ROIImages", 1, false, "false");   // master on/off for saving ROI images
