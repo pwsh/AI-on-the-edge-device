@@ -159,6 +159,7 @@ function ParseConfig() {
     ParamAddValue(param, catname, "FastReadThreshold", 1, false, "8");
     ParamAddValue(param, catname, "FastReadFullInterval", 1, false, "20");
     ParamAddValue(param, catname, "DigitConfidenceThreshold", 1, false, "0.5");   // 4.3: reject reads below this conf (enable to use)
+    ParamAddValue(param, catname, "ROIImages", 1, false, "false");   // master on/off for saving ROI images
     ParamAddValue(param, catname, "ROIImagesLocation");
     ParamAddValue(param, catname, "ROIImagesRetention");
 
@@ -168,6 +169,7 @@ function ParseConfig() {
     category[catname]["found"] = false;
     param[catname] = new Object();
     ParamAddValue(param, catname, "Model");
+    ParamAddValue(param, catname, "ROIImages", 1, false, "false");   // master on/off for saving ROI images
     ParamAddValue(param, catname, "ROIImagesLocation");
     ParamAddValue(param, catname, "ROIImagesRetention");
 
@@ -577,6 +579,8 @@ function getCamConfig() {
     param["Alignment"]["InitialRotate"]["enabled"] = true;
 			
     param["TakeImage"]["RawImages"]["enabled"] = true;   // no enable checkbox - keep the select editable
+    param["Digits"]["ROIImages"]["enabled"] = true;      // master "Save ROI Images" toggle (no checkbox)
+    param["Analog"]["ROIImages"]["enabled"] = true;      // master "Save ROI Images" toggle (no checkbox)
     param["TakeImage"]["WaitBeforeTakingPicture"]["enabled"] = true;
     param["TakeImage"]["CamGainceiling"]["enabled"] = true;		// Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)
     param["TakeImage"]["CamQuality"]["enabled"] = true;    		// 0 - 63

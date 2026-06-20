@@ -1012,6 +1012,19 @@
 
         <tr class="DigitItem">
             <td class="indent1">
+                <label><class id="Digits_ROIImages_text" style="color:black;">Save ROI Images</class></label>
+            </td>
+            <td>
+                <select id="Digits_ROIImages_value1">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_Digits_ROIImages</td>
+        </tr>
+
+        <tr class="DigitItem">
+            <td class="indent1">
                 <input type="checkbox" id="Digits_ROIImagesLocation_enabled" value="1"  onclick = 'InvertEnableItem("Digits", "ROIImagesLocation")' unchecked >
                 <label for=Digits_ROIImagesLocation_enabled><class id="Digits_ROIImagesLocation_text" style="color:black;">ROI Images Location</class></label>
             </td>
@@ -1049,6 +1062,19 @@
                 <select required class="select_large" id="Analog_Model_value1"></select>
             </td>
             <td>$TOOLTIP_Analog_Model</td>
+        </tr>
+
+        <tr class="AnalogItem">
+            <td class="indent1">
+                <label><class id="Analog_ROIImages_text" style="color:black;">Save ROI Images</class></label>
+            </td>
+            <td>
+                <select id="Analog_ROIImages_value1">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_Analog_ROIImages</td>
         </tr>
 
         <tr class="AnalogItem">
@@ -2937,9 +2963,11 @@ function UpdateInput() {
     WriteParameter(param, category, "Digits", "FastReadThreshold", true);
     WriteParameter(param, category, "Digits", "FastReadFullInterval", true);
     WriteParameter(param, category, "Digits", "DigitConfidenceThreshold", true);
+    WriteParameter(param, category, "Digits", "ROIImages", false);
     WriteParameter(param, category, "Digits", "ROIImagesLocation", true);
     WriteParameter(param, category, "Digits", "ROIImagesRetention", true);
     
+    WriteParameter(param, category, "Analog", "ROIImages", false);
     WriteParameter(param, category, "Analog", "ROIImagesLocation", true);		
     WriteParameter(param, category, "Analog", "ROIImagesRetention", true);		
     
@@ -3296,10 +3324,12 @@ function ReadParameterAll() {
     ReadParameter(param, "Digits", "FastReadThreshold", true);
     ReadParameter(param, "Digits", "FastReadFullInterval", true);
     ReadParameter(param, "Digits", "DigitConfidenceThreshold", true);
+    ReadParameter(param, "Digits", "ROIImages", false);
     ReadParameter(param, "Digits", "ROIImagesLocation", true);
     ReadParameter(param, "Digits", "ROIImagesRetention", true);
 
     ReadParameter(param, "Analog", "Model", false);
+    ReadParameter(param, "Analog", "ROIImages", false);
     ReadParameter(param, "Analog", "ROIImagesLocation", true);
     ReadParameter(param, "Analog", "ROIImagesRetention", true);
 

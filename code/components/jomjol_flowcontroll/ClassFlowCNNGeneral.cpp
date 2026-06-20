@@ -492,11 +492,18 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
         return true;
     }
 
+    // Master "ROIImages = true/false" toggle (mirrors RawImages in ClassFlowTakeImage): wins regardless
+    // of line order. -1 = unset -> fall back to the legacy "a configured location enables saving".
+    int roiImagesExplicit = -1;
     while (this->getNextLine(pfile, &aktparamgraph) && !this->isNewParagraph(aktparamgraph)) {
         splitted = ZerlegeZeile(aktparamgraph);
-        if ((toUpper(splitted[0]) == "ROIIMAGESLOCATION") && (splitted.size() > 1)) {
+        if ((toUpper(splitted[0]) == "ROIIMAGES") && (splitted.size() > 1)) {
+            roiImagesExplicit = alphanumericToBoolean(splitted[1]) ? 1 : 0;
+            this->isLogImage = (roiImagesExplicit == 1);
+        }
+        else if ((toUpper(splitted[0]) == "ROIIMAGESLOCATION") && (splitted.size() > 1)) {
             this->imagesLocation = "/sdcard" + splitted[1];
-            this->isLogImage = true;
+            if (roiImagesExplicit == -1) this->isLogImage = true;   // back-compat: a configured location enables saving unless ROIImages overrides
         }
         
         if ((toUpper(splitted[0]) == "LOGIMAGESELECT") && (splitted.size() > 1)) {
