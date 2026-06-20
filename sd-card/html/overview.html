@@ -78,6 +78,9 @@
 			</div>
 			<div class="ov-img app-card">
 				<img id="img" src="" alt="Latest processed image">
+				<label style="display:block; margin-top:6px; font-size:.9em; color:#888; cursor:pointer;">
+					<input type="checkbox" id="showRoiOverlayCb" onclick="toggleRoiOverlay()"> Show ROI overlay boxes
+				</label>
 			</div>
 		</div>
 		<div id="digitmatrix"></div>
@@ -104,9 +107,18 @@
 		}
 
 		$(document).ready(function() {
+			var _cb = document.getElementById('showRoiOverlayCb');
+			if (_cb) { _cb.checked = (localStorage.getItem('showRoiOverlay') !== 'false'); }
 			LoadData();
 			LoadROIImage();
 		});
+
+		// Toggle the ROI overlay boxes on the overview image (remembered per-browser, no reboot).
+		function toggleRoiOverlay() {
+			localStorage.setItem('showRoiOverlay',
+				document.getElementById('showRoiOverlayCb').checked ? 'true' : 'false');
+			LoadROIImage();
+		}
 
 		function LoadData(){
 			loadValue("value", "value", "border-collapse: collapse; width: 100%");
@@ -164,7 +176,9 @@
 			var h = addZero(d.getHours());
 			var m = addZero(d.getMinutes());
 			var s = addZero(d.getSeconds());
-			document.getElementById("img").src = getDomainname() + '/img_tmp/alg_roi.jpg?timestamp=' + timestamp;
+			// Show ROI overlay boxes (alg_roi.jpg) or the plain aligned image (alg.jpg). Default on.
+			var _imgName = (localStorage.getItem('showRoiOverlay') !== 'false') ? 'alg_roi.jpg' : 'alg.jpg';
+			document.getElementById("img").src = getDomainname() + '/img_tmp/' + _imgName + '?timestamp=' + timestamp;
 			$('#timestamp').html("Last Page Refresh:" + (h + ":" + m + ":" + s));
 		}
 
