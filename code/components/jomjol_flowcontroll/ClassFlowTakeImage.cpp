@@ -137,14 +137,9 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _WaitBeforePicture = std::stoi(splitted[1]);
-                if (_WaitBeforePicture != 0)
-                {
-                    CCstatus.WaitBeforePicture = _WaitBeforePicture;
-                }
-                else
-                {
-                    CCstatus.WaitBeforePicture = 2;
-                }
+                // Allow 0 = no pre-capture/flash delay (previously 0 was forced back to the default 2,
+                // so the delay could never be disabled). A negative value still falls back to the default.
+                CCstatus.WaitBeforePicture = (_WaitBeforePicture >= 0) ? _WaitBeforePicture : 2;
             }
         }
 
