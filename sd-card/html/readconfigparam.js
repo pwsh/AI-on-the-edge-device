@@ -559,6 +559,9 @@ function getCamConfig() {
     ParseConfig();		
 
     param["System"]["Tooltip"]["enabled"] = true;
+    param["System"]["CPUFrequency"]["enabled"] = true;             // no enable checkbox - always persisted
+    param["System"]["DynamicFrequencyScaling"]["enabled"] = true;  // no enable checkbox - dropdown is the value
+    param["System"]["BackupInterval"]["enabled"] = true;           // no enable checkbox - 0 = off
     param["Alignment"]["InitialRotate"]["enabled"] = true;
 			
     param["TakeImage"]["RawImages"]["enabled"] = true;   // no enable checkbox - keep the select editable

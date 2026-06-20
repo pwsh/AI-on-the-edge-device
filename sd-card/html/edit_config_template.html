@@ -2500,8 +2500,7 @@
 
         <tr class="expert" unused_id="System_CPUFrequency">
             <td class="indent1">
-                <input type="checkbox" id="System_CPUFrequency_enabled" value="1"  onclick = 'InvertEnableItem("System", "CPUFrequency")' unchecked >
-                <label for=System_CPUFrequency_enabled><class id="System_CPUFrequency_text" style="color:black;">CPU Frequency</class></label>
+                <label><class id="System_CPUFrequency_text" style="color:black;">CPU Frequency</class></label>
             </td>
             <td>
                 <select id="System_CPUFrequency_value1">
@@ -2515,8 +2514,7 @@
 
         <tr class="expert" unused_id="System_DynamicFrequencyScaling">
             <td class="indent1">
-                <input type="checkbox" id="System_DynamicFrequencyScaling_enabled" value="1"  onclick = 'InvertEnableItem("System", "DynamicFrequencyScaling")' unchecked >
-                <label for=System_DynamicFrequencyScaling_enabled><class id="System_DynamicFrequencyScaling_text" style="color:black;">Dynamic Frequency Scaling (ESP32-S3 only)</class></label>
+                <label><class id="System_DynamicFrequencyScaling_text" style="color:black;">Dynamic Frequency Scaling (ESP32-S3 only)</class></label>
             </td>
             <td>
                 <select id="System_DynamicFrequencyScaling_value1">
@@ -2529,8 +2527,7 @@
 
         <tr class="expert" unused_id="System_BackupInterval">
             <td class="indent1">
-                <input type="checkbox" id="System_BackupInterval_enabled" value="1"  onclick = 'InvertEnableItem("System", "BackupInterval")' unchecked >
-                <label for=System_BackupInterval_enabled><class id="System_BackupInterval_text" style="color:black;">Backup Interval (days)</class></label>
+                <label><class id="System_BackupInterval_text" style="color:black;">Backup Interval (days, 0 = off)</class></label>
             </td>
             <td>
                 <input required type="number" id="System_BackupInterval_value1" size="13" min="0" step="1" value="0">
@@ -3027,8 +3024,9 @@ function UpdateInput() {
     WriteParameter(param, category, "System", "Hostname", true);
     WriteParameter(param, category, "System", "TimeServer", true);
     WriteParameter(param, category, "System", "RSSIThreshold", true);
-    WriteParameter(param, category, "System", "CPUFrequency", true);
-    WriteParameter(param, category, "System", "DynamicFrequencyScaling", true);
+    WriteParameter(param, category, "System", "CPUFrequency", false);
+    WriteParameter(param, category, "System", "DynamicFrequencyScaling", false);
+    WriteParameter(param, category, "System", "BackupInterval", false);
 
     WriteModelFiles();
 }
@@ -3402,8 +3400,9 @@ function ReadParameterAll() {
     ReadParameter(param, "System", "Hostname", true);
     ReadParameter(param, "System", "TimeServer", true);
     ReadParameter(param, "System", "RSSIThreshold", true);
-    ReadParameter(param, "System", "CPUFrequency", true);
-    ReadParameter(param, "System", "DynamicFrequencyScaling", true);
+    ReadParameter(param, "System", "CPUFrequency", false);
+    ReadParameter(param, "System", "DynamicFrequencyScaling", false);
+    ReadParameter(param, "System", "BackupInterval", false);
 
     var sel = document.getElementById("Numbers_value1");
     UpdateInputIndividual(sel);
