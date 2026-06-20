@@ -590,8 +590,20 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         SaveConfigToServer(domainname);
         UpdateROIs();
         document.getElementById("saveroi").disabled = true;
+        applyConfigNoReboot();
+    }
 
-        firework.launch('Configuration saved. It will get applied after the next reboot!<br><br>\n<a id="reboot_button" onclick="doReboot()">reboot now</a>', 'success', 5000);
+    // Re-initialise the processing flow (/doinit, round-safe in firmware) so ROI / sequence / alignment
+    // edits take effect WITHOUT a full reboot. Falls back to offering a reboot if the request fails.
+    function applyConfigNoReboot() {
+        firework.launch('Configuration saved. Applying (re-initialising the device)…', 'success', 4000);
+        fetch(getDomainname() + '/doinit', { cache: 'no-store' })
+            .then(function(r){ if (!r.ok) throw 0;
+                firework.launch('Configuration applied — no reboot needed.<br><br>\n'
+                    + 'If anything looks off, <a id="reboot_button" onclick="doReboot()">reboot</a>.', 'success', 6000); })
+            .catch(function(){
+                firework.launch('Saved, but live-apply failed.<br><br>\n'
+                    + '<a id="reboot_button" onclick="doReboot()">reboot now</a> to apply.', 'warning', 8000); });
     }
 
     function ShowMultiplier() {

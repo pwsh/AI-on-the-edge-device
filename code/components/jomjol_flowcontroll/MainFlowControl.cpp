@@ -439,7 +439,15 @@ esp_err_t handler_init(httpd_req_t *req)
     const char *resp_str = "Init started<br>";
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
 
+    // Serialise against a running round: doInit() rebuilds the flow objects, so doing it mid-round would
+    // crash. Take the same round mutex the flow task uses (wait up to 30s for any in-flight round to
+    // finish); a round won't start while we hold it. Lets the web UI apply config (e.g. ROI/sequence
+    // edits) via /doinit without a full reboot.
+    bool locked = flowRoundLock(30000);
     doInit();
+    if (locked) {
+        flowRoundUnlock();
+    }
 
     resp_str = "Init done<br>";
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
