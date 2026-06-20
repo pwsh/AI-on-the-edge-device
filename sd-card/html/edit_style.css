@@ -39,7 +39,7 @@
 
 	.button {
 		padding: 5px 10px;
-		width: 160px;
+		min-width: 160px;   /* was width:160px - a fixed width clipped longer labels e.g. "Show reference image" */
 		font-size: 16px;
 	}
 
