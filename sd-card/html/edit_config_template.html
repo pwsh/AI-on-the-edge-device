@@ -2225,6 +2225,20 @@
             <td>$TOOLTIP_GPIO_StatusLED</td>
         </tr>
 
+        <!------------- Always-on LED (constant illumination) ------------------>
+        <tr class="GPIO_item expert">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDAlwaysOn_text">Always-on LED (overrides status colours; disables capture delay)</span>
+            </td>
+            <td>
+                <select class="GPIO_item" id="GPIO_LEDAlwaysOn_value1">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_GPIO_LEDAlwaysOn</td>
+        </tr>
+
         <tr class="GPIO_item expert">
             <td class="indent1"><span class="GPIO_item" id="GPIO_StatusLEDIdle_text">&nbsp;&nbsp;Colour: Idle / ready</span></td>
             <td>
@@ -3024,6 +3038,7 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "LEDMaxCurrent", false);
     updateExtLedEstimate();   // refresh the live current estimate + show/hide the injection mA field
     WriteParameter(param, category, "GPIO", "StatusLED", false);
+    WriteParameter(param, category, "GPIO", "LEDAlwaysOn", false);
     WriteParameter(param, category, "GPIO", "OnboardLED", false);
     WriteParameter(param, category, "GPIO", "StatusLEDIdle", false);
     WriteParameter(param, category, "GPIO", "StatusLEDTakeImage", false);
@@ -3388,6 +3403,7 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "LEDPowerInjection", false);
     ReadParameter(param, "GPIO", "LEDMaxCurrent", false);
     ReadParameter(param, "GPIO", "StatusLED", false);
+    ReadParameter(param, "GPIO", "LEDAlwaysOn", false);
     ReadParameter(param, "GPIO", "OnboardLED", false);
     ReadParameter(param, "GPIO", "StatusLEDIdle", false);
     ReadParameter(param, "GPIO", "StatusLEDTakeImage", false);

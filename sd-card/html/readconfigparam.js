@@ -296,6 +296,7 @@ function ParseConfig() {
     // Global GPIO param (NOT per-number) -> _isNUMBER must be false, otherwise it gets written
     // as "main.StatusLED"/"rate.StatusLED" instead of a single "StatusLED" line.
     ParamAddValue(param, catname, "StatusLED", 1, false, "false");
+    ParamAddValue(param, catname, "LEDAlwaysOn", 1, false, "false");   // always-on LED master toggle
     ParamAddValue(param, catname, "OnboardLED", 1, false, "true");   // ESP32-S3 onboard RGB (GPIO48) on/off
     ParamAddValue(param, catname, "StatusLEDIdle", 3);
     ParamAddValue(param, catname, "StatusLEDTakeImage", 3);
@@ -757,6 +758,7 @@ function getCamConfig() {
     category["GPIO"]["enabled"] = true;
 
     param["GPIO"]["StatusLED"]["enabled"] = true;
+    param["GPIO"]["LEDAlwaysOn"]["enabled"] = true;   // no enable checkbox - always persisted
     // Onboard LED (S3): keep editable + default on even when absent from an older config.ini.
     if (param["GPIO"]["OnboardLED"]) {
         param["GPIO"]["OnboardLED"]["enabled"] = true;

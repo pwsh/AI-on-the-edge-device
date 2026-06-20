@@ -567,7 +567,7 @@ bool ClassFlowTakeImage::doFlow(string zwtime)
 
     string logPath = CreateLogFolder(zwtime);
 
-    int flash_duration = (int)(CCstatus.WaitBeforePicture * 1000);
+    int flash_duration = gLedAlwaysOn ? 0 : (int)(CCstatus.WaitBeforePicture * 1000);   // always-on LED: scene already lit, skip the settle wait
 
 #ifdef DEBUG_DETAIL_ON
     LogFile.WriteHeapInfo("ClassFlowTakeImage::doFlow - Before takePictureWithFlash");
@@ -622,7 +622,7 @@ bool ClassFlowTakeImage::doFlow(string zwtime)
 
 esp_err_t ClassFlowTakeImage::SendRawJPG(httpd_req_t *req)
 {
-    int flash_duration = (int)(CCstatus.WaitBeforePicture * 1000);
+    int flash_duration = gLedAlwaysOn ? 0 : (int)(CCstatus.WaitBeforePicture * 1000);   // always-on LED: scene already lit, skip the settle wait
     time(&TimeImageTaken);
     localtime(&TimeImageTaken);
 
@@ -633,7 +633,7 @@ ImageData *ClassFlowTakeImage::SendRawImage(void)
 {
     CImageBasis *zw = new CImageBasis("SendRawImage", rawImage);
     ImageData *id;
-    int flash_duration = (int)(CCstatus.WaitBeforePicture * 1000);
+    int flash_duration = gLedAlwaysOn ? 0 : (int)(CCstatus.WaitBeforePicture * 1000);   // always-on LED: scene already lit, skip the settle wait
     Camera.CaptureToBasisImage(zw, flash_duration);
     time(&TimeImageTaken);
     localtime(&TimeImageTaken);

@@ -58,6 +58,7 @@ unsigned int systemStatus = 0;
 sdmmc_cid_t SDCardCid;
 sdmmc_csd_t SDCardCsd;
 bool SDCardIsMMC;
+bool gLedAlwaysOn = false;   // see Helper.h - master "always-on LED" flag (set by the GPIO handler)
 
 // #define DEBUG_DETAIL_ON
 

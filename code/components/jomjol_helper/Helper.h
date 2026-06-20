@@ -163,4 +163,10 @@ typedef void (*tStatusLedStageCb)(int stage);
 void registerStatusLedStageCallback(tStatusLedStageCb cb);
 void setProcessingStage(int stage);   // no-op if no callback registered
 
+// "Always-on LED" master flag (set from the [GPIO] LEDAlwaysOn config by the GPIO handler). When true the
+// external LED is kept constantly lit (overriding the per-stage status colours) and the camera's
+// pre-capture flash/AEC-settle wait is skipped (the scene is already lit). Lives here so both the GPIO
+// handler (writer) and ClassFlowTakeImage (reader) can see it without a cross-component dependency.
+extern bool gLedAlwaysOn;
+
 #endif //HELPER_H

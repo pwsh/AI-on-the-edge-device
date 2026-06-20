@@ -120,6 +120,9 @@ private:
 
     // Status LED: show the current processing stage as a colour on the WS281x LED.
     bool statusLedEnabled = false;
+    // "Always-on LED": keep the external WS281x strip constantly lit at LEDColor, overriding the per-stage
+    // status colours and the capture flash on/off. Also disables the pre-capture wait (via gLedAlwaysOn).
+    bool ledAlwaysOn = false;
     Rgb statusLedColors[8];   // indexed by ProcessingStage (>= PROC_STAGE_COUNT)
     void initStatusLedDefaults();
     void driveWs281x(Rgb color);   // shared low-level WS281x writer

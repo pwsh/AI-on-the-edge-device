@@ -260,6 +260,10 @@ void GpioHandler::init()
         it->second->init();
     }
 
+    if (ledAlwaysOn) {
+        flashLightEnable(true);   // light the external LED immediately so the scene is lit from boot on
+    }
+
 #ifdef ENABLE_MQTT
     std::function<void()> f = std::bind(&GpioHandler::handleMQTTconnect, this);
     MQTTregisterConnectFunction("gpio-handler", f);
@@ -514,6 +518,12 @@ bool GpioHandler::readConfig()
         if (toUpper(splitted[0]) == "STATUSLED" && splitted.size() > 1)
         {
             statusLedEnabled = alphanumericToBoolean(splitted[1]);
+        }
+        // ---- Always-on LED: keep the external strip constantly lit (overrides the status colours) ----
+        if (toUpper(splitted[0]) == "LEDALWAYSON" && splitted.size() > 1)
+        {
+            ledAlwaysOn = alphanumericToBoolean(splitted[1]);
+            gLedAlwaysOn = ledAlwaysOn;   // shared flag: ClassFlowTakeImage skips the pre-capture wait
         }
         {
             // map "StatusLEDColor<Stage>" key -> ProcessingStage index
@@ -807,6 +817,10 @@ void GpioHandler::driveWs281x(Rgb color)
 // Show the colour for the given ProcessingStage (no-op if status LED disabled / not configured).
 void GpioHandler::setStatusStageLED(int stage)
 {
+    if (ledAlwaysOn) {
+        driveWs281x(LEDColor);   // always-on overrides the per-stage status colour (keeps the scene lit)
+        return;
+    }
     if (!statusLedEnabled) {
         return;
     }
@@ -863,6 +877,10 @@ static void statusLedStageTrampoline(int stage)
 void GpioHandler::flashLightEnable(bool value)
 {
     ESP_LOGD(TAG, "GpioHandler::flashLightEnable %s", value ? "true" : "false");
+
+    if (ledAlwaysOn) {
+        value = true;   // always-on: the capture's flash on/off must never switch the LED off
+    }
 
     if (gpioMap != NULL) {
         for(std::map<gpio_num_t, GpioPin*>::iterator it = gpioMap->begin(); it != gpioMap->end(); ++it) 
