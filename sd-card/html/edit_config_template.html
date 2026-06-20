@@ -4089,13 +4089,26 @@ function ReadParameter(_param, _cat, _name, _optional, _number = -1) {
     }
     else
     {
+        // Guard against an unregistered param (mirrors WriteParameter). Without this, accessing
+        // _param[_cat][_name]["anzParam"] throws on a missing param and aborts the WHOLE ReadParameterAll
+        // pass on save - so EVERY setting silently fails to save, not just the unknown one. This happens
+        // when the page (this HTML) and readconfigparam.js are out of sync, almost always a stale 12h
+        // browser cache after a web-UI update. Skip the unknown param instead of breaking the save.
+        if ((_param[_cat] == undefined) || (_param[_cat][_name] == undefined)) {
+            console.warn("ReadParameter: unknown parameter '" + _cat + "/" + _name + "' (skipped). " +
+                         "If you just updated the web UI, hard-refresh to clear the cache.");
+            return;
+        }
+
         if (_optional) {
-            _param[_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;			
+            _param[_cat][_name]["enabled"] = document.getElementById(_cat+"_"+_name+"_enabled").checked;
         }
 
         for (var j = 1; j <= _param[_cat][_name]["anzParam"]; ++j) {
             let element = document.getElementById(_cat+"_"+_name+"_value"+j);
 			
+            if (!element) { continue; }   // row missing from this (possibly cached) HTML - don't abort the save
+
             if (element.tagName.toLowerCase() == "select") {
                 _param[_cat][_name]["value"+j] = element.selectedIndex > -1 ? element.options[element.selectedIndex].value : "";
             }
