@@ -5,6 +5,7 @@
 #include "../../include/defines.h"
 
 #include <esp_log.h>
+#include <cstdint>
 
 static const char* TAG = "C FIND TEMPL";
 
@@ -94,8 +95,14 @@ bool CFindTemplate::FindTemplate(RefInfo *_ref)
 //    ESP_LOGD(TAG, "FindTemplate 04");
 
 
-    double aktSAD;
-    double minSAD = pow(tpl_width * tpl_height * 255, 2);
+    // SAD (sum of squared differences) template match. The squared difference is an integer multiply
+    // (d*d) instead of pow(): pow() is a libm call in the innermost loop and made this search dominate the
+    // whole flow round (~85% of it). We also abandon a candidate position as soon as its running SAD can
+    // no longer beat the best match (branch-and-bound). Both are pure optimisations - the chosen position
+    // is identical to before (a position that early-exits has SAD >= minSAD, so it never wins).
+    int64_t aktSAD;
+    int64_t maxLin = (int64_t)tpl_width * tpl_height * 255;
+    int64_t minSAD = maxLin * maxLin;   // upper bound, same value as the old pow(tpl_width*tpl_height*255, 2)
 
     RGBImageLock();
 
@@ -110,15 +117,20 @@ bool CFindTemplate::FindTemplate(RefInfo *_ref)
         {
             aktSAD = 0;
             for (tpl_x = 0; tpl_x < tpl_width; tpl_x++)
+            {
                 for (tpl_y = 0; tpl_y < tpl_height; tpl_y++)
                 {
                     stbi_uc* p_org = rgb_image + (channels * ((youter + tpl_y) * width + (xouter + tpl_x)));
                     stbi_uc* p_tpl = rgb_template + (channels * (tpl_y * tpl_width + tpl_x));
                     for (_ch = 0; _ch < _anzchannels; ++_ch)
                     {
-                        aktSAD += pow(p_tpl[_ch] - p_org[_ch], 2);
+                        int d = (int)p_tpl[_ch] - (int)p_org[_ch];
+                        aktSAD += d * d;
                     }
                 }
+                if (aktSAD >= minSAD)   // partial SAD already worse than the best - stop scoring this position
+                    break;
+            }
             if (aktSAD < minSAD)
             {
                 minSAD = aktSAD;
