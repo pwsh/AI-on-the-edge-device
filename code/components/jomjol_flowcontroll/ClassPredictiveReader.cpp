@@ -68,6 +68,10 @@ RateBounds deriveRateBounds(const PhysicalLimits& L) {
 
     switch (L.utility) {
         case Utility::Water: {
+            // No pipe diameter configured -> we can't derive a physical ceiling. Treat it as UNKNOWN
+            // (don't reject) instead of deriving a 0-flow ceiling, which would otherwise flag EVERY
+            // change as "exceeds physical max" (e.g. a rate-dial sequence left with no pipe set).
+            if (L.waterPipeDiameterMm <= 0.0) { rb.known = false; break; }
             const double expectedSi = waterFlowLpm(L.waterPipeDiameterMm, L.waterPressureKPa, L.waterExpectedVelMs);
             const double ceilSi     = waterFlowLpm(L.waterPipeDiameterMm, L.waterPressureKPa, /*cap*/ 0.0);
             rb.expectedMaxPerMin = expectedSi / upv;
@@ -75,6 +79,7 @@ RateBounds deriveRateBounds(const PhysicalLimits& L) {
             rb.known = true;
         } break;
         case Utility::Electricity: {
+            if (L.elecServiceAmps <= 0.0) { rb.known = false; break; }   // no service rating -> no ceiling
             // The service rating is already the hard ceiling; expected == ceiling.
             const double si = electricEnergyKwhPerMin(L.elecServiceVolts, L.elecServiceAmps);
             rb.expectedMaxPerMin = si / upv;
@@ -82,6 +87,7 @@ RateBounds deriveRateBounds(const PhysicalLimits& L) {
             rb.known = true;
         } break;
         case Utility::Gas: {
+            if (L.gasPipeDiameterMm <= 0.0) { rb.known = false; break; }   // no pipe diameter -> no ceiling
             const double expectedSi = gasFlowM3PerMin(L.gasPipeDiameterMm, L.gasPressureKPa, L.gasExpectedVelMs);
             const double ceilSi     = gasFlowM3PerMin(L.gasPipeDiameterMm, L.gasPressureKPa, /*cap*/ 0.0);
             rb.expectedMaxPerMin = expectedSi / upv;
