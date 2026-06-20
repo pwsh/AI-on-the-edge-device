@@ -562,6 +562,18 @@ function getCamConfig() {
     param["System"]["CPUFrequency"]["enabled"] = true;             // no enable checkbox - always persisted
     param["System"]["DynamicFrequencyScaling"]["enabled"] = true;  // no enable checkbox - dropdown is the value
     param["System"]["BackupInterval"]["enabled"] = true;           // no enable checkbox - 0 = off
+    param["System"]["TimeServer"]["enabled"] = true;               // no enable checkbox - empty = NTP off
+    param["System"]["Hostname"]["enabled"] = true;                 // no enable checkbox - empty = default edgeai-<MAC>
+    // Don't carry the "undefined" placeholder into the Hostname field: writing Hostname=undefined would
+    // set the hostname literally to "undefined" (the firmware applies any non-empty value). Empty = default.
+    if (param["System"]["Hostname"]["value1"] == "undefined") {
+        param["System"]["Hostname"]["value1"] = "";
+    }
+    // TimeServer: empty means "disable NTP", so keep the configured value (default pool.ntp.org) rather
+    // than blanking it. Only normalise the firmware's "undefined" sentinel to the real default.
+    if (!param["System"]["TimeServer"]["value1"] || param["System"]["TimeServer"]["value1"] == "undefined") {
+        param["System"]["TimeServer"]["value1"] = "pool.ntp.org";
+    }
     param["Alignment"]["InitialRotate"]["enabled"] = true;
 			
     param["TakeImage"]["RawImages"]["enabled"] = true;   // no enable checkbox - keep the select editable

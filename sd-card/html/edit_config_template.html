@@ -2465,22 +2465,20 @@
 
         <tr class="expert" unused_id="ex16">
             <td class="indent1">
-                <input type="checkbox" id="System_TimeServer_enabled" value="1"  onclick = 'InvertEnableItem("System", "TimeServer")' unchecked >
-                <label for=System_TimeServer_enabled><class id="System_TimeServer_text" style="color:black;">Time Server (NTP)</class></label>
+                <label><class id="System_TimeServer_text" style="color:black;">Time Server (NTP)</class></label>
             </td>
             <td>
-                <input type="text" id="System_TimeServer_value1">
+                <input type="text" id="System_TimeServer_value1" placeholder="pool.ntp.org (empty = NTP off)">
             </td>
             <td>$TOOLTIP_System_TimeServer</td>
         </tr>
 
-        <tr class="expert" unused_id="System_Hostname">
+        <tr unused_id="System_Hostname">
             <td class="indent1">
-                <input type="checkbox" id="System_Hostname_enabled" value="1"  onclick = 'InvertEnableItem("System", "Hostname")' unchecked >
-                <label for=System_Hostname_enabled><class id="System_Hostname_text" style="color:black;">Hostname</class></label>
+                <label><class id="System_Hostname_text" style="color:black;">Hostname</class></label>
             </td>
             <td>
-                <input type="text" id="System_Hostname_value1">
+                <input type="text" id="System_Hostname_value1" placeholder="leave empty for default (edgeai-MAC)">
             </td>
             <td>$TOOLTIP_System_Hostname</td>
         </tr>
@@ -3021,8 +3019,8 @@ function UpdateInput() {
     WriteParameter(param, category, "System", "Tooltip", false);
     WriteParameter(param, category, "System", "TimeZone", true);
     ensureTimezoneValuePresent();   // keep a custom/unknown POSIX TZ string selectable
-    WriteParameter(param, category, "System", "Hostname", true);
-    WriteParameter(param, category, "System", "TimeServer", true);
+    WriteParameter(param, category, "System", "Hostname", false);
+    WriteParameter(param, category, "System", "TimeServer", false);
     WriteParameter(param, category, "System", "RSSIThreshold", true);
     WriteParameter(param, category, "System", "CPUFrequency", false);
     WriteParameter(param, category, "System", "DynamicFrequencyScaling", false);
@@ -3397,8 +3395,8 @@ function ReadParameterAll() {
 
     ReadParameter(param, "System", "Tooltip", false);
     ReadParameter(param, "System", "TimeZone", true);
-    ReadParameter(param, "System", "Hostname", true);
-    ReadParameter(param, "System", "TimeServer", true);
+    ReadParameter(param, "System", "Hostname", false);
+    ReadParameter(param, "System", "TimeServer", false);
     ReadParameter(param, "System", "RSSIThreshold", true);
     ReadParameter(param, "System", "CPUFrequency", false);
     ReadParameter(param, "System", "DynamicFrequencyScaling", false);
