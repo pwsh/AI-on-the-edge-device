@@ -681,9 +681,12 @@ static esp_err_t download_get_handler(httpd_req_t *req)
 
     if ((stat(filepath, &file_stat) == -1) || (testwlan.compare("/WLAN.INI") == 0 )) {  // wlan.ini should not be displayed!
 
-        /* If file not present on SPIFFS check if URI
-         * corresponds to one of the hardcoded paths */
-        LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to stat file: " + std::string(filepath) + "!");
+        /* The file isn't there (stat failed) or it's a restricted file (wlan.ini) -> 404. This is
+         * routine, not an error: e.g. the config / publishing page fetches config/publishing.cfg, which
+         * doesn't exist until the data-publishing quick control is first saved (a missing file just means
+         * "use defaults"). Log at DEBUG so it doesn't clutter the log as an ERROR. */
+        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "File not found or restricted -> returning 404: " +
+                            std::string(filepath) + " (normal for optional files, e.g. config/publishing.cfg before first save)");
         /* Respond with 404 Not Found */
         httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, get404());
         return ESP_FAIL;
