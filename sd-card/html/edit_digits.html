@@ -142,10 +142,10 @@
 					<div id="roiTabs" style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:2px 0;"></div>
 			</td>
             <td>
-				<input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI">
+				<input class="button" type="button" id="examineROIbtn" onclick="examineROI()" value="Examine ROI"><span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
 			</td>
             <td>
-				<input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;">
+				<input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI"><input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;">
 			</td>	  
             <td>
 				<input class="button" type="submit" id="deleteROI" name="deleteROI" onclick="deleteROI()" value="Delete ROI">
@@ -170,16 +170,6 @@
 			</td>
         </tr>
 
-        <tr>
-            <td colspan="2">
-                <input class="button" type="button" id="examineROIbtn" onclick="examineROI()" value="Examine ROI">
-                <span id="examineStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
-            </td>
-            <td colspan="2">
-                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull camera image">
-                <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
-            </td>
-        </tr>
     </table>
 
     <div id="examineResult" style="display:none; margin-top:6px; padding:8px; border:1px solid rgba(127,127,127,.35); border-radius:6px;">
@@ -228,9 +218,13 @@
         </colgroup>
 		
         <tr>
-            <td colspan="3" style="vertical-align: bottom;"><b>Reference Image:</b>
+            <td colspan="2" style="vertical-align: bottom;"><b>Reference Image:</b>
                 <span id="imgSourceLabel" style="font-weight:normal; font-size:.9em; color:#888;">showing: reference image</span>
                 <input class="button" type="button" id="showRefBtn" onclick="showReferenceImage()" value="Show reference image" style="display:none; margin-left:8px;">
+            </td>
+            <td>
+                <input class="button" type="button" id="loadFreshBtn" onclick="loadFreshImage()" value="Pull camera image">
+                <span id="freshStatus" style="margin-left:8px; font-size:.9em; color:#888;"></span>
             </td>
             <td>
 				<input style="font-weight:bold;" class="button" type="submit" id="saveroi" name="saveroi" onclick="SaveToConfig()" value="Save Config" tabindex=11>
