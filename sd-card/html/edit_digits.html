@@ -27,10 +27,11 @@
            lifts those two buttons slightly above the rest of the row. */
         .button { vertical-align: middle; }
         #examineStatus, #freshStatus { vertical-align: middle; }
-        /* The actual fix is cross-cell: middle-align the table CELLS that hold control buttons.
-           A button-only cell and a button+status-span cell otherwise baseline-align to different
-           heights, lifting Examine ROI / Pull camera image above the rest of the row. */
-        td:has(.button) { vertical-align: middle; }
+        /* The actual fix is cross-cell: middle-align the table CELLS. A button-only cell and a
+           button+status-span cell otherwise baseline-align to different heights, lifting Examine
+           ROI / Pull camera image above the rest of the row. Plain `td` (not `td:has(.button)`) so
+           it works in browsers without :has() support too; this style block is page-local. */
+        td { vertical-align: middle; }
     </style>
 
     <link href="edit_style.css" rel="stylesheet">
