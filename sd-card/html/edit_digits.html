@@ -138,13 +138,14 @@
 		
         <tr>
             <td>
-				<select id="index" name="index" onchange="ChangeSelection()" tabindex=1></select>
+				<select id="index" name="index" onchange="ChangeSelection()" tabindex=1 style="display:none;"></select>
+					<div id="roiTabs" style="display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:2px 0;"></div>
 			</td>
             <td>
 				<input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI">
 			</td>
             <td>
-				<input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI">
+				<input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;">
 			</td>	  
             <td>
 				<input class="button" type="submit" id="deleteROI" name="deleteROI" onclick="deleteROI()" value="Delete ROI">
@@ -422,7 +423,10 @@
             _roialt = "dig";
         }
 
-        var _roinew = prompt("Please enter a name for the new ROI", _roialt);
+        // Auto-name: ROIs are renamed to <sequence><position> on save (autoNameROIs); here we only need a
+        // unique placeholder so CreateROI accepts it (the name is never shown - the chips show position).
+        var _roinew, _autoN = ROIInfo.length + 1;
+        do { _roinew = _number + _autoN; _autoN++; } while (ROIInfo.some(function(r){ return r.name === _roinew; }));
 	
         if (_roinew === null) {
             return; //break out of the function early because prompt was aborted
@@ -512,6 +516,47 @@
         UpdateROIs();
     }
 
+    // --- Numbered-chip ROI switcher + auto-naming -------------------------------------
+    // ROIs are named <sequence><position> (e.g. main1, main2, ...) automatically at save; the name is
+    // never shown to the user. The switcher is a row of clickable numbered chips instead of a dropdown.
+    function selectRoiTab(i) {
+        if (i < 0 || !ROIInfo || i >= ROIInfo.length) return;
+        aktindex = i;
+        document.getElementById("index").value = i;   // keep the hidden backing <select> in sync
+        UpdateROIs();
+    }
+
+    function buildRoiTabs() {
+        var c = document.getElementById("roiTabs");
+        if (!c) return;
+        c.innerHTML = "";
+        for (var i = 0; i < (ROIInfo ? ROIInfo.length : 0); ++i) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.textContent = (i + 1);
+            b.title = "Edit ROI " + (i + 1);
+            b.style.cssText = "min-width:2.2em;padding:3px 8px;cursor:pointer;border:1px solid #888;" +
+                "border-radius:4px;font-weight:bold;line-height:1.2;" +
+                (i === aktindex ? "background:#27ae60;color:#fff;border-color:#27ae60;"
+                                : "background:rgba(127,127,127,.18);color:inherit;");
+            (function(idx){ b.onclick = function(){ selectRoiTab(idx); }; })(i);
+            c.appendChild(b);
+        }
+    }
+
+    // Rename every digit ROI (all sequences) to <sequence><position> right before the config is written.
+    function autoNameROIs() {
+        if (typeof NUMBERS === 'undefined' || !NUMBERS) return;
+        for (var s = 0; s < NUMBERS.length; ++s) {
+            var seq = NUMBERS[s]["name"];
+            var digs = NUMBERS[s]["digit"];
+            if (!digs) continue;
+            for (var i = 0; i < digs.length; ++i) {
+                digs[i]["name"] = seq + (i + 1);
+            }
+        }
+    }
+
     // --- Model selection (the CNN model used to read the digit ROIs) ---------------
     function populateModelSelect() {
         var sel = document.getElementById("Digits_Model_value1");
@@ -556,6 +601,7 @@
         // _zwcat = getConfigCategory();
         cofcat["Digits"]["enabled"] = document.getElementById("Category_Digits_enabled").checked;
         syncModelToParam();
+        autoNameROIs();          // names = <sequence><position>, regenerated at save (not exposed in the UI)
         WriteConfigININew();
         SaveConfigToServer(domainname);
         UpdateROIs();
@@ -642,6 +688,7 @@
 
         if (ROIInfo.length == 0){
             firework.launch('No digit ROIs defined in selected number sequence', 'warning', 10000);
+        buildRoiTabs();   // clear the ROI chips (none defined)
             document.getElementById("newROI").disabled = false;
             document.getElementById("deleteROI").disabled = true;
             document.getElementById("renameROI").disabled = true;
@@ -702,7 +749,8 @@
             }
         }
 	    
-        _index.selectedIndex = aktindex; 
+        _index.selectedIndex = aktindex;
+        buildRoiTabs();   // render the numbered ROI chips (the visible switcher)
 
         document.getElementById("movePrevious").disabled = false;
         if (aktindex == 0){
@@ -1025,7 +1073,7 @@
                         // Outer box = the analysed region (solid)
                         context.setLineDash([]);
                         context.strokeRect(x0, y0, dx, dy);
-                        drawTextBG(context, ROIInfo[_nb]["name"], x0+dx/2, y0-12, 5);
+                        drawTextBG(context, (_nb+1).toString(), x0+dx/2, y0-12, 5);   // show position, names are auto-generated
 
                         // Inner 60% box = centering guide (dashed, 60% opacity)
                         context.lineWidth = 1;
@@ -1056,7 +1104,7 @@
             // Outer box = the analysed region (solid, full opacity): fill it with the digit
             context.setLineDash([]);
             context.strokeRect(x0, y0, dx, dy);
-            drawTextBG(context, ROIInfo[aktindex]["name"], x0+dx/2, y0-11, 5);
+            drawTextBG(context, (aktindex+1).toString(), x0+dx/2, y0-11, 5);   // show position, names are auto-generated
 
             // Inner 60% box = centering guide only (dashed, 60% opacity); not saved/analysed
             context.lineWidth = 1;
