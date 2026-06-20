@@ -2853,11 +2853,11 @@ function UpdateInputIndividual(sel) {
         var _ppd = NUMBERS[NUNBERSAkt]["PostProcessing"];
         if (_ppd["LeakDetection"]) { _ppd["LeakDetection"]["enabled"] = true; }
         if (_ppd["Utility"]) { _ppd["Utility"]["enabled"] = true; }
-        // Auto-enable the Expert sub-field matching the saved Meter Type so it's editable on load
-        // (Water -> Water Pipe Diameter, Gas -> Gas pipe, Electricity -> Service A).
-        var _um = { water: "WaterPipeDiameterMm", gas: "GasPipeDiameterMm", electricity: "ServiceAmps" };
-        var _uv = _ppd["Utility"] ? (_ppd["Utility"]["value1"] || "") : "";
-        if (_um[_uv] && _ppd[_um[_uv]]) { _ppd[_um[_uv]]["enabled"] = true; }
+        // The pipe-diameter / service-amps override is OPT-IN (it has its own enable checkbox), so we
+        // respect its SAVED enabled state and do NOT force it on to match the Meter Type. Force-enabling
+        // it turned the override on with no value entered, writing e.g. "rate.WaterPipeDiameterMm ="
+        // (empty, uncommented); the firmware read that empty pipe as a 0-flow ceiling and rejected every
+        // reading as "exceeds physical max". The user ticks it only when they want a physics ceiling.
     }
     // WriteParameter(param, category, "PostProcessing", "PreValueUse", false, NUNBERSAkt);
     WriteParameter(param, category, "PostProcessing", "DecimalShift", true, NUNBERSAkt);
@@ -3854,12 +3854,11 @@ function populateMaxRateFromUtility() {
     var uEl = document.getElementById("PostProcessing_Utility_value1");
     if (!uEl) return;
     var u = uEl.value;
-    // Auto-enable (tick) the Expert sub-field matching the chosen Meter Type so it becomes editable.
-    var _subMap = { water: "WaterPipeDiameterMm", gas: "GasPipeDiameterMm", electricity: "ServiceAmps" };
-    if (_subMap[u]) {
-        var _scb = document.getElementById("PostProcessing_" + _subMap[u] + "_enabled");
-        if (_scb && !_scb.checked) { _scb.checked = true; InvertEnableItem("PostProcessing", _subMap[u]); }
-    }
+    // NOTE: the pipe-diameter / service-amps override is opt-in (its own checkbox); we intentionally do
+    // NOT auto-enable it here. Forcing it on left it enabled with no value entered -> an empty,
+    // uncommented "rate.WaterPipeDiameterMm =" that the firmware read as a 0-flow ceiling (rejecting
+    // every reading). The math below still reads the field's value (or a sane default) to SUGGEST a
+    // Maximum Rate, without enabling the raw pipe override.
     var rate = null;
     if (u === "water") {
         var dwin = (parseFloat(document.getElementById("PostProcessing_WaterPipeDiameterMm_value1").value) || 25.4) / 25.4;
