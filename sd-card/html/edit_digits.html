@@ -22,6 +22,11 @@
             text-decoration: none;
             display: inline-block;
         }
+        /* Keep all control buttons on the same line even when one sits next to an inline
+           status span (Examine ROI / Pull camera image) - baseline alignment otherwise
+           lifts those two buttons slightly above the rest of the row. */
+        .button { vertical-align: middle; }
+        #examineStatus, #freshStatus { vertical-align: middle; }
     </style>
 
     <link href="edit_style.css" rel="stylesheet">
