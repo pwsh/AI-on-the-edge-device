@@ -149,6 +149,8 @@
         max-width: 92vw;
         box-sizing: border-box;
         background-color: #fcfcfc;
+        color: #1c2024;   /* explicit dark text: the popup must stay readable even when its anchor row
+                             is greyed out (EnDisableItem sets a light-grey colour that would inherit) */
 
         padding: 5px;
         padding-bottom: 0;
@@ -157,10 +159,17 @@
 
         /* Position the popup below its anchor (the setting name), extending to the right */
         position: absolute;
-        z-index: 5;
+        z-index: 100;   /* above the sticky Save bar (.actionbar, z-index 30) so popups aren't covered */
         top: 100%;
         left: 0;
     }
+
+    /* The markdown help text uses RTD/FontAwesome glyph icons (admonition + heading/headerlink ::before)
+       that we don't ship, so they'd render as empty boxes - hide those decorative icons in the popups. */
+    .tooltiptext .admonition-title:before,
+    .tooltiptext .headerlink:before,
+    .tooltiptext .fa:before,
+    .tooltiptext .icon:before { content: none !important; }
 
     .tooltip:hover .tooltiptext,
     .cfg-nt:hover .tooltiptext {
