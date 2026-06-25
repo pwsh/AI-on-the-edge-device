@@ -3204,10 +3204,14 @@ function mountLedTogglesConfig() {
         layout: gv('LEDLayout', 'line'),
         cols: parseInt(gv('LEDLayoutCols', 0)) || 0,
         domain: getDomainname(),
-        onChange: function (s) { setp('LEDMask', s.mask); setp('LEDLayout', s.layout); setp('LEDLayoutCols', s.cols); }
+        onChange: function (s) {
+            setp('LEDMask', s.mask); setp('LEDLayout', s.layout); setp('LEDLayoutCols', s.cols);
+            if (typeof updateExtLedEstimate === 'function') updateExtLedEstimate();   // estimate tracks enabled LEDs
+        }
     });
     var s0 = w.getState();   // persist the normalised initial state so a Save without toggling is correct
     setp('LEDMask', s0.mask); setp('LEDLayout', s0.layout); setp('LEDLayoutCols', s0.cols);
+    if (typeof updateExtLedEstimate === 'function') updateExtLedEstimate();   // reflect the (possibly new) enabled count
 }
 
 function updateExtLedEstimate() {
@@ -3229,8 +3233,15 @@ function updateExtLedEstimate() {
     var maxRow = document.getElementById('GPIO_LEDMaxCurrent_row');
     if (maxRow) maxRow.style.display = injection ? '' : 'none';
 
-    var n = parseInt((document.getElementById('GPIO_LEDNumbers_value1') || {}).value);
-    if (isNaN(n) || n < 0) n = 0;
+    var nTotal = parseInt((document.getElementById('GPIO_LEDNumbers_value1') || {}).value);
+    if (isNaN(nTotal) || nTotal < 0) nTotal = 0;
+    // Power scales with the LEDs actually lit, not the strip length: count the enabled LEDs from the
+    // mask (param model, kept current by the toggle widget). '0' = off; anything else - including indices
+    // beyond a short/empty mask - counts as on, so an unset mask is treated as all-on.
+    var maskStr = (typeof param !== 'undefined' && param['GPIO'] && param['GPIO']['LEDMask'] &&
+                   typeof param['GPIO']['LEDMask']['value1'] !== 'undefined') ? ('' + param['GPIO']['LEDMask']['value1']) : '';
+    var n = 0;
+    for (var _mi = 0; _mi < nTotal; _mi++) { if (maskStr[_mi] !== '0') n++; }
     var bright = parseInt((document.getElementById('GPIO_LEDBrightness_value1') || {}).value);
     if (isNaN(bright)) bright = 100;
     bright = Math.max(0, Math.min(100, bright));

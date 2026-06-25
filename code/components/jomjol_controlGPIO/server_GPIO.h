@@ -137,6 +137,14 @@ private:
     std::vector<bool> ledEnabledMask;
     std::string ledMaskCfg;   // raw LEDMask string from config; applied after the parse loop (needs final LEDNumbers)
     bool ledIndexOn(int i) { return (i < 0 || i >= (int)ledEnabledMask.size()) ? true : ledEnabledMask[i]; }
+    // Number of LEDs actually lit (disabled pixels draw ~nothing), used for the 5V budget estimate.
+    // Falls back to LEDNumbers if the mask has not been built yet (treated as all-on).
+    int enabledLedCount() {
+        if (ledEnabledMask.empty()) return LEDNumbers;
+        int n = 0;
+        for (size_t i = 0; i < ledEnabledMask.size(); ++i) if (ledEnabledMask[i]) n++;
+        return n;
+    }
     void applyLedMaskFromString(const std::string &mask);   // parse "1101.." into ledEnabledMask
 
     bool readConfig();

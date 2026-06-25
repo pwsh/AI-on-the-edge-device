@@ -780,8 +780,9 @@ Rgb GpioHandler::scaleExtLedColor(Rgb base, bool applyBrightness)
     float sumChannels = r + g + b;
     // Log only on the rising edge so a static bright config doesn't spam the log every round.
     static bool wasClamped = false;
-    if (LEDNumbers > 0 && sumChannels > 0.0f && budget > 0) {
-        float estimate_mA = (float)LEDNumbers * sumChannels * LED_MA_PER_CHANNEL_FULL / 255.0f;
+    int litLeds = enabledLedCount();   // budget against the LEDs actually lit, not the whole strip
+    if (litLeds > 0 && sumChannels > 0.0f && budget > 0) {
+        float estimate_mA = (float)litLeds * sumChannels * LED_MA_PER_CHANNEL_FULL / 255.0f;
         if (estimate_mA > (float)budget) {
             float factor = (float)budget / estimate_mA;
             r *= factor; g *= factor; b *= factor;
