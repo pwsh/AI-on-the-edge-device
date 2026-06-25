@@ -203,6 +203,12 @@ esp_err_t callHandleLedBrightness(httpd_req_t *req)
     return gpioHandler->handleLedBrightnessRequest(req);
 }
 
+esp_err_t callHandleLedState(httpd_req_t *req)
+{
+    GpioHandler *gpioHandler = (GpioHandler*)req->user_ctx;
+    return gpioHandler->handleLedStateRequest(req);
+}
+
 void taskGpioHandler(void *pvParameter)
 {
     ESP_LOGD(TAG,"taskGpioHandler");
@@ -462,6 +468,12 @@ bool GpioHandler::readConfig()
         {
             LEDNumbers = cfgStoi(splitted[1], LEDNumbers);
         }
+        // Per-LED on/off mask (one '0'/'1' char per pixel). Stored now, applied after the loop once
+        // LEDNumbers is final (the two keys can appear in any order).
+        if (toUpper(splitted[0]) == "LEDMASK" && splitted.size() > 1)
+        {
+            ledMaskCfg = splitted[1];
+        }
         // External WS281x data pin (the simple way to place the strip on any free GPIO, instead of an
         // IOxx=external-flash-ws281x line). Set up after the loop so it can see whether an IOxx already
         // claimed the WS281x role.
@@ -571,6 +583,7 @@ bool GpioHandler::readConfig()
     }
 
     setOnboardLedEnabled(onboardLedEnabled);   // apply the on/off toggle for the onboard RGB (S3)
+    applyLedMaskFromString(ledMaskCfg);        // size + populate the per-LED mask (LEDNumbers now final)
 
     if (gpioExtLED > 0)
     {
@@ -625,6 +638,15 @@ void GpioHandler::registerGpioUri()
     leduri.handler   = APPLY_BASIC_AUTH_FILTER(callHandleLedBrightness);
     leduri.user_ctx  = (void*)this;
     httpd_register_uri_handler(_httpServer, &leduri);
+
+    // Live per-LED on/off: GET /ledstate?mask=11101111 - applies immediately (no reboot) so the config
+    // and camera-setup pages can toggle individual LEDs in the strip in realtime.
+    httpd_uri_t ledstateuri = { };
+    ledstateuri.method    = HTTP_GET;
+    ledstateuri.uri       = "/ledstate";
+    ledstateuri.handler   = APPLY_BASIC_AUTH_FILTER(callHandleLedState);
+    ledstateuri.user_ctx  = (void*)this;
+    httpd_register_uri_handler(_httpServer, &ledstateuri);
 }
 
 esp_err_t GpioHandler::handleHttpRequest(httpd_req_t *req)
@@ -800,13 +822,13 @@ void GpioHandler::driveWs281x(Rgb color)
             leds_global->wait();   // see SmartLeds issue #10
         }
         for (int i = 0; i < LEDNumbers; ++i) {
-            (*leds_global)[i] = color;
+            (*leds_global)[i] = ledIndexOn(i) ? color : Rgb{ 0, 0, 0 };   // masked-off pixel -> black
         }
         leds_global->show();
 #else
         SmartLed leds(LEDType, LEDNumbers, it->second->getGPIO(), 0, DoubleBuffer);
         for (int i = 0; i < LEDNumbers; ++i) {
-            leds[i] = color;
+            leds[i] = ledIndexOn(i) ? color : Rgb{ 0, 0, 0 };   // masked-off pixel -> black
         }
         leds.show();
 #endif
@@ -916,12 +938,14 @@ void GpioHandler::flashLightEnable(bool value)
                         {
                             // Apply the external output % and clamp to the 5V current budget.
                             Rgb flashColor = scaleExtLedColor(LEDColor, /*applyBrightness=*/true);
-                            for (int i = 0; i < LEDNumbers; ++i)
+                            for (int i = 0; i < LEDNumbers; ++i) {
+                                Rgb px = ledIndexOn(i) ? flashColor : Rgb{0, 0, 0};   // masked-off pixel -> black
 #ifdef __LEDGLOBAL
-                                (*leds_global)[i] = flashColor;
+                                (*leds_global)[i] = px;
 #else
-                                leds[i] = flashColor;
+                                leds[i] = px;
 #endif
+                            }
                         }
                         else
                         {
@@ -974,6 +998,43 @@ esp_err_t GpioHandler::handleLedBrightnessRequest(httpd_req_t *req)
     setExternalLedBrightnessLive(pct);
     std::string resp = "external LED brightness = " + std::to_string(externalLedBrightnessPct) + "%";
     httpd_resp_send(req, resp.c_str(), resp.length());
+    return ESP_OK;
+}
+
+// Parse a per-LED on/off string ("1101..", one char per pixel) into ledEnabledMask, sized to LEDNumbers.
+// Pixels past the end of the string (or an empty string) default to ON, so a short/absent mask never
+// blanks the strip.
+void GpioHandler::applyLedMaskFromString(const std::string &mask)
+{
+    ledEnabledMask.assign(LEDNumbers > 0 ? LEDNumbers : 0, true);
+    for (int i = 0; i < (int)mask.size() && i < LEDNumbers; ++i) {
+        ledEnabledMask[i] = (mask[i] != '0');
+    }
+}
+
+// Apply a per-LED mask immediately (no reboot) and light the strip at LEDColor so the user sees which
+// LEDs are enabled as they toggle them. The strip returns to its normal flash/status state on the next
+// capture round.
+void GpioHandler::setLedMaskLive(const std::string &mask)
+{
+    applyLedMaskFromString(mask);
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "External LED mask set live: " + mask);
+    driveWs281x(LEDColor);
+}
+
+esp_err_t GpioHandler::handleLedStateRequest(httpd_req_t *req)
+{
+    char query[300];
+    char val[256];
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK &&
+        httpd_query_key_value(query, "mask", val, sizeof(val)) == ESP_OK) {
+        setLedMaskLive(std::string(val));
+        std::string resp = "external LED mask = " + std::string(val);
+        httpd_resp_send(req, resp.c_str(), resp.length());
+        return ESP_OK;
+    }
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing 'mask' (e.g. 11101111)");
     return ESP_OK;
 }
 

@@ -7,6 +7,8 @@
 
 #include <esp_http_server.h>
 #include <map>
+#include <vector>
+#include <string>
 #include "driver/gpio.h"
 
 #include "SmartLeds.h"
@@ -87,6 +89,8 @@ public:
     void setFlashLEDColor(uint8_t r, uint8_t g, uint8_t b) { LEDColor = Rgb{r, g, b}; }   // runtime flash colour (e.g. live camera-setup stream)
     void setExternalLedBrightnessLive(int pct);   // apply external-LED brightness % now (no reboot) + re-draw
     esp_err_t handleLedBrightnessRequest(httpd_req_t *req);   // GET /ledbrightness?value=N
+    void setLedMaskLive(const std::string &mask);   // apply per-LED on/off mask now (no reboot) + re-draw
+    esp_err_t handleLedStateRequest(httpd_req_t *req);   // GET /ledstate?mask=11101111
     bool isEnabled() { return _isEnabled; }
 #ifdef ENABLE_MQTT
     void handleMQTTconnect();
@@ -126,6 +130,14 @@ private:
     Rgb statusLedColors[8];   // indexed by ProcessingStage (>= PROC_STAGE_COUNT)
     void initStatusLedDefaults();
     void driveWs281x(Rgb color);   // shared low-level WS281x writer
+
+    // Per-LED on/off mask for the external WS281x strip. ledEnabledMask[i] == false -> pixel i is forced
+    // off (black) on every strip write; missing/empty -> on. Parsed from the LEDMask config key (one
+    // '0'/'1' char per LED) and from GET /ledstate for live preview.
+    std::vector<bool> ledEnabledMask;
+    std::string ledMaskCfg;   // raw LEDMask string from config; applied after the parse loop (needs final LEDNumbers)
+    bool ledIndexOn(int i) { return (i < 0 || i >= (int)ledEnabledMask.size()) ? true : ledEnabledMask[i]; }
+    void applyLedMaskFromString(const std::string &mask);   // parse "1101.." into ledEnabledMask
 
     bool readConfig();
     void clear();

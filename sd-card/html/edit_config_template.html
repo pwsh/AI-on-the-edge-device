@@ -2134,7 +2134,8 @@
             </td>
             <td>
                 <input required type="number" name="name" id="GPIO_LEDNumbers_value1" size="13" min="1"
-                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+                    oninput="(!validity.rangeUnderflow||(value=1)) && (!validity.stepMismatch||(value=parseInt(this.value)));"
+                    onchange="mountLedTogglesConfig()">
             </td>
             <td>$TOOLTIP_GPIO_LEDNumbers</td>
         </tr>
@@ -2207,6 +2208,23 @@
                 <div class="rst-content"><div class="tooltip"><img src="help.png" width="32px"><span class="tooltiptext">
                     Live estimate of the external strip's peak 5V draw (~60&nbsp;mA per LED at full white &times; colour &times; brightness),
                     shown against the active budget. When it would exceed the budget the firmware dims the strip to fit and this value turns red.
+                </span></div></div>
+            </td>
+        </tr>
+
+        <!------------- Per-LED on/off toggles (line / grid / circle), realtime ------------------>
+        <tr class="GPIO_item">
+            <td class="indent1">
+                <span class="GPIO_item" id="GPIO_LEDMask_text">Individual LEDs (on/off)</span>
+            </td>
+            <td>
+                <div id="GPIO_LedToggles_area"></div>
+            </td>
+            <td>
+                <div class="rst-content"><div class="tooltip"><img src="help.png" width="32px"><span class="tooltiptext">
+                    Turn individual LEDs in the external strip on or off. Changes apply to the hardware in
+                    real time as you click; arrange the toggles as a line, grid, or circle to match your
+                    physical layout. The choices are saved with the configuration.
                 </span></div></div>
             </td>
         </tr>
@@ -2655,6 +2673,7 @@
 
 <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
 <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
+<script type="text/javascript" src="led_toggles.js?v=$COMMIT_HASH"></script>
 <script type="text/javascript" src="timezones.js?v=$COMMIT_HASH"></script>
 
 <script type="text/javascript">
@@ -3040,6 +3059,10 @@ function UpdateInput() {
     WriteParameter(param, category, "GPIO", "StatusLED", false);
     WriteParameter(param, category, "GPIO", "LEDAlwaysOn", false);
     WriteParameter(param, category, "GPIO", "OnboardLED", false);
+    // LEDMask/LEDLayout/LEDLayoutCols have no visible row, so they are NOT routed through
+    // WriteParameter (which would call EnDisableItem on a non-existent _text element). The toggle
+    // widget reads/writes them on the param model directly:
+    mountLedTogglesConfig();   // build the per-LED toggle widget from the loaded config
     WriteParameter(param, category, "GPIO", "StatusLEDIdle", false);
     WriteParameter(param, category, "GPIO", "StatusLEDTakeImage", false);
     WriteParameter(param, category, "GPIO", "StatusLEDAlign", false);
@@ -3163,6 +3186,28 @@ function liveSetExtLedBrightness(v) {
         try { fetch(getDomainname() + '/ledbrightness?value=' + pct, { cache: 'no-store' }).catch(function () {}); }
         catch (e) {}
     }, 150);
+}
+
+// Build / rebuild the per-LED on/off toggle widget from the current LEDNumbers + saved mask/layout,
+// writing changes back to the hidden registered params so they persist on Save. Re-runs when the LED
+// count changes. Toggling a LED also hits /ledstate for a realtime hardware update (handled in the widget).
+function mountLedTogglesConfig() {
+    var cont = document.getElementById('GPIO_LedToggles_area');
+    if (!cont || typeof mountLedToggles !== 'function' || typeof param === 'undefined' || !param['GPIO']) return;
+    var g = param['GPIO'];
+    var gv = function (k, d) { return (g[k] && typeof g[k]['value1'] !== 'undefined') ? g[k]['value1'] : d; };
+    var setp = function (k, v) { if (g[k]) { g[k]['value1'] = '' + v; g[k]['enabled'] = true; } };
+    var countEl = document.getElementById('GPIO_LEDNumbers_value1');
+    var w = mountLedToggles(cont, {
+        count: parseInt(countEl ? countEl.value : gv('LEDNumbers', 0)) || 0,
+        mask: gv('LEDMask', ''),
+        layout: gv('LEDLayout', 'line'),
+        cols: parseInt(gv('LEDLayoutCols', 0)) || 0,
+        domain: getDomainname(),
+        onChange: function (s) { setp('LEDMask', s.mask); setp('LEDLayout', s.layout); setp('LEDLayoutCols', s.cols); }
+    });
+    var s0 = w.getState();   // persist the normalised initial state so a Save without toggling is correct
+    setp('LEDMask', s0.mask); setp('LEDLayout', s0.layout); setp('LEDLayoutCols', s0.cols);
 }
 
 function updateExtLedEstimate() {
@@ -3405,6 +3450,8 @@ function ReadParameterAll() {
     ReadParameter(param, "GPIO", "StatusLED", false);
     ReadParameter(param, "GPIO", "LEDAlwaysOn", false);
     ReadParameter(param, "GPIO", "OnboardLED", false);
+    // LEDMask/LEDLayout/LEDLayoutCols are written into the param model by the toggle widget's onChange
+    // (see mountLedTogglesConfig), so they are persisted by WriteConfigININew without a ReadParameter.
     ReadParameter(param, "GPIO", "StatusLEDIdle", false);
     ReadParameter(param, "GPIO", "StatusLEDTakeImage", false);
     ReadParameter(param, "GPIO", "StatusLEDAlign", false);

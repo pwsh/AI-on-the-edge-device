@@ -298,6 +298,9 @@ function ParseConfig() {
     ParamAddValue(param, catname, "StatusLED", 1, false, "false");
     ParamAddValue(param, catname, "LEDAlwaysOn", 1, false, "false");   // always-on LED master toggle
     ParamAddValue(param, catname, "OnboardLED", 1, false, "true");   // ESP32-S3 onboard RGB (GPIO48) on/off
+    ParamAddValue(param, catname, "LEDMask", 1, false, "");          // per-LED on/off string (1=on per pixel; empty=all on)
+    ParamAddValue(param, catname, "LEDLayout", 1, false, "line");    // toggle widget display: line/grid/circle
+    ParamAddValue(param, catname, "LEDLayoutCols", 1, false, "0");   // grid columns (0 = auto near-square)
     ParamAddValue(param, catname, "StatusLEDIdle", 3);
     ParamAddValue(param, catname, "StatusLEDTakeImage", 3);
     ParamAddValue(param, catname, "StatusLEDAlign", 3);
@@ -759,6 +762,10 @@ function getCamConfig() {
 
     param["GPIO"]["StatusLED"]["enabled"] = true;
     param["GPIO"]["LEDAlwaysOn"]["enabled"] = true;   // no enable checkbox - always persisted
+    // Per-LED mask + toggle-layout: checkbox-less, always persisted (guard against a stale cached readconfigparam.js).
+    if (param["GPIO"]["LEDMask"]) param["GPIO"]["LEDMask"]["enabled"] = true;
+    if (param["GPIO"]["LEDLayout"]) param["GPIO"]["LEDLayout"]["enabled"] = true;
+    if (param["GPIO"]["LEDLayoutCols"]) param["GPIO"]["LEDLayoutCols"]["enabled"] = true;
     // Onboard LED (S3): keep editable + default on even when absent from an older config.ini.
     if (param["GPIO"]["OnboardLED"]) {
         param["GPIO"]["OnboardLED"]["enabled"] = true;

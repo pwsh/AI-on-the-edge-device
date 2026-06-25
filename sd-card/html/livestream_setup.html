@@ -11,6 +11,7 @@
     <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script>
     <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>
     <script type="text/javascript" src="readconfigparam.js?v=$COMMIT_HASH"></script>
+    <script type="text/javascript" src="led_toggles.js?v=$COMMIT_HASH"></script>
     <script type="text/javascript" src="firework.js?v=$COMMIT_HASH"></script>
     <style>
         body { margin: 0; font-family: Arial, sans-serif; }
@@ -18,6 +19,10 @@
         .streamcol { flex: 1 1 420px; min-width: 320px; }
         .ctrlcol { flex: 1 1 340px; min-width: 300px; max-height: 96vh; overflow-y: auto; }
         #stream { width: 100%; height: auto; display: block; border: 1px solid #888; background: #111; }
+        .streamwrap { position: relative; line-height: 0; }
+        #grid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+        #grid line { stroke: rgba(255,255,255,.55); stroke-width: 1; vector-effect: non-scaling-stroke; }
+        #grid line.cx { stroke: rgba(255,80,80,.9); }
         fieldset { margin: 0 0 10px 0; border: 1px solid #bbb; border-radius: 5px; }
         legend { font-weight: bold; padding: 0 5px; }
         .row { display: flex; align-items: center; justify-content: space-between; margin: 5px 0; gap: 8px; }
@@ -32,9 +37,21 @@
 <body onload="init()">
     <div class="wrap">
         <div class="streamcol">
-            <img id="stream" alt="live stream" crossorigin>
-            <div class="row" style="margin-top:6px;">
+            <div class="streamwrap">
+                <img id="stream" alt="live stream" crossorigin>
+                <svg id="grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+            </div>
+            <div class="row" style="margin-top:6px; flex-wrap:wrap;">
                 <label style="flex:0 0 auto;"><input type="checkbox" id="flash" onchange="onCtrlChange()"> &#128161; Light (flash LED)</label>
+                <label style="flex:0 0 auto;">Alignment grid
+                    <select id="gridSel" onchange="drawGrid()">
+                        <option value="off" selected>off</option>
+                        <option value="3">3 &times; 3</option>
+                        <option value="4">4 &times; 4</option>
+                        <option value="86">8 &times; 6</option>
+                    </select>
+                </label>
+                <label style="flex:0 0 auto;"><input type="checkbox" id="crossChk" onchange="drawGrid()"> center cross</label>
                 <span class="hint" id="status"></span>
             </div>
         </div>
@@ -85,6 +102,12 @@
                 <div class="hint">Used for the live view when the &#128161; Light box is on, and saved as the flash for captured images.</div>
                 <div class="row"><label>LED colour (external RGB flash)</label><input type="color" id="led_color" value="#ffffff" onchange="onCtrlChange()"></div>
                 <div class="row"><label>Onboard flash intensity (%)</label><input type="number" id="TakeImage_LEDIntensity_value1" min="0" max="100" step="1" value="0" onchange="onCtrlChange()"></div>
+            </fieldset>
+
+            <fieldset>
+                <legend>External LED &ndash; individual LEDs</legend>
+                <div class="hint">Toggle individual LEDs in the strip on/off. Changes apply to the hardware in real time and preview on the next frame. Saved with the camera settings.</div>
+                <div id="ledtoggles"></div>
             </fieldset>
         </div>
     </div>
@@ -160,7 +183,48 @@
                 camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
             });
             onZoomToggle();    // enable/disable the zoom sub-fields for the current zoom state
+            mountLedTogglesSetup();   // per-LED on/off toggles (realtime), seeded from [GPIO] config
+            drawGrid();        // alignment-grid overlay (off until selected)
             startPreview();    // begin polling preview frames (with the light state set above)
+        }
+
+        // Build the per-LED on/off widget from the [GPIO] config. Toggling a LED hits /ledstate
+        // (realtime) via the widget and updates the param model so SaveCam persists it.
+        function mountLedTogglesSetup() {
+            var cont = document.getElementById("ledtoggles");
+            if (!cont || typeof mountLedToggles !== "function") return;
+            var g = (param && param["GPIO"]) ? param["GPIO"] : {};
+            var gv = function (k, d) { return (g[k] && typeof g[k]["value1"] !== "undefined") ? g[k]["value1"] : d; };
+            mountLedToggles(cont, {
+                count: parseInt(gv("LEDNumbers", 0)) || 0,
+                mask: gv("LEDMask", ""),
+                layout: gv("LEDLayout", "line"),
+                cols: parseInt(gv("LEDLayoutCols", 0)) || 0,
+                domain: domainname,
+                onChange: function (s) {
+                    if (!param["GPIO"]) return;
+                    var setp = function (k, v) { if (param["GPIO"][k]) { param["GPIO"][k]["value1"] = "" + v; param["GPIO"][k]["enabled"] = true; } };
+                    setp("LEDMask", s.mask); setp("LEDLayout", s.layout); setp("LEDLayoutCols", s.cols);
+                }
+            });
+        }
+
+        // Alignment-grid overlay over the live stream (off / 3x3 / 4x4 / 8x6 + optional centre cross).
+        // The SVG uses a 0..100 viewBox stretched to the image, so it scales with the frame.
+        function drawGrid() {
+            var svg = document.getElementById("grid");
+            if (!svg) return;
+            var sel = document.getElementById("gridSel").value;
+            var lines = "";
+            var vert = function (n) { for (var i = 1; i < n; i++) { var p = 100 * i / n; lines += '<line x1="' + p + '" y1="0" x2="' + p + '" y2="100"/>'; } };
+            var horz = function (n) { for (var i = 1; i < n; i++) { var p = 100 * i / n; lines += '<line x1="0" y1="' + p + '" x2="100" y2="' + p + '"/>'; } };
+            if (sel === "3") { vert(3); horz(3); }
+            else if (sel === "4") { vert(4); horz(4); }
+            else if (sel === "86") { vert(8); horz(6); }
+            if (document.getElementById("crossChk").checked) {
+                lines += '<line class="cx" x1="50" y1="0" x2="50" y2="100"/><line class="cx" x1="0" y1="50" x2="100" y2="50"/>';
+            }
+            svg.innerHTML = lines;
         }
 
         // Resume processing when the window is closed (best-effort; index.html also resumes on close).
