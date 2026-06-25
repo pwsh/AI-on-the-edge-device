@@ -1019,6 +1019,12 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             NUMBERS[j]->ReturnConfidence = (float)(seqConf < 0 ? 0 : (seqConf > 100 ? 100 : seqConf));
         }
 
+        // Roll the last-3 per-sequence read-confidence history (newest at [0]) every round - including
+        // low-confidence reads, so a single shaky read correctly blocks the rate-limit override below.
+        NUMBERS[j]->RateConfHistory[2] = NUMBERS[j]->RateConfHistory[1];
+        NUMBERS[j]->RateConfHistory[1] = NUMBERS[j]->RateConfHistory[0];
+        NUMBERS[j]->RateConfHistory[0] = NUMBERS[j]->ReturnConfidence;
+
         NUMBERS[j]->ReturnRawValue = ShiftDecimal(NUMBERS[j]->ReturnRawValue, NUMBERS[j]->DecimalShift);
 
         #ifdef SERIAL_DEBUG
@@ -1161,6 +1167,18 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             NUMBERS[j]->FlowRateAct = (NUMBERS[j]->Value - NUMBERS[j]->PreValue) / LastPreValueTimeDifference;
             NUMBERS[j]->ReturnRateValue =  to_string(NUMBERS[j]->FlowRateAct);
 
+            // Rate-limit confidence override: when a DigitConfidenceThreshold is configured (>0) and the
+            // last 3 reads were ALL at/above it (per-sequence confidence = weakest digit), the digits are
+            // being read reliably, so a large rate is a real change rather than a misread - the two rate
+            // checks below ACCEPT it instead of clamping back to PreValue. Needs 3 valid reads (history
+            // seeds to -1) so it can't fire in the first rounds after boot; never fires for analog-only
+            // sequences (ReturnConfidence stays -1); inert when the threshold is 0/off (opt-in per meter).
+            float _confThrPct = (flowDigit ? flowDigit->GetDigitConfidenceThreshold() : 0.0f) * 100.0f;
+            bool rateConfOverride = (_confThrPct > 0.0f) &&
+                (NUMBERS[j]->RateConfHistory[0] >= _confThrPct) &&
+                (NUMBERS[j]->RateConfHistory[1] >= _confThrPct) &&
+                (NUMBERS[j]->RateConfHistory[2] >= _confThrPct);
+
             // Physics ceiling: when a utility model is configured, reject a jump that exceeds what the
             // supply could physically deliver in the elapsed time. This derives its own bound (so no
             // manual MaxRate is needed) and never rejects a physically-possible reading. It is skipped
@@ -1170,7 +1188,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 predictive::Plausibility _pl = predictive::checkPlausibility(
                     NUMBERS[j]->PhysLimits, NUMBERS[j]->PreValue, NUMBERS[j]->Value, LastPreValueTimeDifference,
                     NUMBERS[j]->AllowNegativeRates);   // symmetric +/- bound for flow-rate-style sequences
-                if (_pl == predictive::Plausibility::ExceedsPhysicalMax) {
+                if ((_pl == predictive::Plausibility::ExceedsPhysicalMax) && !rateConfOverride) {
                     NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate exceeds physical max - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
                     NUMBERS[j]->ReturnValue = ErrorMessage ? "" : RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
@@ -1181,6 +1199,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     WriteDataLog(j);
                     if (flowDigit) flowDigit->TriggerFullEval();   // force a full re-read next round
                     continue;
+                }
+                else if (_pl == predictive::Plausibility::ExceedsPhysicalMax) {   // confidence override -> accept the jump
+                    LogFile.WriteToFile(ESP_LOG_INFO, TAG, NUMBERS[j]->name + ": rate exceeds physical max but ACCEPTED (last 3 reads all >= confidence threshold) - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma));
                 }
             }
 
@@ -1198,7 +1219,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     _ratedifference = (NUMBERS[j]->Value - NUMBERS[j]->PreValue);
                 }
 
-                if (abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) {
+                if ((abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) && !rateConfOverride) {
                     NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate too high - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
                     // "Skip Messages on Error" (ErrorMessage): when true (default) skip the transmission
@@ -1213,6 +1234,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     // FastRead: rejected reading -> force a full re-read of every digit next cycle.
                     if (flowDigit) flowDigit->TriggerFullEval();
                     continue;
+                }
+                else if (abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) {   // confidence override -> accept
+                    LogFile.WriteToFile(ESP_LOG_INFO, TAG, NUMBERS[j]->name + ": rate exceeds MaxRateValue but ACCEPTED (last 3 reads all >= confidence threshold) - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma));
                 }
             }
 

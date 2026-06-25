@@ -64,6 +64,10 @@ public:
     // flow's model input (saving that analysed image to displayPath), run the CNN, and return a JSON
     // fragment: "reading":"<digit/value/N>","confidence":<percent|null>  (no surrounding braces).
     std::string ExamineCut(const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
+
+    // The configured per-digit confidence floor (0..1; 0 = off). Exposed so PostProcessing can decide
+    // whether recent reads were confident enough to override a rate-limit rejection.
+    float GetDigitConfidenceThreshold() { return DigitConfidenceThreshold; }
 protected:
 
     bool isDigitalCNN();                       // true for Digit / Digit100

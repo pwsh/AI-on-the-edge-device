@@ -81,6 +81,9 @@ struct NumberPost {
     string ErrorMessageText;    // errorMessage; Error message for consistency checks
     float  ReturnConfidence = -1.0f; // per-sequence recognition confidence 0..100 (-1 = not available);
                                      // aggregated from the digit ROIs, publishable via the Data Publishing page
+    float  RateConfHistory[3] = { -1.0f, -1.0f, -1.0f }; // last 3 ReturnConfidence values (newest at [0],
+                                     // -1 = no read yet); used to override a rate-limit rejection when the
+                                     // recent reads have all been confident (see ClassFlowPostProcessing)
     // "Send only changed readings" mode: each publisher tracks the ReturnValue it last sent (they run
     // independently each round, so they cannot share one tracker).
     string LastPubMqtt;
