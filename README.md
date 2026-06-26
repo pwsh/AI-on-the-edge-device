@@ -144,6 +144,13 @@ There are several options for what to do with that value:
 ## What's New in v17 🆕
 A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
 
+### ✨ v17.1
+- **Per-LED control of the external strip** – turn individual WS281x pixels on/off from a line/grid/circle toggle widget (on the config *and* camera-setup pages) that updates the hardware in realtime; the 5V power budget now counts only the **enabled** LEDs. Plus an optional **alignment-grid overlay** on the live stream to line up the camera.
+- **ROI editor overhaul** – an **Auto-tune** button that searches nearby positions/sizes for the highest-confidence digit box, a numbered-chip ROI switcher with auto-named ROIs, on-screen model selection and editable decimal shift, and **ROI/sequence edits that apply without a reboot** (Save re-inits the flow live).
+- **Configurable CPU frequency** (80 / 160 / 240 MHz) on every board, plus a runtime **Dynamic Frequency Scaling** option on the ESP32-S3 (idle down-clock). A boot bug that ignored the configured frequency on the S3 is fixed.
+- **FastRead & accuracy improvements** – confidence-gated FastRead caching, temporal voting for low-confidence digits, a tunable per-digit confidence threshold, a High-sensitivity default, plus a faster ROI downscale and lazy model load.
+- **Rate-limit correctness** – an unset pipe diameter no longer caps valid readings at zero flow, the pipe-diameter override is now opt-in, and three consecutive confident reads can override a rate-limit rejection.
+
 ### 🧩 Hardware & platform
 - Rebuilt on **ESP-IDF 6.0.1** (modern GCC&nbsp;15 / C++ toolchain).
 - **New: ESP32-S3 support** (8&nbsp;MB and 16&nbsp;MB variants) alongside the classic **ESP32-CAM**. ESP32-S3 boards run **with or without an SD card** — the web UI, CNN models and configuration can live in on-board flash. The **ESP32-WROVER** is also supported.

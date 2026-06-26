@@ -14,7 +14,7 @@ between the ESP32-CAM and the ESP32-S3 variants.
 | **Build selector** | default (`idf.py` esp32) | `IDF_TARGET=esp32s3` | `IDF_TARGET=esp32s3 AIOTEDGE_S3_FLASH=16mb` |
 | **Flash size** | 4 MB | 8 MB | 16 MB |
 | **PSRAM** | ~4 MB mapped, **quad**, 40 MHz | 8 MB, **octal (OPI)**, 80 MHz | 8 MB octal, 80 MHz |
-| **CPU frequency** | 160 MHz (IDF default) | **240 MHz** | 240 MHz |
+| **CPU frequency** | configurable `CPUFrequency` **80 / 160 / 240 MHz** (default 160) | configurable 80 / 160 / 240 (default 160; boots at 240) | same |
 | **Main task stack** | 3584 B (default) | **8192 B** | 8192 B |
 | **Partition table** | `partitions.csv` | `partitions_esp32s3_8mb.csv` | `partitions_esp32s3_16mb.csv` |
 | **OTA app slots** | dual-OTA, 1.9 MB each | dual-OTA, **2.5 MB** each | dual-OTA, **3 MB** each |
@@ -26,10 +26,11 @@ between the ESP32-CAM and the ESP32-S3 variants.
 | **Camera PWDN reset (stuck-sensor auto-recovery)** | ✅ `CAM_PIN_PWDN = GPIO 32` — firmware power-cycles a wedged OV2640 over the PWDN line before init | ❌ no PWDN pin (`GPIO_NUM_NC`) — software reset only | ❌ same |
 | **Status / flash LED** | PWM LED (LEDC); `USE_PWM_LEDFLASH`; flash GPIO4 | **WS2812 RGB** on GPIO48 (RMT); flash via GPIO handler | same |
 | **Internal flash LED brightness** | ✅ `LEDIntensity` 0–100 % (PWM duty) | 🟡 onboard WS2812 (no PWM %; out of scope) | 🟡 same |
-| **External LED strip (WS281x) brightness + 5V budget** | ✅ `LEDBrightness` % + draw clamped to `EXTERNAL_LED_5V_BUDGET_MA` = **500 mA**; `LEDPowerInjection`/`LEDMaxCurrent` override | ✅ same (flat budget) | ✅ same |
+| **External LED strip (WS281x) brightness + 5V budget** | ✅ `LEDBrightness` % + draw clamped to `EXTERNAL_LED_5V_BUDGET_MA` = **500 mA** (budget counts **enabled** LEDs); `LEDPowerInjection`/`LEDMaxCurrent` override | ✅ same (flat budget) | ✅ same |
+| **External LED per-pixel control** | ✅ `LEDMask` per-pixel on/off via line/grid/circle toggles (`LEDLayout`/`LEDLayoutCols`), realtime via `/ledstate`; `LEDAlwaysOn` continuous mode | ✅ same | ✅ same |
 | **RGB Wi-Fi status feedback** | ❌ (simple LED) | ✅ `driveSystemStatusWs281x()` (orange/red/green) | ✅ |
 | **Info-page "Hardware details" section** | ❌ hidden (S3-gated) | ✅ shown | ✅ shown |
-| **Power management (DFS/light-sleep)** | ❌ **not feasible** (no XTAL LEDC clock for XCLK → APB-tied) | 🟡 **feasible candidate** (XTAL LEDC clock; needs HW validation) | 🟡 same |
+| **Power management (DFS/light-sleep)** | ❌ **not feasible** (no XTAL LEDC clock for XCLK → APB-tied; `DynamicFrequencyScaling` force-disabled with a WARN) | ✅ runtime **`DynamicFrequencyScaling`** option (off by default; idle down-clock to 80 MHz, scales up under load). Light-sleep still out (dual-core SMP) | ✅ same |
 | **SPI flash 120 MHz** | ❌ (80 MHz max) | ❌ blocked by octal-PSRAM@80 (compile-time); viable only on quad/no-PSRAM S3 | ❌ same |
 | **OTA** | ✅ dual-OTA + rollback | ✅ dual-OTA + rollback | ✅ dual-OTA + rollback |
 
@@ -39,7 +40,8 @@ for drift:
 OTA app rollback (auto-recover a crash-looping update) · `esp_crt_bundle` (verified MQTTS/HTTPS without
 a manual cert) · async MJPEG live stream (non-blocking UI) · `esp_log` v2 · heap failed-alloc hook ·
 `ICameraBackend` seam · confidence-vote post-processing (§10, default off) · changed-digit overview
-highlight · pause-processing menu · scheduling · FastRead · dark mode · the STBI decode safety net.
+highlight · pause-processing menu · scheduling · FastRead · dark mode · the STBI decode safety net ·
+ROI editor (numbered-chip switcher, on-screen model select, **Auto-tune ROI**, no-reboot Save→`/doinit`).
 
 ## Notes / known drift risks
 - **ESP32-WROVER** (`BOARD_WROVER_KIT`) is also `esp32` and feature-equivalent to the ESP32-CAM, but
@@ -50,4 +52,4 @@ highlight · pause-processing menu · scheduling · FastRead · dark mode · the
 - Any new `#if defined(BOARD_ESP32S3_CAM)` / `USE_FLASH_FS` / `CONFIG_IDF_TARGET_ESP32S3` gate is, by
   definition, board drift → **add/refresh a row here in the same change.**
 
-_Last updated: 2026-06-15._
+_Last updated: 2026-06-26._

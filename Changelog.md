@@ -1,4 +1,4 @@
-# [Unreleased]
+# [17.1.0] - 2026-06-26
 
 ### General
 
@@ -23,6 +23,59 @@
 - **ESP32-S3 onboard RGB (GPIO48)**: a board-aware **`OnboardLED`** enable/disable toggle; the GPIO4
   flash-LED block is hidden on the S3 (GPIO4 is a camera pin there). The GPIO config section is now
   labelled **"LED Configuration"** with each LED enabled on its own.
+- **Per-LED on/off control of the external strip**: a new toggle grid (rendered as a **line, grid or
+  circle**, `LEDMask`/`LEDLayout`/`LEDLayoutCols`) lets you turn individual WS281x pixels on or off, on
+  both the config page and the camera-setup page. Each toggle drives the hardware **in realtime** via a
+  new `/ledstate` endpoint (no reboot), so capture-flash, status colours and the always-on mode all
+  honour the mask. The **5V power budget now counts only ENABLED LEDs** (not the strip length), and the
+  config page's "estimated peak current" readout updates live as you toggle.
+- **Always-on external LED** (`LEDAlwaysOn`, off by default): drives the strip continuously at
+  `LEDColor`, overriding the per-stage status colours, keeping it lit through capture, and — because the
+  scene is already lit — **skipping the pre-capture flash/settle delay**.
+- **Alignment-grid overlay on the camera-setup / live-stream page**: an optional SVG grid (off / 3×3 /
+  4×4 / 8×6, plus a centre cross) over the live image to help line up the camera and ROIs.
+- **External LED strip no longer goes dark after a `doInit`** (e.g. when saving ROI edits): the
+  persistent WS281x driver is now torn down and rebuilt on the reconfigured GPIO, instead of holding a
+  dead RMT binding that silently stopped lighting the strip.
+- **Configurable CPU frequency** (`CPUFrequency`, **80 / 160 / 240 MHz**): trade speed for power on any
+  board. A boot bug is fixed so the configured value now actually applies — the ESP32-S3 boots at
+  240 MHz, so a configured 160 was previously ignored there. On the **ESP32-S3** a new runtime
+  **`DynamicFrequencyScaling`** option (off by default) down-clocks to 80 MHz when idle and back up under
+  load; it is force-disabled on the ESP32-CAM, where the camera clock is APB-tied and scaling would
+  corrupt captures.
+
+### Recognition & accuracy
+
+- **Confidence-gated FastRead cache**: a digit read is only cached for reuse when its confidence clears
+  the history floor, so a single low-confidence misread can no longer be cached and replayed for the
+  rest of the FastRead interval — it is simply re-inferred next round.
+- **Temporal voting for low-confidence in-range digits**: when a digit reads 0–9 but below the
+  confidence floor and the recent history has a stable majority, the reported value is corrected to that
+  majority; a genuinely rolling digit has mixed history, so a real change is never masked.
+- **`DigitConfidenceThreshold`** (new, `[Digits]`, default 0 = off, wired into the config page): a
+  class-based-digit confidence floor — a read below it is marked unknown ("N") and resolved from
+  confident history + carry physics rather than committing a shaky value (the class-model analogue of
+  `CNNGoodThreshold`).
+- **High-sensitivity FastRead by default**: the change-detection default (`FastReadThreshold`) is now
+  **5 (High)** instead of 8 — a wrong "changed" decision only costs one extra inference, so erring
+  sensitive avoids skipping a real digit change.
+- **Faster recognition**: a purpose-built bilinear ROI→model-input downscale replaces the generic stb
+  resizer on the hot path, and the tflite model is now **loaded lazily** — a fully-cached FastRead round
+  does zero model load and skips the per-round model SD read.
+- **Faster alignment**: the template-match search drops the per-pixel `pow()` for an integer `d*d` and
+  adds branch-and-bound (abandon a candidate once it can't beat the current best). The match result is
+  identical; on the ESP32-CAM this cut the alignment step (≈85 % of every round) and brought a ~22 s
+  round down to roughly 5 s.
+- **Rate-limit: an unset pipe diameter no longer caps the rate at 0 flow**: with no pipe diameter /
+  service amps configured, the physical-maximum ceiling is treated as *unknown* instead of being
+  computed from a zero, so valid readings are no longer rejected as "exceeds physical max".
+- **Pipe-diameter override is now opt-in**: selecting a Meter Type still suggests a Maximum Rate but no
+  longer force-enables (and saves blank) the raw pipe-diameter / service-amps override — an untouched
+  override stays commented out so the firmware uses its own default.
+- **Confident reads can override a rate-limit rejection**: when the last 3 reads of a sequence all meet
+  `DigitConfidenceThreshold`, a large jump is accepted (and logged) instead of being clamped back, for
+  both the physical-max ceiling and the user `MaxRateValue` check. Inert when the threshold is off, and
+  it never fires for analog-only sequences or in the first rounds after boot.
 
 ### Connectivity & security
 
@@ -44,6 +97,36 @@
   per-folder download icon on each sub-folder row (`GET /fileserver/<dir>/?zip=1`). The archive is built
   on-device with the existing miniz writer and streamed as `<foldername>.zip`; `wlan.ini` is always
   excluded.
+- **Reworked ROI editor**: the digit and analog editors swap the name dropdown for a row of clickable
+  **numbered chips** and **auto-name** ROIs (`<sequence><position>`), so you no longer manage ROI names.
+  You can now **pick the digit/analog model** right on the editor screen (a configured model missing
+  from the SD card is preserved as a `(missing)` option), edit the **Decimal Shift** inline with a live
+  multiplier preview, and the **layout-lock preferences** (lock aspect ratio / synchronize / keep
+  equidistance / spacing) are remembered across visits.
+- **Apply ROI / sequence edits without a reboot**: saving the digit or analog editor now re-inits the
+  processing flow via `/doinit` (~1–2 s, round-safe under the flow lock) instead of requiring a full
+  reboot, falling back to a reboot prompt if the live re-init fails.
+- **Auto-tune a digit ROI**: a new **Auto-tune ROI** button pauses processing, captures and aligns a
+  single fresh image, drops the layout-lock constraints, and searches nearby positions then sizes
+  (reusing the per-ROI examine test against that one static capture) for the box the CNN reads with the
+  **highest confidence** — ignoring blank `N`/no-digit reads (which the model can report at ~100&nbsp;%)
+  so the box can't drift off the digit. It applies the winning box for you to review and Save, and
+  deliberately **leaves processing paused** (a new **Resume processing** button restarts it) so repeated
+  tuning passes can't collide with a running round.
+- **Persisted system settings**: **CPU Frequency**, **Dynamic Frequency Scaling**, **Backup Interval**,
+  **Time Server** and **Hostname** now reliably save (some previously needed an easily-missed enable
+  checkbox or had no save wiring at all). **Hostname** is now a non-expert field, and several
+  per-sequence Meter Type / leak-detection settings that were silently dropped now load and save.
+- **More robust Save**: one unknown/stale parameter no longer aborts the whole Save (so every other
+  setting still saves); the **Meter Type (Utility)** select is no longer greyed-out/unselectable on
+  load, and selecting a Meter Type auto-enables its matching sub-field (pipe diameter / service amps).
+- **Capture controls**: **`WaitBeforeTakingPicture = 0`** now disables the pre-capture flash/settle
+  delay (it used to be forced back to 2 s); explicit **Save Raw Images** and **Save ROI Images** on/off
+  toggles (both default **off**) put per-round image logging under direct control regardless of any
+  configured location; and the **overview** gains a **"Show ROI overlay boxes"** toggle (remembered per
+  browser) to view the clean aligned image.
+- **Tooltip readability**: config-page help popups now use dark text (no longer light-grey on white),
+  hide the missing-font glyph icons that rendered as empty boxes, and sit **above the sticky Save bar**.
 
 ### Reliability
 
