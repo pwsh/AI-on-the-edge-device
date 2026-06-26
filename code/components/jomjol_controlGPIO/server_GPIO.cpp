@@ -605,9 +605,20 @@ bool GpioHandler::readConfig()
     return true;
 }
 
-void GpioHandler::clear() 
+void GpioHandler::clear()
 {
     ESP_LOGD(TAG, "GpioHandler::clear");
+
+#ifdef __LEDGLOBAL
+    // Release the persistent WS281x driver so a re-init (init() after a doInit - e.g. applying ROI edits)
+    // rebuilds it on the freshly reconfigured GPIO/RMT. Without this the stale SmartLed keeps a dead RMT
+    // binding to the now-deleted GPIO pin, so the strip - including the always-on LED that init()
+    // re-applies via flashLightEnable(true) - silently stops lighting after editing ROIs / any doInit.
+    if (leds_global != NULL) {
+        delete leds_global;
+        leds_global = NULL;
+    }
+#endif
 
     if (gpioMap != NULL) {
         for(std::map<gpio_num_t, GpioPin*>::iterator it = gpioMap->begin(); it != gpioMap->end(); ++it) {
