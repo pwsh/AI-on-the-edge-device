@@ -153,6 +153,7 @@
 			</td>
             <td>
 				<input class="button" type="submit" id="examineROIbtn" name="examineROIbtn" onclick="examineROI()" value="Examine ROI">
+					<input class="button" type="button" id="autoTuneROIbtn" name="autoTuneROIbtn" onclick="autoTuneROI()" value="Auto-tune ROI" title="Search nearby positions and sizes for the box that reads this digit with the highest confidence">
 			</td>
             <td>
 				<input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI"><input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;">
@@ -418,6 +419,101 @@
             cf.textContent = (d.confidence === null || typeof d.confidence === 'undefined') ? 'n/a (analog)' : (d.confidence + '%');
             cf.style.color = (typeof d.confidence === 'number') ? (d.confidence >= 90 ? '#1f9d55' : (d.confidence >= 70 ? '#b7791f' : '#c0392b')) : '';
         }).catch(function(e){ st.textContent = 'error: ' + e; });
+    }
+
+    // Auto-tune the selected digit ROI: search nearby positions, then sizes, for the box that the CNN
+    // reads with the highest confidence - reusing the same per-ROI "examineroi" test. During the search
+    // it pauses processing (so the flow doesn't fight for the camera/CNN) and drops the layout-lock
+    // constraints (Lock aspect ratio / Synchronize / Keep equidistance) so this one box can move and
+    // resize freely, then restores those and applies the winning box for the user to review + Save.
+    function autoTuneROI() {
+        var st = document.getElementById('examineStatus');
+        var gv = function (id) { return parseInt(document.getElementById(id).value); };
+        var x0 = gv('refx'), y0 = gv('refy'), dx0 = gv('refdx'), dy0 = gv('refdy');
+        if ([x0, y0, dx0, dy0].some(isNaN) || typeof aktindex === 'undefined' || aktindex < 0 ||
+            typeof ROIInfo === 'undefined' || !ROIInfo[aktindex]) {
+            if (st) st.textContent = 'select a ROI first'; return;
+        }
+        var dn = getDomainname();
+        var fresh = (typeof _usingFreshImage !== 'undefined' && _usingFreshImage) ? '&src=fresh' : '';
+        var btns = ['autoTuneROIbtn', 'examineROIbtn'];
+        btns.forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = true; });
+
+        // Save the user's layout-lock choices, then drop them for the search (restored at the end).
+        var saved = {
+            ar: document.getElementById('lockAspectRatio').checked,
+            sz: document.getElementById('lockSizes').checked,
+            sp: document.getElementById('lockSpaceEquidistant').checked
+        };
+        var setLocks = function (ar, sz, sp) {
+            var c = function (id, v) { var e = document.getElementById(id); if (e) e.checked = v; };
+            c('lockAspectRatio', ar); lockAspectRatio = ar;
+            c('lockSizes', sz); lockSizes = sz;
+            c('lockSpaceEquidistant', sp); lockSpaceEquidistant = sp;
+            var spel = document.getElementById('space'); if (spel) spel.disabled = !sp;
+        };
+        setLocks(false, false, false);
+
+        var examine = function (x, y, dx, dy) {
+            var url = dn + '/editflow?task=examineroi&type=digit&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy + fresh;
+            return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+                return (d && typeof d.confidence === 'number') ? { x: x, y: y, dx: dx, dy: dy, conf: d.confidence, reading: d.reading } : null;
+            }).catch(function () { return null; });
+        };
+
+        var POS = [-6, -4, -2, 0, 2, 4, 6], SIZE = [-4, -2, 0, 2, 4];
+        // Keep every candidate inside the reference image so a box can never be cut out of bounds.
+        var IW = (typeof canvas !== 'undefined' && canvas.width) ? canvas.width : 99999;
+        var IH = (typeof canvas !== 'undefined' && canvas.height) ? canvas.height : 99999;
+        var valid = function (x, y, dx, dy) { return x >= 0 && y >= 0 && dx >= 4 && dy >= 4 && (x + dx) <= IW && (y + dy) <= IH; };
+        var best = { x: x0, y: y0, dx: dx0, dy: dy0, conf: -1, reading: '?' };
+        var done = 0, total = 0;
+        var prog = function () { if (st) st.textContent = 'auto-tuning… ' + done + '/' + total + (best.conf < 0 ? '' : ' (best ' + best.conf + '%)'); };
+        var runSeq = function (cands) {
+            var chain = Promise.resolve();
+            cands.forEach(function (c) {
+                chain = chain.then(function () {
+                    return examine(c.x, c.y, c.dx, c.dy).then(function (res) {
+                        done++; if (res && res.conf > best.conf) best = res; prog();
+                    });
+                });
+            });
+            return chain;
+        };
+
+        // Phase 1: position at the current size. Phase 2: size at the best position.
+        var posCands = [];
+        POS.forEach(function (oy) { POS.forEach(function (ox) {
+            var c = { x: x0 + ox, y: y0 + oy, dx: dx0, dy: dy0 };
+            if (valid(c.x, c.y, c.dx, c.dy)) posCands.push(c);
+        }); });
+        total = posCands.length;
+        prog();
+        // Pause first (awaited), so the examines aren't rejected by a round in progress.
+        fetch(dn + '/pause?status=pause', { cache: 'no-store' }).catch(function () {}).then(function () {
+            return runSeq(posCands);
+        }).then(function () {
+            var sizeCands = [];
+            SIZE.forEach(function (ody) { SIZE.forEach(function (odx) {
+                var ndx = best.dx + odx, ndy = best.dy + ody;
+                if (valid(best.x, best.y, ndx, ndy)) sizeCands.push({ x: best.x, y: best.y, dx: ndx, dy: ndy });
+            }); });
+            total += sizeCands.length; prog();
+            return runSeq(sizeCands);
+        }).then(function () {
+            setLocks(saved.ar, saved.sz, saved.sp);                 // restore the user's lock choices
+            try { fetch(dn + '/pause?status=resume', { cache: 'no-store' }); } catch (e) {}
+            btns.forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = false; });
+            if (best.conf < 0) { if (st) st.textContent = 'auto-tune failed (the examine returned no confidence)'; return; }
+            // Apply the winning box straight into the selected ROI (locks are off so nothing reshapes it).
+            ROIInfo[aktindex].x = best.x; ROIInfo[aktindex].y = best.y; ROIInfo[aktindex].dx = best.dx; ROIInfo[aktindex].dy = best.dy;
+            document.getElementById('refx').value = best.x;
+            document.getElementById('refy').value = best.y;
+            document.getElementById('refdx').value = best.dx;
+            document.getElementById('refdy').value = best.dy;
+            if (typeof draw === 'function') draw();
+            if (st) st.textContent = 'best ' + best.conf + '% (read ' + best.reading + ') @ x' + best.x + ' y' + best.y + ' Δx' + best.dx + ' Δy' + best.dy + ' — review and Save';
+        });
     }
 
     function newROI() {
