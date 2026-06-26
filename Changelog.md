@@ -1,3 +1,16 @@
+# [17.1.1] - 2026-06-26
+
+### Reliability
+
+- **ROI Auto-tune no longer exhausts PSRAM**: the digit-ROI Auto-tune search now runs a short **sequential
+  1-D pass** (optimise Y, then X, then size — ~17 candidate boxes) instead of a full 2-D grid (~74). The
+  long grid search allocated and freed image/JPEG-decode buffers fast enough to **fragment PSRAM** until
+  the largest free block collapsed and allocations failed (`Failed to allocate … STBI`, `reference.jpg …
+  corrupted`) — and could take a concurrent round down with it. Auto-tune now also **refuses to start when
+  free PSRAM is already fragmented** and continues to leave processing paused (use **Resume processing**)
+  so a resumed round can't collide with the search. Verified: the largest free PSRAM block now holds steady
+  (~3&nbsp;MB) across a full search instead of collapsing to ~160&nbsp;KB.
+
 # [17.1.0] - 2026-06-26
 
 ### General

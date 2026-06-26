@@ -465,7 +465,7 @@
             }).catch(function () { return null; });
         };
 
-        var POS = [-6, -4, -2, 0, 2, 4, 6], SIZE = [-4, -2, 0, 2, 4];
+        var POS = [-6, -4, -2, 0, 2, 4, 6];
         // Keep every candidate inside the reference image so a box can never be cut out of bounds.
         var IW = (typeof canvas !== 'undefined' && canvas.width) ? canvas.width : 99999;
         var IH = (typeof canvas !== 'undefined' && canvas.height) ? canvas.height : 99999;
@@ -484,6 +484,15 @@
             });
             return chain;
         };
+        // Largest contiguous free PSRAM block (bytes). Each examine allocates+frees image/JPEG buffers, which
+        // FRAGMENTS PSRAM - a long 2-D grid search (74 boxes) shrinks the largest block until JPEG decode /
+        // image allocations fail (and a round, if one ran, would too). So we (a) run a SHORT 1-D sequential
+        // search (~17 boxes), and (b) refuse to start when the heap is already fragmented.
+        var heapLargeBlock = function () {
+            return fetch(dn + '/heap', { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+                var m = /SPI Large Block:\s*(\d+)/.exec(t); return m ? parseInt(m[1], 10) : 0;
+            }).catch(function () { return 0; });
+        };
 
         var finishUI = function () {
             setLocks(saved.ar, saved.sz, saved.sp);                 // restore the user's lock choices
@@ -495,18 +504,10 @@
             // resumes manually with the "Resume processing" button when finished tuning.
         };
 
-        // Phase 1: position at current size. Phase 2: size at best position - both against ONE static capture.
-        var posCands = [];
-        POS.forEach(function (oy) { POS.forEach(function (ox) {
-            var c = { x: x0 + ox, y: y0 + oy, dx: dx0, dy: dy0 };
-            if (valid(c.x, c.y, c.dx, c.dy)) posCands.push(c);
-        }); });
-        total = posCands.length;
-
         if (st) st.textContent = 'auto-tuning… pausing + capturing a fresh aligned image…';
         // Pause and STAY paused; capture + align ONCE; dump that aligned frame to a private file via a
-        // src=fresh warm-up; then test every candidate against that one static file (src=static) so there
-        // is no per-candidate re-grab and nothing fights the live flow for PSRAM / alg.jpg.
+        // src=fresh warm-up; then run a SEQUENTIAL 1-D search (optimise y, then x, then size) against that
+        // one static file. Sequential keeps the examine count low (~17) so PSRAM doesn't fragment.
         fetch(dn + '/pause?status=pause', { cache: 'no-store' }).catch(function () {})
             .then(function () { return fetch(dn + '/editflow?task=test_take', { cache: 'no-store' }).then(function (r) { return r.text(); }); })
             .then(function (t) {
@@ -516,21 +517,37 @@
             })
             .then(function (t) {
                 if (t.indexOf('Busy') >= 0) throw new Error('device busy — try again in a moment');
+                return heapLargeBlock();
+            })
+            .then(function (lb) {
+                // Refuse to start on an already-fragmented heap (e.g. a prior tune hasn't recovered yet).
+                if (lb > 0 && lb < 1200000) throw new Error('device memory is fragmented (' + Math.round(lb / 1024) + ' KB free block) — wait ~10 s and retry');
                 return examine(x0, y0, dx0, dy0, 'fresh');     // warm-up: dumps examine_src.jpg + reads current box
             })
             .then(function (res) {
                 if (res && isDigit(res.reading) && res.conf > best.conf) best = res;
-                prog();
-                return runSeq(posCands);
+                // Phase 1: optimise Y at the current x/size (skip 0 - the warm-up already did it).
+                var yC = [];
+                POS.forEach(function (oy) { var c = { x: x0, y: y0 + oy, dx: dx0, dy: dy0 }; if (oy !== 0 && valid(c.x, c.y, c.dx, c.dy)) yC.push(c); });
+                total = yC.length; prog();
+                return runSeq(yC);
             })
             .then(function () {
-                var sizeCands = [];
-                SIZE.forEach(function (ody) { SIZE.forEach(function (odx) {
-                    var ndx = best.dx + odx, ndy = best.dy + ody;
-                    if (valid(best.x, best.y, ndx, ndy)) sizeCands.push({ x: best.x, y: best.y, dx: ndx, dy: ndy });
-                }); });
-                total += sizeCands.length; prog();
-                return runSeq(sizeCands);
+                // Phase 2: optimise X at the best Y.
+                var xC = [];
+                POS.forEach(function (ox) { var c = { x: x0 + ox, y: best.y, dx: dx0, dy: dy0 }; if (ox !== 0 && valid(c.x, c.y, c.dx, c.dy)) xC.push(c); });
+                total += xC.length; prog();
+                return runSeq(xC);
+            })
+            .then(function () {
+                // Phase 3: optimise size (±3 px per axis) at the best position.
+                var sC = [];
+                [[-3, 0], [3, 0], [0, -3], [0, 3]].forEach(function (d) {
+                    var c = { x: best.x, y: best.y, dx: best.dx + d[0], dy: best.dy + d[1] };
+                    if (valid(c.x, c.y, c.dx, c.dy)) sC.push(c);
+                });
+                total += sC.length; prog();
+                return runSeq(sC);
             })
             .then(function () {
                 finishUI();
