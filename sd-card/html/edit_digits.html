@@ -154,6 +154,7 @@
             <td>
 				<input class="button" type="submit" id="examineROIbtn" name="examineROIbtn" onclick="examineROI()" value="Examine ROI">
 					<input class="button" type="button" id="autoTuneROIbtn" name="autoTuneROIbtn" onclick="autoTuneROI()" value="Auto-tune ROI" title="Search nearby positions and sizes for the box that reads this digit with the highest confidence">
+						<input class="button" type="button" id="resumeProcBtn" name="resumeProcBtn" onclick="resumeProcessing()" value="Resume processing" title="Auto-tune pauses meter processing and leaves it paused. Click when finished tuning to resume." style="display:none; background:#2a7d2a;">
 			</td>
             <td>
 				<input class="button" type="submit" id="newROI" name="newROI" onclick="newROI()" value="New ROI"><input class="button" type="submit" id="renameROI" name="renameROI" onclick="renameROI()" value="Rename ROI" style="display:none;">
@@ -435,7 +436,6 @@
             if (st) st.textContent = 'select a ROI first'; return;
         }
         var dn = getDomainname();
-        var fresh = (typeof _usingFreshImage !== 'undefined' && _usingFreshImage) ? '&src=fresh' : '';
         var btns = ['autoTuneROIbtn', 'examineROIbtn'];
         btns.forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = true; });
 
@@ -454,8 +454,12 @@
         };
         setLocks(false, false, false);
 
-        var examine = function (x, y, dx, dy) {
-            var url = dn + '/editflow?task=examineroi&type=digit&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy + fresh;
+        // Only a real digit (0-9) counts. A box parked on a blank gap reads "N" (no digit), and the model
+        // can report that at 100% confidence - we must NOT let that win, or auto-tune walks off the digit.
+        var isDigit = function (r) { return /^[0-9]$/.test(r); };
+
+        var examine = function (x, y, dx, dy, src) {
+            var url = dn + '/editflow?task=examineroi&type=digit&x=' + x + '&y=' + y + '&dx=' + dx + '&dy=' + dy + '&src=' + src;
             return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
                 return (d && typeof d.confidence === 'number') ? { x: x, y: y, dx: dx, dy: dy, conf: d.confidence, reading: d.reading } : null;
             }).catch(function () { return null; });
@@ -468,52 +472,94 @@
         var valid = function (x, y, dx, dy) { return x >= 0 && y >= 0 && dx >= 4 && dy >= 4 && (x + dx) <= IW && (y + dy) <= IH; };
         var best = { x: x0, y: y0, dx: dx0, dy: dy0, conf: -1, reading: '?' };
         var done = 0, total = 0;
-        var prog = function () { if (st) st.textContent = 'auto-tuning… ' + done + '/' + total + (best.conf < 0 ? '' : ' (best ' + best.conf + '%)'); };
+        var prog = function () { if (st) st.textContent = 'auto-tuning… ' + done + '/' + total + (best.conf < 0 ? '' : ' (best ' + best.conf + '% read ' + best.reading + ')'); };
         var runSeq = function (cands) {
             var chain = Promise.resolve();
             cands.forEach(function (c) {
                 chain = chain.then(function () {
-                    return examine(c.x, c.y, c.dx, c.dy).then(function (res) {
-                        done++; if (res && res.conf > best.conf) best = res; prog();
+                    return examine(c.x, c.y, c.dx, c.dy, 'static').then(function (res) {
+                        done++; if (res && isDigit(res.reading) && res.conf > best.conf) best = res; prog();
                     });
                 });
             });
             return chain;
         };
 
-        // Phase 1: position at the current size. Phase 2: size at the best position.
+        var finishUI = function () {
+            setLocks(saved.ar, saved.sz, saved.sp);                 // restore the user's lock choices
+            btns.forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = false; });
+            var rb = document.getElementById('resumeProcBtn'); if (rb) rb.style.display = '';
+            // NOTE: deliberately NO /pause?status=resume here - processing stays PAUSED so repeated
+            // auto-tune cycles can't collide with a resumed round (the shared-PSRAM / alg.jpg contention
+            // that produced the "Failed to allocate STBI / reference.jpg corrupted" errors). The user
+            // resumes manually with the "Resume processing" button when finished tuning.
+        };
+
+        // Phase 1: position at current size. Phase 2: size at best position - both against ONE static capture.
         var posCands = [];
         POS.forEach(function (oy) { POS.forEach(function (ox) {
             var c = { x: x0 + ox, y: y0 + oy, dx: dx0, dy: dy0 };
             if (valid(c.x, c.y, c.dx, c.dy)) posCands.push(c);
         }); });
         total = posCands.length;
-        prog();
-        // Pause first (awaited), so the examines aren't rejected by a round in progress.
-        fetch(dn + '/pause?status=pause', { cache: 'no-store' }).catch(function () {}).then(function () {
-            return runSeq(posCands);
-        }).then(function () {
-            var sizeCands = [];
-            SIZE.forEach(function (ody) { SIZE.forEach(function (odx) {
-                var ndx = best.dx + odx, ndy = best.dy + ody;
-                if (valid(best.x, best.y, ndx, ndy)) sizeCands.push({ x: best.x, y: best.y, dx: ndx, dy: ndy });
-            }); });
-            total += sizeCands.length; prog();
-            return runSeq(sizeCands);
-        }).then(function () {
-            setLocks(saved.ar, saved.sz, saved.sp);                 // restore the user's lock choices
-            try { fetch(dn + '/pause?status=resume', { cache: 'no-store' }); } catch (e) {}
-            btns.forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = false; });
-            if (best.conf < 0) { if (st) st.textContent = 'auto-tune failed (the examine returned no confidence)'; return; }
-            // Apply the winning box straight into the selected ROI (locks are off so nothing reshapes it).
-            ROIInfo[aktindex].x = best.x; ROIInfo[aktindex].y = best.y; ROIInfo[aktindex].dx = best.dx; ROIInfo[aktindex].dy = best.dy;
-            document.getElementById('refx').value = best.x;
-            document.getElementById('refy').value = best.y;
-            document.getElementById('refdx').value = best.dx;
-            document.getElementById('refdy').value = best.dy;
-            if (typeof draw === 'function') draw();
-            if (st) st.textContent = 'best ' + best.conf + '% (read ' + best.reading + ') @ x' + best.x + ' y' + best.y + ' Δx' + best.dx + ' Δy' + best.dy + ' — review and Save';
-        });
+
+        if (st) st.textContent = 'auto-tuning… pausing + capturing a fresh aligned image…';
+        // Pause and STAY paused; capture + align ONCE; dump that aligned frame to a private file via a
+        // src=fresh warm-up; then test every candidate against that one static file (src=static) so there
+        // is no per-candidate re-grab and nothing fights the live flow for PSRAM / alg.jpg.
+        fetch(dn + '/pause?status=pause', { cache: 'no-store' }).catch(function () {})
+            .then(function () { return fetch(dn + '/editflow?task=test_take', { cache: 'no-store' }).then(function (r) { return r.text(); }); })
+            .then(function (t) {
+                if (t.indexOf('Busy') >= 0) throw new Error('device busy — try again in a moment');
+                if (st) st.textContent = 'auto-tuning… aligning…';
+                return fetch(dn + '/editflow?task=test_align', { cache: 'no-store' }).then(function (r) { return r.text(); });
+            })
+            .then(function (t) {
+                if (t.indexOf('Busy') >= 0) throw new Error('device busy — try again in a moment');
+                return examine(x0, y0, dx0, dy0, 'fresh');     // warm-up: dumps examine_src.jpg + reads current box
+            })
+            .then(function (res) {
+                if (res && isDigit(res.reading) && res.conf > best.conf) best = res;
+                prog();
+                return runSeq(posCands);
+            })
+            .then(function () {
+                var sizeCands = [];
+                SIZE.forEach(function (ody) { SIZE.forEach(function (odx) {
+                    var ndx = best.dx + odx, ndy = best.dy + ody;
+                    if (valid(best.x, best.y, ndx, ndy)) sizeCands.push({ x: best.x, y: best.y, dx: ndx, dy: ndy });
+                }); });
+                total += sizeCands.length; prog();
+                return runSeq(sizeCands);
+            })
+            .then(function () {
+                finishUI();
+                if (best.conf < 0) { if (st) st.textContent = 'auto-tune found no digit (0–9) in range — box left unchanged. Processing is PAUSED (use "Resume processing").'; return; }
+                // Apply the winning box straight into the selected ROI (locks are off so nothing reshapes it).
+                ROIInfo[aktindex].x = best.x; ROIInfo[aktindex].y = best.y; ROIInfo[aktindex].dx = best.dx; ROIInfo[aktindex].dy = best.dy;
+                document.getElementById('refx').value = best.x;
+                document.getElementById('refy').value = best.y;
+                document.getElementById('refdx').value = best.dx;
+                document.getElementById('refdy').value = best.dy;
+                if (typeof draw === 'function') draw();
+                if (st) st.textContent = 'best ' + best.conf + '% (read ' + best.reading + ') @ x' + best.x + ' y' + best.y + ' Δx' + best.dx + ' Δy' + best.dy + ' — review & Save. Processing is PAUSED — click "Resume processing" when done.';
+            })
+            .catch(function (e) {
+                finishUI();
+                if (st) st.textContent = 'auto-tune error: ' + (e && e.message ? e.message : e) + ' — processing left PAUSED (use "Resume processing").';
+            });
+    }
+
+    // Auto-tune deliberately leaves processing paused; this resumes it when the user is done tuning.
+    function resumeProcessing() {
+        var st = document.getElementById('examineStatus');
+        var dn = getDomainname();
+        fetch(dn + '/pause?status=resume', { cache: 'no-store' })
+            .then(function () {
+                var rb = document.getElementById('resumeProcBtn'); if (rb) rb.style.display = 'none';
+                if (st) st.textContent = 'processing resumed';
+            })
+            .catch(function (e) { if (st) st.textContent = 'resume failed: ' + (e && e.message ? e.message : e); });
     }
 
     function newROI() {

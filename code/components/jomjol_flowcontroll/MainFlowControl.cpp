@@ -1528,7 +1528,10 @@ esp_err_t handler_editflow(httpd_req_t *req)
         // Which already-aligned image to cut the ROI from. Default is the stored reference; "fresh"
         // uses the most recent on-demand aligned capture (/img_tmp/alg.jpg from a test_take+test_align),
         // so the user can examine the live scene against the same ROI box without saving a new reference.
-        bool wantFresh = (httpd_query_key_value(_query, "src", vc, sizeof(vc)) == ESP_OK && std::string(vc) == "fresh");
+        std::string srcVal;
+        if (httpd_query_key_value(_query, "src", vc, sizeof(vc)) == ESP_OK) srcVal = std::string(vc);
+        bool wantFresh  = (srcVal == "fresh");
+        bool wantStatic = (srcVal == "static");   // examine the already-dumped fresh aligned image (ROI auto-tune)
         std::string srcImg = "/sdcard/config/reference.jpg";
 
         std::string body;
@@ -1551,6 +1554,18 @@ esp_err_t handler_editflow(httpd_req_t *req)
                     srcImg = "";   // no fresh aligned image available yet
                 }
             }
+            else if (wantStatic)
+            {
+                // The ROI auto-tune captured + aligned + dumped the aligned frame ONCE (via a src=fresh
+                // warm-up); reuse that exact file for every candidate box rather than re-grabbing per
+                // call. Re-grabbing per candidate would fight a resumed round for the shared PSRAM and
+                // clobber alg.jpg - the source of the "Failed to allocate ... STBI / reference.jpg
+                // corrupted" errors. No SaveFreshAlignedImage here: the file is already on disk.
+                if (file_size("/sdcard/img_tmp/examine_src.jpg") > 0)
+                    srcImg = "/sdcard/img_tmp/examine_src.jpg";
+                else
+                    srcImg = "";   // warm-up never ran / failed
+            }
 
             CAlignAndCutImage *caic = srcImg.empty() ? NULL : new CAlignAndCutImage("examine", srcImg);
             // Verify the source image actually decoded before cutting. A fresh capture (src=fresh) may
@@ -1559,8 +1574,8 @@ esp_err_t handler_editflow(httpd_req_t *req)
             if (!caic || !caic->ImageOkay()) {
                 delete caic;
                 psram_deinit_shared_memory_for_take_image_step();
-                body = wantFresh
-                    ? "{\"error\":\"no fresh aligned image yet - pull a fresh camera image first\"}"
+                body = (wantFresh || wantStatic)
+                    ? "{\"error\":\"no fresh aligned image yet - pull/capture a fresh camera image first\"}"
                     : "{\"error\":\"could not load the reference image\"}";
             }
             else
