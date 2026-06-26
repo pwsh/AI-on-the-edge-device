@@ -332,6 +332,10 @@ Plausibility checkPlausibility(const PhysicalLimits& limits,
                                bool allowNegative) {
     const RateBounds rb = deriveRateBounds(limits);
     if (!rb.known || rb.ceilingPerMin < 0.0) return Plausibility::Unknown;
+    // Rejection is OPT-IN: only reject against an EXPLICITLY-configured supply model (a pipe diameter /
+    // service-amps rating, or an explicit user MaxRate). With just a Meter Type and no pipe set, rb is
+    // "known" off the residential DEFAULTS - but those are for prediction, so don't reject against them.
+    if (!limits.supplyModelExplicit && limits.userMaxRatePerMin < 0.0) return Plausibility::Unknown;
 
     const double delta = newValue - previousValue;
 

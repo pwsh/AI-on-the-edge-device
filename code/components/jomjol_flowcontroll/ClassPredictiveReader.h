@@ -64,6 +64,14 @@ struct PhysicalLimits {
     // derived expected rate and the physical ceiling. Keeps the existing MaxRate escape hatch.
     double userMaxRatePerMin = -1.0;
 
+    // True only when the user EXPLICITLY configured a supply model (a pipe diameter, or a service-amps
+    // rating). The physical REJECTION ceiling (checkPlausibility) requires this, so that merely picking
+    // a Meter Type (Utility = water/gas/electricity) does NOT start rejecting readings against the
+    // residential DEFAULTS above - those defaults exist for PREDICTION only. Rejection is opt-in: with no
+    // pipe/amps set, a water/gas/electric meter behaves like Generic for rejection (no ceiling). This is
+    // why setting only "Meter Type = water" no longer flags normal rates as "exceeds physical max".
+    bool supplyModelExplicit = false;
+
     // Multiplicative safety margin applied to the expected rate when deciding what *might* have
     // changed (so a slightly-faster-than-modelled round never silently drops a real digit change).
     double predictionSafetyFactor = 1.5;

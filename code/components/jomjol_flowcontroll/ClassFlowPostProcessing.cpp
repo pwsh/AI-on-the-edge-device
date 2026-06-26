@@ -580,12 +580,15 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
         }
         else if (isStringNumeric(_val)) {
             double d = std::stod(_val);
-            if      (_key == "WATERPIPEDIAMETERMM") { L.waterPipeDiameterMm = d; }
-            else if (_key == "GASPIPEDIAMETERMM")   { L.gasPipeDiameterMm = d; }
-            else if (_key == "PIPEDIAMETERMM")      { L.waterPipeDiameterMm = d; L.gasPipeDiameterMm = d; } // legacy alias
+            // Pipe diameter / service amps are the opt-in trigger for the physical REJECTION ceiling:
+            // setting one marks the supply model EXPLICIT so checkPlausibility may reject. Without one, a
+            // water/gas/electric meter keeps its prediction defaults but does NOT reject (see header).
+            if      (_key == "WATERPIPEDIAMETERMM") { L.waterPipeDiameterMm = d; L.supplyModelExplicit = true; }
+            else if (_key == "GASPIPEDIAMETERMM")   { L.gasPipeDiameterMm = d;   L.supplyModelExplicit = true; }
+            else if (_key == "PIPEDIAMETERMM")      { L.waterPipeDiameterMm = d; L.gasPipeDiameterMm = d; L.supplyModelExplicit = true; } // legacy alias
             else if (_key == "SUPPLYPRESSUREKPA")   { L.waterPressureKPa = d; }
             else if (_key == "GASPRESSUREKPA")      { L.gasPressureKPa = d; }
-            else if (_key == "SERVICEAMPS")         { L.elecServiceAmps = d; }
+            else if (_key == "SERVICEAMPS")         { L.elecServiceAmps = d;     L.supplyModelExplicit = true; }
             else if (_key == "SERVICEVOLTS")        { L.elecServiceVolts = d; }
             else if (_key == "UNITSPERVALUE")       { if (d > 0) L.unitsPerValue = d; }
         }

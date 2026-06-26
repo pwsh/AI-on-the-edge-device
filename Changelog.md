@@ -1,3 +1,17 @@
+# [17.1.2] - 2026-06-26
+
+### Reliability
+
+- **Meter Type alone no longer flags normal rates as "exceeds physical max"**: the physical rate-rejection
+  ceiling is now strictly **opt-in**. Selecting a Meter Type (`Utility = water`/`gas`/`electricity`)
+  *without* setting a pipe diameter (or electrical service rating) previously fell back to built-in
+  **residential defaults** (a 1″ water pipe with m³ scaling) and derived a ~0.9&nbsp;units/min ceiling —
+  rejecting ordinary readings as `Rate exceeds physical max` until the interval stretched enough to drop
+  the per-minute rate under it (so the same read got flagged repeatedly at, e.g., 2.94 → 1.47 → 0.98).
+  Those defaults are now used for **prediction only**; **rejection requires an explicitly configured**
+  pipe diameter / service-amps (or a user MaxRate). My earlier "unset pipe = no ceiling" guard didn't
+  catch this because the *default* diameter is non-zero (25.4&nbsp;mm), so it never read as unset.
+
 # [17.1.1] - 2026-06-26
 
 ### Reliability
