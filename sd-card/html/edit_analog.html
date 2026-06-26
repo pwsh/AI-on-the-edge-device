@@ -466,6 +466,41 @@ The following settings are only used for easier setup, they are <b>not</b> persi
         UpdateROIs();    
     }
 
+    // Persist the ROI-layout lock preferences across visits (per-browser, shared by the digit + analog
+    // editors) so the user's choices for "Lock aspect ratio" / "Synchronize y, Δx and Δy" / "Keep
+    // equidistance" survive a page reload instead of resetting to the defaults each time.
+    function saveRoiPrefs() {
+        try {
+            var gc = function (id) { var e = document.getElementById(id); return e ? (e.checked ? '1' : '0') : null; };
+            var a = gc('lockAspectRatio'); if (a !== null) localStorage.setItem('roi_lockAspectRatio', a);
+            var s = gc('lockSizes'); if (s !== null) localStorage.setItem('roi_lockSizes', s);
+            var e = gc('lockSpaceEquidistant'); if (e !== null) localStorage.setItem('roi_lockSpaceEquidistant', e);
+            var sp = document.getElementById('space'); if (sp && sp.value !== '') localStorage.setItem('roi_space', sp.value);
+        } catch (err) {}
+    }
+    function restoreRoiPrefs() {
+        try {
+            var apply = function (id, key, setVar) {
+                var v = localStorage.getItem(key);
+                if (v === null) return;
+                var el = document.getElementById(id);
+                if (el) el.checked = (v === '1');
+                setVar(v === '1');   // set the global directly; avoids the handlers' side effects (UpdateROIs, warning)
+            };
+            apply('lockAspectRatio', 'roi_lockAspectRatio', function (b) { lockAspectRatio = b; });
+            apply('lockSizes', 'roi_lockSizes', function (b) { lockSizes = b; });
+            apply('lockSpaceEquidistant', 'roi_lockSpaceEquidistant', function (b) {
+                lockSpaceEquidistant = b;
+                var sp = document.getElementById('space'); if (sp) sp.disabled = !b;
+            });
+            var spv = localStorage.getItem('roi_space');
+            if (spv !== null && spv !== '') {
+                var spel = document.getElementById('space'); if (spel) spel.value = spv;
+                space = parseInt(spv) || space;
+            }
+        } catch (err) {}
+    }
+
     function changelockAspectRatio() {
         lockAspectRatio = document.getElementById("lockAspectRatio").checked;
     }
@@ -843,6 +878,12 @@ The following settings are only used for easier setup, they are <b>not</b> persi
     function init() {
         openDescription();
         domainname = getDomainname();
+
+        restoreRoiPrefs();   // apply the user's saved ROI layout-lock preferences (per-browser)
+        ['lockAspectRatio', 'lockSizes', 'lockSpaceEquidistant', 'space'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('change', saveRoiPrefs);   // persist on any change
+        });
 		
 		if (!loadConfig(domainname)) {
 			firework.launch('Configuration could not be loaded! Please reload the page!', 'danger', 30000);
