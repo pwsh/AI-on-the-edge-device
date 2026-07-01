@@ -119,10 +119,12 @@ function ParseConfig() {
     ParamAddValue(param, catname, "CamAec2");          	// automatic exposure sensor  (0 or 1)
     ParamAddValue(param, catname, "CamAeLevel");       	// auto exposure levels (-2 to 2)
     ParamAddValue(param, catname, "CamAecValue");      	// set exposure manually  (0-1200)
+    ParamAddValue(param, catname, "CamXclk");          	// camera master clock MHz (6-20); lower = more exposure
     ParamAddValue(param, catname, "CamAgc");           	// auto gain off (1 or 0)
     ParamAddValue(param, catname, "CamAgcGain");       	// set gain manually (0 - 30)
     ParamAddValue(param, catname, "CamBpc");           	// black pixel correction
     ParamAddValue(param, catname, "CamWpc");           	// white pixel correction
+    ParamAddValue(param, catname, "CamColorbar");      	// sensor test pattern (diagnostic; off normally)
     ParamAddValue(param, catname, "CamRawGma");        	// (1 or 0)
     ParamAddValue(param, catname, "CamLenc");          	// lens correction (1 or 0)
     ParamAddValue(param, catname, "CamHmirror");       	// (0 or 1) flip horizontally
@@ -601,10 +603,12 @@ function getCamConfig() {
     param["TakeImage"]["CamAec2"]["enabled"] = true;          	// automatic exposure sensor  (0 or 1)
     param["TakeImage"]["CamAeLevel"]["enabled"] = true;       	// auto exposure levels (-2 to 2)
     param["TakeImage"]["CamAecValue"]["enabled"] = true;      	// set exposure manually  (0-1200)
+    param["TakeImage"]["CamXclk"]["enabled"] = true;          	// camera master clock MHz (6-20)
     param["TakeImage"]["CamAgc"]["enabled"] = true;           	// auto gain off (1 or 0)
     param["TakeImage"]["CamAgcGain"]["enabled"] = true;       	// set gain manually (0 - 30)
     param["TakeImage"]["CamBpc"]["enabled"] = true;          	// black pixel correction
     param["TakeImage"]["CamWpc"]["enabled"] = true;           	// white pixel correction
+    param["TakeImage"]["CamColorbar"]["enabled"] = true;      	// sensor test pattern (diagnostic)
     param["TakeImage"]["CamRawGma"]["enabled"] = true;        	// (1 or 0)
     param["TakeImage"]["CamLenc"]["enabled"] = true;          	// lens correction (1 or 0)
     param["TakeImage"]["CamHmirror"]["enabled"] = true;       	// (0 or 1) flip horizontally
@@ -692,6 +696,10 @@ function getCamConfig() {
         param["TakeImage"]["CamAecValue"]["found"] = true;
         param["TakeImage"]["CamAecValue"].value1 = '600';
     }
+    if (!param["TakeImage"]["CamXclk"]["found"]) {
+        param["TakeImage"]["CamXclk"]["found"] = true;
+        param["TakeImage"]["CamXclk"].value1 = '20';
+    }
     if (!param["TakeImage"]["CamAgc"]["found"]) {
         param["TakeImage"]["CamAgc"]["found"] = true;
         param["TakeImage"]["CamAgc"].value1 = 'true';
@@ -707,7 +715,11 @@ function getCamConfig() {
     if (!param["TakeImage"]["CamWpc"]["found"]) {
         param["TakeImage"]["CamWpc"]["found"] = true;
         param["TakeImage"]["CamWpc"].value1 = 'true';
-    }		
+    }
+    if (!param["TakeImage"]["CamColorbar"]["found"]) {
+        param["TakeImage"]["CamColorbar"]["found"] = true;
+        param["TakeImage"]["CamColorbar"].value1 = 'false';
+    }
     if (!param["TakeImage"]["CamRawGma"]["found"]) {
         param["TakeImage"]["CamRawGma"]["found"] = true;
         param["TakeImage"]["CamRawGma"].value1 = 'true';

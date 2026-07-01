@@ -137,6 +137,11 @@ esp_err_t CCamera::InitCam(void)
     CCstatus.ImageQuality = camera_config.jpeg_quality;
     CCstatus.ImageFrameSize = camera_config.frame_size;
 
+    // Use the configured master clock (XCLK) for this (re)init. On first boot CamXclk hasn't been loaded
+    // yet, so ImageXclk holds its default (20) which matches the built-in default.
+    if (CCstatus.ImageXclk >= 6 && CCstatus.ImageXclk <= 20)
+        camera_config.xclk_freq_hz = CCstatus.ImageXclk * 1000000;
+
     // De-init in case it was already initialized
     backend->deinit();
     vTaskDelay(cam_xDelay);
@@ -256,6 +261,23 @@ esp_err_t CCamera::setSensorDatenFromCCstatus(void)
 
     if (s != NULL)
     {
+        // Apply the configured master clock (XCLK). A bare set_xclk only nudges the LEDC and the OV3660's
+        // frame timing (hence exposure) doesn't follow it, so when the clock actually differs we RE-INIT
+        // the camera at the new XCLK (InitCam picks it up from camera_config). This resets the sensor, so
+        // do it FIRST and let the setters below re-apply everything. InitCam overwrites Quality/FrameSize
+        // from camera_config, so preserve the configured values across the call.
+        if (CCstatus.ImageXclk >= 6 && CCstatus.ImageXclk <= 20 &&
+            (int)(s->xclk_freq_hz / 1000000) != CCstatus.ImageXclk)
+        {
+            int _q = CCstatus.ImageQuality; framesize_t _f = CCstatus.ImageFrameSize;
+            camera_config.xclk_freq_hz = CCstatus.ImageXclk * 1000000;   // InitCam re-inits the sensor at this clock
+            InitCam();
+            CCstatus.ImageQuality = _q; CCstatus.ImageFrameSize = _f;
+            s = backend->sensorGet();
+            if (s == NULL) return ESP_FAIL;
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Camera re-initialised at XCLK " + std::to_string(CCstatus.ImageXclk) + " MHz");
+        }
+
         s->set_framesize(s, CCstatus.ImageFrameSize);
 		
         // s->set_contrast(s, CCstatus.ImageContrast);     // -2 to 2
@@ -294,6 +316,10 @@ esp_err_t CCamera::setSensorDatenFromCCstatus(void)
         // s->set_sharpness(s, CCstatus.ImageSharpness);   // auto-sharpness is not officially supported, default to 0
         SetCamSharpness(CCstatus.ImageAutoSharpness, CCstatus.ImageSharpness);
         s->set_denoise(s, CCstatus.ImageDenoiseLevel); // The OV2640 does not support it, OV3660 and OV5640 (0 to 8)
+
+        // The camera master clock (XCLK / CamXclk) is applied by the re-init at the top of this function,
+        // not here - a bare set_xclk only moves the LEDC and doesn't change the OV3660's frame timing.
+        s->set_colorbar(s, CCstatus.ImageColorbar);   // sensor test pattern (diagnostic; 0 for normal use)
 
         TickType_t cam_xDelay = 100 / portTICK_PERIOD_MS;
         vTaskDelay(cam_xDelay);
@@ -347,6 +373,9 @@ esp_err_t CCamera::getSensorDatenToCCstatus(void)
 
         // CCstatus.ImageSharpness = s->status.sharpness; // returns -1 because it is not supported
         CCstatus.ImageDenoiseLevel = s->status.denoise;
+
+        CCstatus.ImageColorbar = s->status.colorbar;
+        if (s->xclk_freq_hz > 0) CCstatus.ImageXclk = s->xclk_freq_hz / 1000000;   // Hz -> MHz
 
         return ESP_OK;
     }

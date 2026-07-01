@@ -652,6 +652,17 @@
             <td>$TOOLTIP_TakeImage_CamAecValue</td>
         </tr>
 
+        <tr class="expert" unused_id="TakeImage_CamXclk_ex3">
+            <td class="indent1">
+                <class id="TakeImage_CamXclk_text" style="color:black;">Camera Clock (MHz)</class>
+            </td>
+            <td>
+                <input required type="number" id="TakeImage_CamXclk_value1" size="13" min="6" max="20" onchange="cameraParameterChanged()"
+                    oninput="(!validity.rangeUnderflow||(value=6)) && (!validity.rangeOverflow||(value=20)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
+            </td>
+            <td>$TOOLTIP_TakeImage_CamXclk</td>
+        </tr>
+
         <tr class="expert" unused_id="TakeImage_CamAgc_ex3">
             <td class="indent1">
                 <class id="TakeImage_CamAgc_text" style="color:black;">Auto Gain</class>
@@ -688,6 +699,19 @@
                 </select>
             </td>
             <td>$TOOLTIP_TakeImage_CamBpc</td>
+        </tr>
+
+        <tr class="expert" unused_id="TakeImage_CamColorbar_ex3">
+            <td class="indent1">
+                <class id="TakeImage_CamColorbar_text" style="color:black;">Colorbar Test Pattern</class>
+            </td>
+            <td>
+                <select id="TakeImage_CamColorbar_value1" onchange="cameraParameterChanged()">
+                    <option value="true">enabled</option>
+                    <option value="false" selected>disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_TakeImage_CamColorbar</td>
         </tr>
 		
         <tr class="expert" unused_id="TakeImage_CamWpc_ex3">
@@ -2975,10 +2999,12 @@ function UpdateInput() {
     WriteParameter(param, category, "TakeImage", "CamAec", false);
     WriteParameter(param, category, "TakeImage", "CamAec2", false);
     WriteParameter(param, category, "TakeImage", "CamAeLevel", false);
-    WriteParameter(param, category, "TakeImage", "CamAecValue", false);	
+    WriteParameter(param, category, "TakeImage", "CamAecValue", false);
+    WriteParameter(param, category, "TakeImage", "CamXclk", false);	
     WriteParameter(param, category, "TakeImage", "CamAgc", false);
     WriteParameter(param, category, "TakeImage", "CamAgcGain", false);	
     WriteParameter(param, category, "TakeImage", "CamBpc", false);
+    WriteParameter(param, category, "TakeImage", "CamColorbar", false);
     WriteParameter(param, category, "TakeImage", "CamWpc", false);
     WriteParameter(param, category, "TakeImage", "CamRawGma", false);
     WriteParameter(param, category, "TakeImage", "CamLenc", false);
@@ -3373,10 +3399,12 @@ function ReadParameterAll() {
     ReadParameter(param, "TakeImage", "CamAec", false);
     ReadParameter(param, "TakeImage", "CamAec2", false);
     ReadParameter(param, "TakeImage", "CamAeLevel", false);
-    ReadParameter(param, "TakeImage", "CamAecValue", false);	
+    ReadParameter(param, "TakeImage", "CamAecValue", false);
+    ReadParameter(param, "TakeImage", "CamXclk", false);	
     ReadParameter(param, "TakeImage", "CamAgc", false);
     ReadParameter(param, "TakeImage", "CamAgcGain", false);
     ReadParameter(param, "TakeImage", "CamBpc", false);
+    ReadParameter(param, "TakeImage", "CamColorbar", false);
     ReadParameter(param, "TakeImage", "CamWpc", false);
     ReadParameter(param, "TakeImage", "CamRawGma", false);
     ReadParameter(param, "TakeImage", "CamLenc", false);

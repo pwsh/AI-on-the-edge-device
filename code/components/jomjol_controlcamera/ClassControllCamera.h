@@ -47,6 +47,11 @@ typedef struct
     int ImageVflip;         // Invert image (0 or 1)
     int ImageDcw;           // downsize enable (1 or 0)
 
+    int ImageXclk = 20;     // camera master clock (XCLK) in MHz. Lower => longer frame period => more
+                            // exposure/integration headroom (auto-gain can back off => less noise) at the
+                            // cost of a slower frame rate. Applied live via the sensor's set_xclk. (6-20)
+    int ImageColorbar = 0;  // sensor colour-bar TEST PATTERN - diagnostic only (0 or 1); off for normal use
+
     int ImageDenoiseLevel; // The OV2640 does not support it, OV3660 and OV5640 (0 to 8)
 
     int ImageWidth;

@@ -1,13 +1,14 @@
 # Parameter `CamColorbar`
 
-**Colorbar**
+**Colorbar Test Pattern**
 
-currently not implemented.
+Values: `enabled` / `disabled`
 
-Default Value: `false`
+Default Value: `disabled`
 
-See [here](../datasheets/Camera.ov2640_ds_1.8_.pdf) for the ov2640 camera datasheet.<br>
-See [here](../datasheets/OV5640_datasheet.pdf) for the ov5640 camera datasheet.
+Enables the sensor's built-in **colour-bar test pattern** instead of the live image. This is a **diagnostic**
+to verify the camera data path.
 
 !!! Warning
-    This is an **Expert Parameter**! Only change it if you understand what it does!
+    Leave this **disabled** for normal operation — with it enabled the sensor outputs test bars instead of
+    the meter, so no reading is possible. This is an **Expert Parameter**.

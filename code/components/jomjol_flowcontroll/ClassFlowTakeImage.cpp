@@ -216,6 +216,17 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             }
         }
 
+        else if ((toUpper(splitted[0]) == "CAMXCLK") && (splitted.size() > 1))
+        {
+            if (isStringNumeric(splitted[1]))
+            {
+                int _ImageXclk = std::stoi(splitted[1]);
+                // Camera master clock in MHz. 20 is the historical default; lower lengthens the frame
+                // period (more exposure headroom). Clamp 6..20 - below ~6 the sensor timing gets flaky.
+                CCstatus.ImageXclk = clipInt(_ImageXclk, 20, 6);
+            }
+        }
+
         else if ((toUpper(splitted[0]) == "CAMBRIGHTNESS") && (splitted.size() > 1))
         {
             if (isStringNumeric(splitted[1]))
@@ -410,6 +421,12 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
         else if ((toUpper(splitted[0]) == "CAMWPC") && (splitted.size() > 1))
         {
             CCstatus.ImageWpc = alphanumericToBoolean(splitted[1]);
+        }
+
+        else if ((toUpper(splitted[0]) == "CAMCOLORBAR") && (splitted.size() > 1))
+        {
+            // Sensor test pattern (colour bars). Diagnostic only - leave off for normal reading.
+            CCstatus.ImageColorbar = alphanumericToBoolean(splitted[1]);
         }
 
         else if ((toUpper(splitted[0]) == "CAMRAWGMA") && (splitted.size() > 1))
