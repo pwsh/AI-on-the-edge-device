@@ -713,6 +713,19 @@
             </td>
             <td>$TOOLTIP_TakeImage_CamColorbar</td>
         </tr>
+
+        <tr class="expert" unused_id="TakeImage_CamNightMode_ex3">
+            <td class="indent1">
+                <class id="TakeImage_CamNightMode_text" style="color:black;">Night Mode (OV3660/OV5640)</class>
+            </td>
+            <td>
+                <select id="TakeImage_CamNightMode_value1" onchange="cameraParameterChanged()">
+                    <option value="true" selected>enabled</option>
+                    <option value="false">disabled</option>
+                </select>
+            </td>
+            <td>$TOOLTIP_TakeImage_CamNightMode</td>
+        </tr>
 		
         <tr class="expert" unused_id="TakeImage_CamWpc_ex3">
             <td class="indent1">
@@ -3005,6 +3018,7 @@ function UpdateInput() {
     WriteParameter(param, category, "TakeImage", "CamAgcGain", false);	
     WriteParameter(param, category, "TakeImage", "CamBpc", false);
     WriteParameter(param, category, "TakeImage", "CamColorbar", false);
+    WriteParameter(param, category, "TakeImage", "CamNightMode", false);
     WriteParameter(param, category, "TakeImage", "CamWpc", false);
     WriteParameter(param, category, "TakeImage", "CamRawGma", false);
     WriteParameter(param, category, "TakeImage", "CamLenc", false);
@@ -3405,6 +3419,7 @@ function ReadParameterAll() {
     ReadParameter(param, "TakeImage", "CamAgcGain", false);
     ReadParameter(param, "TakeImage", "CamBpc", false);
     ReadParameter(param, "TakeImage", "CamColorbar", false);
+    ReadParameter(param, "TakeImage", "CamNightMode", false);
     ReadParameter(param, "TakeImage", "CamWpc", false);
     ReadParameter(param, "TakeImage", "CamRawGma", false);
     ReadParameter(param, "TakeImage", "CamLenc", false);

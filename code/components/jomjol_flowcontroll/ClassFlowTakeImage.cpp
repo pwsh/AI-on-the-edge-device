@@ -429,6 +429,12 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             CCstatus.ImageColorbar = alphanumericToBoolean(splitted[1]);
         }
 
+        else if ((toUpper(splitted[0]) == "CAMNIGHTMODE") && (splitted.size() > 1))
+        {
+            // OV3660/OV5640 native night mode (auto frame-rate for longer low-light exposure).
+            CCstatus.ImageNightMode = alphanumericToBoolean(splitted[1]);
+        }
+
         else if ((toUpper(splitted[0]) == "CAMRAWGMA") && (splitted.size() > 1))
         {
             CCstatus.ImageRawGma = alphanumericToBoolean(splitted[1]);

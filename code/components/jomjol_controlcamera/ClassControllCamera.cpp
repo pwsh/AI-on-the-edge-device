@@ -321,6 +321,12 @@ esp_err_t CCamera::setSensorDatenFromCCstatus(void)
         // not here - a bare set_xclk only moves the LEDC and doesn't change the OV3660's frame timing.
         s->set_colorbar(s, CCstatus.ImageColorbar);   // sensor test pattern (diagnostic; 0 for normal use)
 
+        // OV3660/OV5640 native NIGHT MODE: AEC_CTRL00 (0x3A00) bit[2] lets auto-exposure extend the frame
+        // period (drop frame rate) in low light for a longer integration time. The banding-filter / max-
+        // exposure registers it needs are already set by the sensor init table; only the enable bit is off.
+        if (CCstatus.CamSensor_id == OV3660_PID || CCstatus.CamSensor_id == OV5640_PID)
+            s->set_reg(s, 0x3A00, 0x04, CCstatus.ImageNightMode ? 0x04 : 0x00);   // 0x3A00 bit2 = night-mode enable
+
         TickType_t cam_xDelay = 100 / portTICK_PERIOD_MS;
         vTaskDelay(cam_xDelay);
 

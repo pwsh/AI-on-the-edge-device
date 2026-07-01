@@ -125,6 +125,7 @@ function ParseConfig() {
     ParamAddValue(param, catname, "CamBpc");           	// black pixel correction
     ParamAddValue(param, catname, "CamWpc");           	// white pixel correction
     ParamAddValue(param, catname, "CamColorbar");      	// sensor test pattern (diagnostic; off normally)
+    ParamAddValue(param, catname, "CamNightMode");     	// OV3660/OV5640 native night mode (auto frame-rate)
     ParamAddValue(param, catname, "CamRawGma");        	// (1 or 0)
     ParamAddValue(param, catname, "CamLenc");          	// lens correction (1 or 0)
     ParamAddValue(param, catname, "CamHmirror");       	// (0 or 1) flip horizontally
@@ -609,6 +610,7 @@ function getCamConfig() {
     param["TakeImage"]["CamBpc"]["enabled"] = true;          	// black pixel correction
     param["TakeImage"]["CamWpc"]["enabled"] = true;           	// white pixel correction
     param["TakeImage"]["CamColorbar"]["enabled"] = true;      	// sensor test pattern (diagnostic)
+    param["TakeImage"]["CamNightMode"]["enabled"] = true;     	// OV3660/OV5640 native night mode
     param["TakeImage"]["CamRawGma"]["enabled"] = true;        	// (1 or 0)
     param["TakeImage"]["CamLenc"]["enabled"] = true;          	// lens correction (1 or 0)
     param["TakeImage"]["CamHmirror"]["enabled"] = true;       	// (0 or 1) flip horizontally
@@ -719,6 +721,10 @@ function getCamConfig() {
     if (!param["TakeImage"]["CamColorbar"]["found"]) {
         param["TakeImage"]["CamColorbar"]["found"] = true;
         param["TakeImage"]["CamColorbar"].value1 = 'false';
+    }
+    if (!param["TakeImage"]["CamNightMode"]["found"]) {
+        param["TakeImage"]["CamNightMode"]["found"] = true;
+        param["TakeImage"]["CamNightMode"].value1 = 'true';
     }
     if (!param["TakeImage"]["CamRawGma"]["found"]) {
         param["TakeImage"]["CamRawGma"]["found"] = true;

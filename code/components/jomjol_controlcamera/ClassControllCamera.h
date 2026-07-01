@@ -51,6 +51,9 @@ typedef struct
                             // exposure/integration headroom (auto-gain can back off => less noise) at the
                             // cost of a slower frame rate. Applied live via the sensor's set_xclk. (6-20)
     int ImageColorbar = 0;  // sensor colour-bar TEST PATTERN - diagnostic only (0 or 1); off for normal use
+    int ImageNightMode = 1; // OV3660/OV5640 native NIGHT MODE (AEC auto-frame-rate, reg 0x3A00 bit2): lets
+                            // auto-exposure drop the frame rate in low light for a longer integration time.
+                            // Left off by the driver init tables; no-op on the OV2640. (0 or 1)
 
     int ImageDenoiseLevel; // The OV2640 does not support it, OV3660 and OV5640 (0 to 8)
 
