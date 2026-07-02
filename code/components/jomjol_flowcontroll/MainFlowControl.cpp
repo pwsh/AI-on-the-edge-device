@@ -1601,6 +1601,39 @@ esp_err_t handler_editflow(httpd_req_t *req)
         return ESP_OK;
     }
 
+    // Firmware-side ROI auto-tune: search positions and sizes around the given box on the in-memory
+    // aligned image (from a prior test_take + test_align), with the CNN model loaded ONCE for the whole
+    // search. Replaces the old web-driven per-box examineroi loop, which re-loaded the model per
+    // candidate (slow) and fragmented PSRAM. No shared-PSRAM init here: the aligned frame lives in the
+    // general heap and the model needs the shared region to itself.
+    if (_task.compare("autotune") == 0)
+    {
+        int x = 0, y = 0, dx = 20, dy = 20;
+        bool isAnalog = false;
+        char vc[40];
+        auto getInt = [&](const char *k, int &dst){ if (httpd_query_key_value(_query, k, vc, sizeof(vc)) == ESP_OK) { std::string s(vc); if (isStringNumeric(s)) dst = std::stoi(s); } };
+        getInt("x", x); getInt("y", y); getInt("dx", dx); getInt("dy", dy);
+        if (httpd_query_key_value(_query, "type", vc, sizeof(vc)) == ESP_OK) isAnalog = (std::string(vc) == "analog");
+
+        std::string body;
+        bool gotLock = flowRoundTryLock();
+        if (gotLock)
+        {
+            std::string frag = flowctrl.AutoTuneRoi(isAnalog, x, y, dx, dy, "/sdcard/img_tmp/examine.jpg");
+            body = "{" + frag + ",\"image\":\"/img_tmp/examine.jpg\"}";
+            flowRoundUnlock();
+        }
+        else
+        {
+            body = "{\"error\":\"device is busy with a round - try again in a moment\"}";
+        }
+
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, body.c_str(), body.length());
+        return ESP_OK;
+    }
+
     if (_task.compare("cutref") == 0)
     {
         std::string in, out, zw;

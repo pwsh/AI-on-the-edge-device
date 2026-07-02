@@ -65,6 +65,14 @@ public:
     // fragment: "reading":"<digit/value/N>","confidence":<percent|null>  (no surrounding braces).
     std::string ExamineCut(const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
 
+    // ROI auto-tune (digit flows only): search positions and sizes around the given box directly on the
+    // in-memory aligned image, loading the CNN model ONCE and scoring candidates by logit margin
+    // (winner/runner-up log-ratio, which keeps ranking after softmax confidence saturates at 100%).
+    // Near-tie candidates are resolved by centering on the plateau, so the box lands mid-digit instead
+    // of at the edge of the acceptable region. Returns a JSON fragment with the winning box
+    // ("x","y","dx","dy","reading","confidence",...) or "error":"..." (no surrounding braces).
+    std::string AutoTuneRoi(CAlignAndCutImage *src, int x, int y, int dx, int dy, const std::string &displayPath);
+
     // The configured per-digit confidence floor (0..1; 0 = off). Exposed so PostProcessing can decide
     // whether recent reads were confident enough to override a rate-limit rejection.
     float GetDigitConfidenceThreshold() { return DigitConfidenceThreshold; }

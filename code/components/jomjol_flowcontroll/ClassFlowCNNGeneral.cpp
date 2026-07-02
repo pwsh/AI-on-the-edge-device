@@ -173,6 +173,148 @@ std::string ClassFlowCNNGeneral::ExamineCut(const std::string &cutOrgPath, const
     return res;
 }
 
+std::string ClassFlowCNNGeneral::AutoTuneRoi(CAlignAndCutImage *src, int x, int y, int dx, int dy, const std::string &displayPath) {
+    if (CNNType != Digit)
+        return "\"error\":\"auto-tune currently supports digit (class) models only\"";
+    if (!src || !src->ImageOkay())
+        return "\"error\":\"no aligned image available\"";
+
+    int64_t t0 = esp_timer_get_time();
+
+    // Load the model ONCE for the whole search. The old web-driven tuner re-loaded model + tensor
+    // arena per candidate box, which both dominated the runtime and fragmented PSRAM.
+    CTfLiteClass *tfl = new CTfLiteClass;
+    if (!tfl->LoadModel(FormatFileName("/sdcard" + cnnmodelfile)) || !tfl->MakeAllocate()) {
+        delete tfl;
+        return "\"error\":\"could not load the model\"";
+    }
+    CImageBasis *rs = new CImageBasis("autotuneRs", modelxsize, modelysize, modelchannel);
+
+    struct Cand { int x = 0, y = 0, dx = 0, dy = 0, cls = -1000; float conf = 0.0f, margin = 0.0f; };
+    int evaluated = 0;
+
+    // Cut one candidate box from the aligned frame (in memory, no SD), resize it to the model input
+    // and classify. Returns the class; -1000 = box invalid / inference failed.
+    auto evalBox = [&](int bx, int by, int bdx, int bdy, float &conf, float &margin) -> int {
+        conf = 0.0f; margin = 0.0f;
+        if (bx < 0 || by < 0 || bdx < 8 || bdy < 8 ||
+            (bx + bdx) > (src->width - 1) || (by + bdy) > (src->height - 1))
+            return -1000;                              // CutAndSave clips high edges but not negatives
+        CImageBasis *cut = src->CutAndSave(bx, by, bdx, bdy);
+        if (!cut || !cut->ImageOkay()) { delete cut; return -1000; }
+        cut->Resize(modelxsize, modelysize, rs);
+        delete cut;
+        if (!tfl->LoadInputImageBasis(rs)) return -1000;
+        tfl->Invoke();
+        evaluated++;
+        return tfl->GetClassAndConfidence(&conf, &margin);
+    };
+
+    // Evaluate a stage of candidate boxes, keeping only genuine digits (0-9): a box parked on a blank
+    // gap reads "N", which the model can report with high confidence, and must never win. With
+    // lockCls >= 0 also drop reads of a DIFFERENT digit, so the box cannot drift onto a neighbour.
+    auto evalStage = [&](const std::vector<Cand> &boxes, int lockCls, std::vector<Cand> &out) {
+        out.clear();
+        for (size_t i = 0; i < boxes.size(); ++i) {
+            Cand c = boxes[i];
+            c.cls = evalBox(c.x, c.y, c.dx, c.dy, c.conf, c.margin);
+            if (c.cls < 0 || c.cls > 9) continue;
+            if (lockCls >= 0 && c.cls != lockCls) continue;
+            out.push_back(c);
+        }
+    };
+
+    // Resolve near-ties by centering: all candidates of the locked class within MARGIN_TOL log-units
+    // of the best margin form a plateau (a quantised softmax saturates, so exact ties are the norm),
+    // and the centroid of that plateau is the box centered on the digit rather than at the edge of
+    // the acceptable region. The centroid box is re-verified; if it no longer reads the locked class
+    // (possible on a non-convex plateau) fall back to the best single candidate.
+    const float MARGIN_TOL = 0.5f;
+    auto plateauCenter = [&](const std::vector<Cand> &cands, int lockCls) -> Cand {
+        int bi = -1;
+        for (size_t i = 0; i < cands.size(); ++i)
+            if (cands[i].cls == lockCls && (bi < 0 || cands[i].margin > cands[bi].margin)) bi = (int)i;
+        if (bi < 0) return Cand();                     // caller guards against empty stages
+        long sx = 0, sy = 0, sdx = 0, sdy = 0; int n = 0;
+        for (size_t i = 0; i < cands.size(); ++i) {
+            const Cand &c = cands[i];
+            if (c.cls != lockCls || c.margin < cands[bi].margin - MARGIN_TOL) continue;
+            sx += c.x; sy += c.y; sdx += c.dx; sdy += c.dy; n++;
+        }
+        Cand center;
+        center.x  = (int)lroundf((float)sx / n);  center.y  = (int)lroundf((float)sy / n);
+        center.dx = (int)lroundf((float)sdx / n); center.dy = (int)lroundf((float)sdy / n);
+        center.cls = evalBox(center.x, center.y, center.dx, center.dy, center.conf, center.margin);
+        return (center.cls == lockCls) ? center : cands[bi];
+    };
+
+    // ---- Stage A: coarse position sweep at the current size ----
+    static const int POS[] = {-6, -4, -2, 0, 2, 4, 6};
+    std::vector<Cand> boxes, cands;
+    for (size_t iy = 0; iy < sizeof(POS) / sizeof(POS[0]); ++iy)
+        for (size_t ix = 0; ix < sizeof(POS) / sizeof(POS[0]); ++ix) {
+            Cand c; c.x = x + POS[ix]; c.y = y + POS[iy]; c.dx = dx; c.dy = dy;
+            boxes.push_back(c);
+        }
+    evalStage(boxes, -1, cands);
+    if (cands.empty()) {
+        delete rs; delete tfl;
+        return "\"error\":\"no digit (0-9) found near this box - place it roughly over a digit first\"";
+    }
+    // Lock onto the digit the best-scoring box reads; all later stages must keep reading it.
+    int lockCls = cands[0].cls;
+    for (size_t i = 0, b = 0; i < cands.size(); ++i)
+        if (cands[i].margin > cands[b].margin) { b = i; lockCls = cands[i].cls; }
+    Cand cur = plateauCenter(cands, lockCls);
+
+    // ---- Stage B: size sweep at that position, growing/shrinking around the box CENTER ----
+    static const int SIZ[] = {-4, -2, 0, 2, 4};
+    boxes.clear();
+    for (size_t iy = 0; iy < sizeof(SIZ) / sizeof(SIZ[0]); ++iy)
+        for (size_t ix = 0; ix < sizeof(SIZ) / sizeof(SIZ[0]); ++ix) {
+            Cand c; c.x = cur.x - SIZ[ix] / 2; c.y = cur.y - SIZ[iy] / 2;
+            c.dx = cur.dx + SIZ[ix]; c.dy = cur.dy + SIZ[iy];
+            boxes.push_back(c);
+        }
+    evalStage(boxes, lockCls, cands);
+    if (!cands.empty()) cur = plateauCenter(cands, lockCls);
+
+    // ---- Stage C: fine position at the chosen size (stage A stepped by 2 px + centroid rounding) ----
+    static const int FINE[] = {-2, -1, 0, 1, 2};
+    boxes.clear();
+    for (size_t iy = 0; iy < sizeof(FINE) / sizeof(FINE[0]); ++iy)
+        for (size_t ix = 0; ix < sizeof(FINE) / sizeof(FINE[0]); ++ix) {
+            Cand c; c.x = cur.x + FINE[ix]; c.y = cur.y + FINE[iy]; c.dx = cur.dx; c.dy = cur.dy;
+            boxes.push_back(c);
+        }
+    evalStage(boxes, lockCls, cands);
+    if (!cands.empty()) cur = plateauCenter(cands, lockCls);
+
+    // Final pass on the winning box so rs holds ITS model-input image for the display file, and the
+    // reported numbers are exactly what a round would see.
+    float conf = 0.0f, margin = 0.0f;
+    int cls = evalBox(cur.x, cur.y, cur.dx, cur.dy, conf, margin);
+    rs->SaveToFile(FormatFileName(displayPath));
+
+    int ms = (int)((esp_timer_get_time() - t0) / 1000);
+    std::string rd = ((cls >= 0) && (cls < 10)) ? std::to_string(cls) : std::string("N");
+    int pct = (int)(conf * 100.0f + 0.5f); if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "ROI auto-tune: (" + std::to_string(x) + "," + std::to_string(y) +
+            " " + std::to_string(dx) + "x" + std::to_string(dy) + ") -> (" + std::to_string(cur.x) + "," +
+            std::to_string(cur.y) + " " + std::to_string(cur.dx) + "x" + std::to_string(cur.dy) + "), reads " +
+            rd + " at " + std::to_string(pct) + "% (margin " + std::to_string(margin) + "), " +
+            std::to_string(evaluated) + " boxes in " + std::to_string(ms) + " ms");
+
+    char buf[192];
+    snprintf(buf, sizeof(buf),
+            "\"x\":%d,\"y\":%d,\"dx\":%d,\"dy\":%d,\"reading\":\"%s\",\"confidence\":%d,\"margin\":%.2f,\"evaluated\":%d,\"ms\":%d,\"type\":\"digit\"",
+            cur.x, cur.y, cur.dx, cur.dy, rd.c_str(), pct, margin, evaluated, ms);
+
+    delete rs; delete tfl;
+    return std::string(buf);
+}
+
 // True if the less-significant neighbour (index i+1, MSD-first ordering) of digit i looks unchanged
 // vs its own confident history - i.e. no carry could have reached digit i this round. The
 // least-significant digit (no neighbour below) is treated as "could have changed".

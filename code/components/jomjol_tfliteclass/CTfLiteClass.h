@@ -52,6 +52,9 @@ class CTfLiteClass
         int GetClassFromImageBasis(CImageBasis *rs, float *outConfidence);
         // Argmax over the current output tensor + winning-class confidence (no Invoke).
         int GetClassAndConfidence(float *outConfidence);
+        // As above, plus the log-ratio of winner to runner-up (~logit margin). The margin keeps
+        // ranking candidates after the softmax confidence saturates at 1.0 (ROI auto-tune).
+        int GetClassAndConfidence(float *outConfidence, float *outMargin);
         std::string GetStatusFlow();
 
         float GetOutputValue(int nr);

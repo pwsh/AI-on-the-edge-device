@@ -6,6 +6,8 @@
 #include "../../include/defines.h"
 
 #include <sys/stat.h>
+#include <algorithm>
+#include <math.h>
 
 // #define DEBUG_DETAIL_ON
 
@@ -52,25 +54,43 @@ int CTfLiteClass::GetClassFromImageBasis(CImageBasis *rs)
 
 int CTfLiteClass::GetClassAndConfidence(float *outConfidence)
 {
+    return GetClassAndConfidence(outConfidence, NULL);
+}
+
+int CTfLiteClass::GetClassAndConfidence(float *outConfidence, float *outMargin)
+{
     TfLiteTensor* output2 = interpreter->output(0);
     if (output2 == NULL) {
         if (outConfidence) *outConfidence = 0.0f;
+        if (outMargin) *outMargin = 0.0f;
         return -1;
     }
 
     int numeroutput = output2->dims->data[1];
     float zw_max = output2->data.f[0];
+    float zw_second = -1.0f;
     int   zw_class = 0;
     float sum = zw_max;
     for (int i = 1; i < numeroutput; ++i) {
         float zw = output2->data.f[i];
         sum += zw;
-        if (zw > zw_max) { zw_max = zw; zw_class = i; }
+        if (zw > zw_max) { zw_second = zw_max; zw_max = zw; zw_class = i; }
+        else if (zw > zw_second) { zw_second = zw; }
     }
 
     if (outConfidence) {
         // Normalise so a non-softmax head still yields a comparable [0,1] confidence; guard sum<=0.
         *outConfidence = (sum > 0.0f) ? (zw_max / sum) : zw_max;
+    }
+    if (outMargin) {
+        // Log-ratio of winner to runner-up ~= logit margin (log p1 - log p2, the normaliser cancels).
+        // Unlike the softmax confidence this does not saturate at 1.0, so it can still rank candidate
+        // ROI boxes that all read "100%". Runner-up is clamped to eps: a quantised output can be an
+        // exact 0, which would make the ratio infinite; the clamp caps the margin at ~20.7.
+        const float eps = 1e-9f;
+        float m = (zw_max > 0.0f) ? logf(zw_max / std::max(zw_second, eps)) : 0.0f;
+        if (m < 0.0f) m = 0.0f;
+        *outMargin = m;
     }
     return zw_class;
 }

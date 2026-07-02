@@ -63,6 +63,10 @@ public:
 	// On-demand: run the digit/analog CNN on an already-cut ROI image and return a JSON fragment
 	// ("reading":..,"confidence":..). Routes to the digit or analog flow. Caller handles mutex/PSRAM.
 	string ExamineCutRoi(bool isAnalog, const std::string &cutOrgPath, const std::string &displayPath, bool ccw);
+	// ROI auto-tune: search positions/sizes around the given box on the in-memory aligned image
+	// (model loaded once, logit-margin score, plateau centering). Digit flows only. Returns a JSON
+	// fragment (winning box + reading) or "error":"..." - see ClassFlowCNNGeneral::AutoTuneRoi.
+	string AutoTuneRoi(bool isAnalog, int x, int y, int dx, int dy, const std::string &displayPath);
 	// Write the most recent in-memory aligned image (the frame the last round/alignment produced) to
 	// an SD file. The live aligned image normally only lives in PSRAM (alg.jpg is written to SD only
 	// with the SaveAllFiles debug flag), so this gives the on-demand "examine fresh" a real file to

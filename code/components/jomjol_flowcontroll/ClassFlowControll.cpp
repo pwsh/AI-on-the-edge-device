@@ -501,6 +501,25 @@ string ClassFlowControll::ExamineCutRoi(bool isAnalog, const std::string &cutOrg
     return flow->ExamineCut(cutOrgPath, displayPath, ccw);
 }
 
+string ClassFlowControll::AutoTuneRoi(bool isAnalog, int x, int y, int dx, int dy, const std::string &displayPath)
+{
+    if (isAnalog) {
+        return "\"error\":\"auto-tune currently supports digit ROIs only\"";
+    }
+    if (!flowdigit) {
+        return "\"error\":\"no digit model is configured\"";
+    }
+    // Search directly on the in-memory aligned frame - exactly what a round's digitization cuts its
+    // ROIs from (it lives in the general PSRAM heap, so it can coexist with the CNN model + tensor
+    // arena in the shared region; no SD dump / re-decode needed). Caller holds the round lock, so
+    // the frame is stable for the whole search.
+    CAlignAndCutImage *aligned = flowalignment ? flowalignment->GetAlignAndCutImage() : NULL;
+    if (!aligned || !aligned->ImageOkay()) {
+        return "\"error\":\"no fresh aligned image yet - pull/capture a fresh camera image first\"";
+    }
+    return flowdigit->AutoTuneRoi(aligned, x, y, dx, dy, displayPath);
+}
+
 bool ClassFlowControll::SaveFreshAlignedImage(const std::string &path)
 {
     if (!flowalignment) {
