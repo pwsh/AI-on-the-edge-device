@@ -1,3 +1,24 @@
+# [Unreleased]
+
+### General
+
+- **ROI Auto-tune moved into the firmware — faster, smarter, fragmentation-free**: the digit-ROI
+  Auto-tune is now a single device-side search (`/editflow?task=autotune`) instead of ~17 sequential
+  web requests. The CNN model is loaded **once** for the whole search and candidate boxes are cut
+  **in memory** from the aligned frame, so a full run evaluates **~100 positions/sizes in ~3 s**
+  (previously ~17 boxes in ~25 s) with no PSRAM churn. The search also scores candidates by
+  **logit margin** (winner vs runner-up), which keeps ranking boxes after the softmax confidence
+  saturates at 100 %, resolves near-ties to the **center of the tied plateau** (the box lands
+  mid-digit instead of at the edge of the acceptable region), and **locks onto the digit identity**
+  found in the coarse pass so the box can't drift onto a neighbouring digit or a high-confidence
+  blank ("N"). Search pattern: 7×7 coarse position grid (±6 px) → 5×5 center-preserving size sweep
+  (±4 px) → 5×5 fine position pass. Processing still pauses for the search and stays paused
+  (use **Resume processing**). Digit ROIs only.
+- **XCLK (camera clock) and colorbar as runtime settings**: new `[TakeImage]` `CamXclk` (6–20 MHz)
+  and `CamColorbar`; XCLK changes re-initialise the camera so the sensor timing actually follows.
+- **OV3660/OV5640 native night mode** (`CamNightMode`, default on): lets the auto-exposure drop the
+  frame rate in low light for longer integration (no effect on OV2640).
+
 # [17.1.2] - 2026-06-26
 
 ### Reliability
