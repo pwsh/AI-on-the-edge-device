@@ -144,6 +144,11 @@ There are several options for what to do with that value:
 ## What's New in v17 🆕
 A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
 
+### ✨ v17.2
+- **On-device ROI Auto-tune** – the digit-ROI Auto-tune search now runs entirely in the firmware: one call evaluates **~100 candidate positions/sizes in ~3 s** (model loaded once, boxes cut in memory). Candidates are ranked by **logit margin** — which keeps discriminating after the confidence saturates at 100 % — near-ties resolve to the **center** of the tied region so the box lands mid-digit, and a digit-identity lock stops the box drifting onto a neighbouring digit or a blank.
+- **Camera clock (XCLK) as a runtime setting** (`CamXclk`, 6–20 MHz) — applied by re-initialising the camera so the sensor timing actually follows — plus a `CamColorbar` test-pattern toggle for diagnostics.
+- **OV3660/OV5640 native night mode** (`CamNightMode`, default on) – lets the auto-exposure drop the frame rate in low light for longer integration and less gain noise (no effect on the OV2640).
+
 ### ✨ v17.1
 - **Per-LED control of the external strip** – turn individual WS281x pixels on/off from a line/grid/circle toggle widget (on the config *and* camera-setup pages) that updates the hardware in realtime; the 5V power budget now counts only the **enabled** LEDs. Plus an optional **alignment-grid overlay** on the live stream to line up the camera.
 - **ROI editor overhaul** – an **Auto-tune** button that searches nearby positions/sizes for the highest-confidence digit box, a numbered-chip ROI switcher with auto-named ROIs, on-screen model selection and editable decimal shift, and **ROI/sequence edits that apply without a reboot** (Save re-inits the flow live).
