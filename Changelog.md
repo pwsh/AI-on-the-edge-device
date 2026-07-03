@@ -1,3 +1,24 @@
+# [17.2.1] - 2026-07-02
+
+### General
+
+- **Alignment-marker quality feedback adapts to the image (fixes "never turns green")**: the live
+  green/orange/red verdict in the marker editor used **absolute** pixel thresholds tuned on crisp
+  OV2640 frames — on a soft or washed-out image (e.g. an OV3660 looking at a low-contrast LCD) not a
+  single spot in the whole frame could reach them, so the box never turned green even on the best
+  possible location. The page now **profiles the whole image on load** and green means *"within 70 %
+  of the strongest window this image offers"* — matching how the template match actually behaves (it
+  is relative and picks the best position; what matters is choosing the strongest available feature).
+  A crisp image keeps the old strict bar; a small absolute floor still rejects genuinely flat picks.
+- **New "Suggest Position" button** in the marker editor: moves the box to the strongest **static**
+  feature the image offers (Marker&nbsp;1: left half, Marker&nbsp;2: right half, so the pair spans
+  the image and pins the rotation). Suggestions avoid image borders and all configured ROIs.
+- **Marker-on-digits warning**: a marker box overlapping a configured digit/analog ROI is now flagged
+  red with an explanation — that display content changes between rounds and would drag the alignment
+  around (previously such a box could show green).
+- Marker feedback minor fixes: live analysis now also works while dragging up/left, and a failed
+  pixel read (e.g. tainted canvas) shows "check unavailable" instead of silently passing.
+
 # [17.2.0] - 2026-07-02
 
 ### General
