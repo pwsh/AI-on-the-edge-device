@@ -155,7 +155,8 @@
         <tr>
             <td style="padding-top: 10px">x: <input type="number" name="refx" id="refx" step=1 onchange="valuemanualchanged()"></td>
             <td style="padding-top: 10px">dx: <input type="number" name="refdx" id="refdx" step=1 onchange="valuemanualchanged()"></td>
-            <td rowspan="2" style="padding-top: 10px;"><button style="color:black;" type="button" class="button" id="updatemarker" onclick="CutOutReference()">Update Marker</button></td>	
+            <td rowspan="2" style="padding-top: 10px;"><button style="color:black;" type="button" class="button" id="updatemarker" onclick="CutOutReference()">Update Marker</button><br>
+                <button style="color:black; margin-top:6px;" type="button" class="button" id="suggestmarker" onclick="SuggestMarker()" disabled title="Move the box to the strongest static feature this image offers (marker 1: left half, marker 2: right half)">Suggest Position</button></td>
         </tr>
 	  
         <tr>
@@ -374,8 +375,10 @@
                 canvas.width = this.width;
                 canvas.height = this.height;
                 drawImage();
+                // Profile the image off-screen (best marker spots + the adaptive "green" bar).
+                setTimeout(buildMarkerProfile, 0);
             };
-    
+
             imageObj.src = dataURL;
         }
     
@@ -589,18 +592,33 @@
                 msg: "Marker " + w + "×" + h + " px - good (recommended " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side)." };
         }
 
-        // Pixel-content thresholds (0-255 grayscale). A good marker needs brightness contrast AND
-        // edge detail in BOTH directions. If it is featureless in one direction the template match
-        // can slide along that direction and "edge-clamp": it lands hard against the edge of its
-        // search window because there is no clear best position, which skews the whole alignment.
-        var MARKER_MIN_CONTRAST = 12;   // std-dev of brightness; low = flat / featureless area
-        var MARKER_MIN_GRADIENT = 6;    // edge strength in one direction; low = slides that way
+        // Pixel-content scoring (0-255 grayscale). A good marker needs brightness contrast AND edge
+        // detail in BOTH directions. If it is featureless in one direction the template match can
+        // slide along that direction and "edge-clamp": it lands hard against the edge of its search
+        // window because there is no clear best position, which skews the whole alignment.
+        //
+        // The verdict is ADAPTIVE: absolute reference values below describe a crisp, well-lit image,
+        // but soft or washed-out cameras (e.g. an OV3660 with low LCD contrast) may not offer a
+        // single spot that reaches them. So on load the whole image is profiled and "green" means
+        // "close to the best THIS image has to offer" (the template match is relative too - it finds
+        // the best-matching position, so what matters is picking the strongest available feature).
+        var MARKER_UNIT_CONTRAST = 12;  // std-dev of brightness on a crisp image (score unit)
+        var MARKER_UNIT_GRADIENT = 6;   // per-direction edge strength on a crisp image (score unit)
+        var MARKER_FLOOR_SCORE = 0.35;  // below this the area is too flat to match, on ANY image
+        var MARKER_GREEN_FRACTION = 0.7;// green = within 70% of the image's best window
+        var MARKER_EDGE_MARGIN = 24;    // keep suggestions clear of borders (search field is ~20 px)
+        var MARKER_WIN = 40;            // profiling / suggestion window size (px)
 
-        // Measure the selected region's contrast and its horizontal vs vertical edge strength.
-        function analyzeMarkerPixels(context) {
+        // Worst-of-three score in "crisp image" units: 1.0 = meets all absolute reference values.
+        function markerUnitScore(px) {
+            return Math.min(px.contrast / MARKER_UNIT_CONTRAST,
+                            px.gradX / MARKER_UNIT_GRADIENT,
+                            px.gradY / MARKER_UNIT_GRADIENT);
+        }
+
+        // Measure a region's contrast and its horizontal vs vertical edge strength.
+        function analyzeMarkerPixels(context, x, y, w, h) {
             try {
-                var x = Math.round(rect.startX), y = Math.round(rect.startY);
-                var w = Math.round(Math.abs(rect.w)), h = Math.round(Math.abs(rect.h));
                 if (w < 3 || h < 3) return null;
                 var data = context.getImageData(x, y, w, h).data;
                 var n = w * h, gray = new Float32Array(n), sum = 0;
@@ -625,11 +643,143 @@
             } catch (e) { return null; }   // tainted/cross-origin canvas -> skip the pixel check
         }
 
+        // Digit/analog ROI rectangles from the parsed config: a marker must not overlap them - that
+        // display content CHANGES between rounds, so a marker there would drag the alignment around.
+        var roiRectsCache = null;
+        function getRoiRects() {
+            if (roiRectsCache) return roiRectsCache;
+            var rects = [];
+            try {
+                for (var i in NUMBERS) {
+                    ["digit", "analog"].forEach(function (kind) {
+                        var arr = NUMBERS[i][kind] || [];
+                        for (var j = 0; j < arr.length; j++) {
+                            var x = parseInt(arr[j]["x"]), y = parseInt(arr[j]["y"]);
+                            var dx = parseInt(arr[j]["dx"]), dy = parseInt(arr[j]["dy"]);
+                            if (!isNaN(x) && !isNaN(y) && dx > 0 && dy > 0)
+                                rects.push({ x: x, y: y, w: dx, h: dy,
+                                             name: NUMBERS[i]["name"] + "." + arr[j]["name"] });
+                        }
+                    });
+                }
+            } catch (e) {}
+            roiRectsCache = rects;
+            return rects;
+        }
+
+        function boxIntersectsRoi(x, y, w, h, pad) {
+            var rs = getRoiRects();
+            pad = pad || 0;
+            for (var i = 0; i < rs.length; i++) {
+                var r = rs[i];
+                if (x < r.x + r.w + pad && x + w > r.x - pad &&
+                    y < r.y + r.h + pad && y + h > r.y - pad) return r.name;
+            }
+            return null;
+        }
+
+        // Whole-image profile: slide a MARKER_WIN window over the (clean, off-screen) image and find
+        // the strongest static feature - overall and per half (marker 1 left, marker 2 right, so the
+        // pair spans the image and pins the rotation). Windows on ROIs or near borders are excluded.
+        // Uses integral images so the sweep is O(1) per window.
+        var markerProfile = null;
+        function buildMarkerProfile() {
+            markerProfile = null;
+            try {
+                var w = imageObj.width, h = imageObj.height;
+                if (!(w > 2 * MARKER_EDGE_MARGIN + MARKER_WIN && h > 2 * MARKER_EDGE_MARGIN + MARKER_WIN)) return;
+                var off = document.createElement("canvas");
+                off.width = w; off.height = h;
+                var octx = off.getContext("2d");
+                octx.drawImage(imageObj, 0, 0);
+                var data = octx.getImageData(0, 0, w, h).data;
+
+                var gray = new Float32Array(w * h);
+                for (var i = 0; i < w * h; i++)
+                    gray[i] = 0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2];
+
+                // Integral images over gray, gray², squared x-diffs and squared y-diffs.
+                var W1 = w + 1;
+                var S  = new Float64Array(W1 * (h + 1));
+                var S2 = new Float64Array(W1 * (h + 1));
+                var DX = new Float64Array(W1 * (h + 1));
+                var DY = new Float64Array(W1 * (h + 1));
+                for (var y = 0; y < h; y++) {
+                    for (var x = 0; x < w; x++) {
+                        var g = gray[y*w + x];
+                        var dx2 = (x + 1 < w) ? Math.pow(gray[y*w + x + 1] - g, 2) : 0;
+                        var dy2 = (y + 1 < h) ? Math.pow(gray[(y+1)*w + x] - g, 2) : 0;
+                        var o = (y+1)*W1 + (x+1);
+                        S[o]  = g       + S[o-1]  + S[o-W1]  - S[o-W1-1];
+                        S2[o] = g*g     + S2[o-1] + S2[o-W1] - S2[o-W1-1];
+                        DX[o] = dx2     + DX[o-1] + DX[o-W1] - DX[o-W1-1];
+                        DY[o] = dy2     + DY[o-1] + DY[o-W1] - DY[o-W1-1];
+                    }
+                }
+                var isum = function (I, x0, y0, x1, y1) {   // sum over [x0,x1) × [y0,y1)
+                    return I[y1*W1 + x1] - I[y0*W1 + x1] - I[y1*W1 + x0] + I[y0*W1 + x0];
+                };
+                var winScore = function (x, y) {
+                    var n = MARKER_WIN * MARKER_WIN;
+                    var mean = isum(S, x, y, x + MARKER_WIN, y + MARKER_WIN) / n;
+                    var vr = isum(S2, x, y, x + MARKER_WIN, y + MARKER_WIN) / n - mean * mean;
+                    // x-diffs are defined for xx < x1-1 (per-row last column has none); same for y.
+                    var ngx = (MARKER_WIN - 1) * MARKER_WIN;
+                    var gx = Math.sqrt(isum(DX, x, y, x + MARKER_WIN - 1, y + MARKER_WIN) / ngx);
+                    var gy = Math.sqrt(isum(DY, x, y, x + MARKER_WIN, y + MARKER_WIN - 1) / ngx);
+                    return markerUnitScore({ contrast: Math.sqrt(Math.max(0, vr)), gradX: gx, gradY: gy });
+                };
+
+                var best = null, left = null, right = null, STEP = 8;
+                for (var wy = MARKER_EDGE_MARGIN; wy <= h - MARKER_EDGE_MARGIN - MARKER_WIN; wy += STEP) {
+                    for (var wx = MARKER_EDGE_MARGIN; wx <= w - MARKER_EDGE_MARGIN - MARKER_WIN; wx += STEP) {
+                        if (boxIntersectsRoi(wx, wy, MARKER_WIN, MARKER_WIN, 8)) continue;
+                        var s = winScore(wx, wy);
+                        var cand = { x: wx, y: wy, w: MARKER_WIN, h: MARKER_WIN, score: s };
+                        if (!best || s > best.score) best = cand;
+                        if (wx + MARKER_WIN / 2 < w / 2) { if (!left  || s > left.score)  left  = cand; }
+                        else                             { if (!right || s > right.score) right = cand; }
+                    }
+                }
+                if (best) markerProfile = { best: best, left: left, right: right };
+            } catch (e) { markerProfile = null; }   // tainted canvas etc. -> absolute thresholds apply
+            var sb = document.getElementById("suggestmarker");
+            if (sb) sb.disabled = !markerProfile;
+            draw();   // re-render the verdict with the profile in place
+        }
+
+        // The score a box must reach to be green: within MARKER_GREEN_FRACTION of the best window
+        // this image offers, never above the crisp-image reference (1.0) and never below the floor.
+        function markerGreenBar() {
+            if (!markerProfile || !markerProfile.best) return 1.0;
+            var b = MARKER_GREEN_FRACTION * markerProfile.best.score;
+            return Math.min(1.0, Math.max(MARKER_FLOOR_SCORE, b));
+        }
+
+        // Set the current marker's box to the strongest static feature (marker 1: left half,
+        // marker 2: right half - a widely separated pair pins the rotation best).
+        function SuggestMarker() {
+            if (!markerProfile) return;
+            var s = (aktindex == 0) ? (markerProfile.left || markerProfile.best)
+                                    : (markerProfile.right || markerProfile.best);
+            if (!s) return;
+            rect.startX = s.x; rect.startY = s.y; rect.w = s.w; rect.h = s.h;
+            document.getElementById("refx").value = s.x;
+            document.getElementById("refy").value = s.y;
+            document.getElementById("refdx").value = s.w;
+            document.getElementById("refdy").value = s.h;
+            draw();
+        }
+
         // Combined verdict (size + content) shown live as the box is drawn. Returns the box colour.
         function evaluateMarker(context) {
             var hint = document.getElementById("markerSizeHint");
-            var w = parseInt(rect.w), h = parseInt(rect.h);
             if (!hint) return "#FF0000";
+            // Normalise so live feedback also works while dragging up/left (negative w/h).
+            var w = parseInt(rect.w), h = parseInt(rect.h);
+            var bx = parseInt(rect.startX), by = parseInt(rect.startY);
+            if (w < 0) { bx += w; w = -w; }
+            if (h < 0) { by += h; h = -h; }
             if (!(w > 0 && h > 0)) {
                 hint.innerHTML = "Draw a box around a fixed, <b>distinctive</b> feature with edges in " +
                     "both directions (e.g. a corner or printed mark), " + MARKER_REC_MIN + "–" + MARKER_REC_MAX + " px per side.";
@@ -637,25 +787,45 @@
                 return "#FF0000";
             }
             var sz = markerSizeStatus(w, h);
-            var px = context ? analyzeMarkerPixels(context) : null;
+            var px = context ? analyzeMarkerPixels(context, bx, by, w, h) : null;
+            var roiHit = boxIntersectsRoi(bx, by, w, h, 0);
+            var suggestHint = markerProfile ? " Or press \"Suggest Position\"." : "";
             var v;
             if (!sz.ok) {
                 v = { ok: false, color: "#E53935", msg: sz.msg };
-            } else if (px && px.contrast < MARKER_MIN_CONTRAST) {
+            } else if (roiHit) {
                 v = { ok: false, color: "#E53935",
-                    msg: "Low contrast (flat / featureless area) - the match is unreliable. Pick a spot with clear dark/light detail." };
-            } else if (px && px.gradX < MARKER_MIN_GRADIENT && px.gradY < MARKER_MIN_GRADIENT) {
-                v = { ok: false, color: "#E53935",
-                    msg: "Too little edge detail in either direction - pick a more distinctive feature (a corner or mark)." };
-            } else if (px && px.gradY < MARKER_MIN_GRADIENT) {
-                v = { ok: false, color: "#FB8C00",
-                    msg: "Weak up/down localisation (looks like a horizontal line): the match can slide up/down and edge-clamp. Include a horizontal edge - a corner works best." };
-            } else if (px && px.gradX < MARKER_MIN_GRADIENT) {
-                v = { ok: false, color: "#FB8C00",
-                    msg: "Weak left/right localisation (looks like a vertical line): the match can slide sideways and edge-clamp. Include a vertical edge - a corner works best." };
+                    msg: "Box overlaps the ROI \"" + roiHit + "\" - that display content CHANGES between rounds, so a marker there drags the alignment around. Pick a static feature." };
+            } else if (px) {
+                var unit = markerUnitScore(px);
+                var bar = markerGreenBar();
+                if (unit >= bar) {
+                    v = { ok: true, color: "#2E7D32",
+                        msg: "Good alignment point (" + w + "×" + h + " px" +
+                             (markerProfile && bar < 1.0 ? ", among the strongest this image offers" : ", detail in both directions") + ")." };
+                } else {
+                    // Say WHICH property is weakest so the user knows what to look for.
+                    var cU = px.contrast / MARKER_UNIT_CONTRAST,
+                        gxU = px.gradX / MARKER_UNIT_GRADIENT,
+                        gyU = px.gradY / MARKER_UNIT_GRADIENT, why;
+                    if (cU <= gxU && cU <= gyU) {
+                        why = "Low contrast (flat / featureless area).";
+                    } else if (gyU < gxU) {
+                        why = "Weak up/down localisation (horizontal-line-like): the match can slide vertically and edge-clamp.";
+                    } else {
+                        why = "Weak left/right localisation (vertical-line-like): the match can slide sideways and edge-clamp.";
+                    }
+                    if (unit < MARKER_FLOOR_SCORE) {
+                        v = { ok: false, color: "#E53935",
+                            msg: why + " Pick a distinctive corner or printed mark." + suggestHint };
+                    } else {
+                        v = { ok: false, color: "#FB8C00",
+                            msg: why + " Usable, but this image has stronger spots." + suggestHint };
+                    }
+                }
             } else {
-                v = { ok: true, color: "#2E7D32",
-                    msg: "Good alignment point (" + Math.abs(w) + "×" + Math.abs(h) + " px, detail in both directions)." };
+                v = { ok: false, color: "#5a636b",
+                    msg: "Size OK (" + w + "×" + h + " px). Pixel check unavailable - make sure the box sits on a distinctive, static feature." };
             }
             hint.textContent = (v.ok ? "✔ " : "⚠ ") + v.msg;
             hint.style.color = v.color;
