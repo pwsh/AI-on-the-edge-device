@@ -164,15 +164,26 @@ function gotoOtaUpdate() {
 
 // --- Per-sensor camera capabilities ------------------------------------------
 // Derived from the esp32-camera drivers (sensors/ov*.c) and the firmware's
-// ClassControllCamera.cpp. Used by the config + livestream-setup pages to expose
-// only the controls a connected sensor actually supports, and to clamp the zoom
-// fields to that sensor's real range (instead of greying things out).
+// clamps (camSensorClampLimit in ClassControllCamera.h). Used by the config,
+// reference-editor and livestream-setup pages to expose only the controls a
+// connected sensor actually supports and to clamp every tuning field to that
+// sensor's real range (instead of greying things out).
 //   unsupported : Cam* settings that are a no-op on this sensor (hide them).
 //   zoom        : max |offsetX|, max |offsetY|, max zoom-size (SetZoomSize()).
+//   ranges      : [min,max] the firmware accepts per Cam* setting on this sensor.
 var CAM_SENSOR_CAPS = {
-    "OV2640": { unsupported: ["CamDenoise"],       zoom: { offX: 480, offY: 360, size: 29 } },
-    "OV3660": { unsupported: ["CamAutoSharpness"], zoom: { offX: 704, offY: 528, size: 43 } },
-    "OV5640": { unsupported: ["CamAutoSharpness"], zoom: { offX: 960, offY: 720, size: 59 } }
+    "OV2640": { unsupported: ["CamDenoise", "CamNightMode"], zoom: { offX: 480, offY: 360, size: 29 },
+                ranges: { CamBrightness: [-2, 2], CamContrast: [-2, 2], CamSaturation: [-2, 2],
+                          CamSharpness: [-2, 2], CamAeLevel: [-2, 2], CamAgcGain: [0, 30],
+                          CamAecValue: [0, 1200], CamDenoise: [0, 0] } },
+    "OV3660": { unsupported: ["CamAutoSharpness"], zoom: { offX: 704, offY: 528, size: 43 },
+                ranges: { CamBrightness: [-3, 3], CamContrast: [-3, 3], CamSaturation: [-4, 4],
+                          CamSharpness: [-3, 3], CamAeLevel: [-5, 5], CamAgcGain: [0, 64],
+                          CamAecValue: [0, 1968], CamDenoise: [0, 8] } },
+    "OV5640": { unsupported: ["CamAutoSharpness"], zoom: { offX: 960, offY: 720, size: 59 },
+                ranges: { CamBrightness: [-3, 3], CamContrast: [-3, 3], CamSaturation: [-4, 4],
+                          CamSharpness: [-3, 3], CamAeLevel: [-5, 5], CamAgcGain: [0, 64],
+                          CamAecValue: [0, 1968], CamDenoise: [0, 8] } }
 };
 
 // Fetch the connected camera model, then call cb(model, caps) where caps is the
@@ -194,4 +205,24 @@ function camSetRange(id, min, max) {
     e.min = min; e.max = max;
     var v = parseInt(e.value, 10);
     if (!isNaN(v)) e.value = Math.max(min, Math.min(max, v));
+    // Keep a paired live-value display (…_value1_output / v_<name>) in sync after clamping.
+    var out = document.getElementById(e.id + "_output");
+    if (out) out.textContent = e.value;
+}
+
+// Apply every per-setting [min,max] from caps.ranges (+ the zoom extents) to the
+// TakeImage_<name>_value1 inputs present on the page. Safe to call on any page -
+// settings the page doesn't show are skipped.
+function camApplyTuningRanges(caps) {
+    if (!caps) return;
+    if (caps.ranges) {
+        for (var name in caps.ranges) {
+            camSetRange("TakeImage_" + name + "_value1", caps.ranges[name][0], caps.ranges[name][1]);
+        }
+    }
+    if (caps.zoom) {
+        camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
+        camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
+        camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+    }
 }

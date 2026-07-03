@@ -16,6 +16,18 @@
 #include "ICameraBackend.h"
 #include "../../include/defines.h"
 
+// Per-sensor limit for a camera tuning range (driver-native envelopes, see SENSOR_CAPABILITIES.md).
+// The OV2640 is the tuned reference sensor (kept at its historical limits so the ESP32-CAM is
+// unchanged); the OV3660/OV5640 accept wider ranges. Unknown sensors fall back to the conservative
+// OV2640 value. Used by every clamp site (config parse, live-stream/reference-editor query) so the
+// accepted range always matches the DETECTED camera.
+inline int camSensorClampLimit(uint16_t pid, int ov2640, int ov3660, int ov5640)
+{
+    if (pid == OV3660_PID) return ov3660;
+    if (pid == OV5640_PID) return ov5640;
+    return ov2640;
+}
+
 typedef struct
 {
     uint16_t CamSensor_id;
@@ -108,6 +120,11 @@ public:
     void SetCamSharpness(bool autoSharpnessEnabled, int sharpnessLevel);
     void SetCamSpecialEffect(sensor_t *s, int specialEffect);
     void SetCamContrastBrightness(sensor_t *s, int _contrast, int _brightness);
+    // Re-initialise the camera at a new master clock (MHz) when it differs from the running one
+    // (a bare set_xclk only nudges the LEDC - the sensor's frame timing doesn't follow). No-op
+    // when the clock is unchanged or out of the 6..20 MHz envelope. Resets the sensor - callers
+    // must re-fetch the sensor handle and re-apply their settings afterwards.
+    esp_err_t ApplyXclkIfChanged(int xclkMhz);
 
     esp_err_t CaptureToHTTP(httpd_req_t *req, int delay = 0);
     esp_err_t CaptureToStream(httpd_req_t *req, bool FlashlightOn);

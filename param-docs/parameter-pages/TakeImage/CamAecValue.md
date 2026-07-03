@@ -2,7 +2,9 @@
 
 **Auto-Exposure-Value**
 
-Range (`0` .. `1200`)
+Range: `0` .. `1200` (OV2640) / `0` .. `1968` (OV3660, OV5640; the sensor additionally limits it to its current frame timing)
+
+The configuration pages clamp the field to the range of the **detected** camera.
 
 Default Value: `160`
 

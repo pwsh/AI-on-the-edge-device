@@ -274,6 +274,10 @@ esp_err_t setCCstatusToCFstatus(void)
     CFstatus.ImageZoomOffsetY = CCstatus.ImageZoomOffsetY;
     CFstatus.ImageZoomSize = CCstatus.ImageZoomSize;
 
+    CFstatus.ImageXclk = CCstatus.ImageXclk;
+    CFstatus.ImageNightMode = CCstatus.ImageNightMode;
+    CFstatus.ImageColorbar = CCstatus.ImageColorbar;
+
     CFstatus.WaitBeforePicture = CCstatus.WaitBeforePicture;
 
     return ESP_OK;
@@ -326,6 +330,10 @@ esp_err_t setCFstatusToCCstatus(void)
     CCstatus.ImageZoomOffsetY = CFstatus.ImageZoomOffsetY;
     CCstatus.ImageZoomSize = CFstatus.ImageZoomSize;
 
+    CCstatus.ImageXclk = CFstatus.ImageXclk;
+    CCstatus.ImageNightMode = CFstatus.ImageNightMode;
+    CCstatus.ImageColorbar = CFstatus.ImageColorbar;
+
     CCstatus.WaitBeforePicture = CFstatus.WaitBeforePicture;
 
     return ESP_OK;
@@ -337,6 +345,14 @@ esp_err_t setCFstatusToCam(void)
 
     if (s != NULL)
     {
+        // Master clock first: a change re-inits the sensor, and the setters below re-apply the rest.
+        Camera.ApplyXclkIfChanged(CFstatus.ImageXclk);
+        s = esp_camera_sensor_get();
+        if (s == NULL)
+        {
+            return ESP_FAIL;
+        }
+
         s->set_framesize(s, CFstatus.ImageFrameSize);
 
         // s->set_contrast(s, CFstatus.ImageContrast);     // -2 to 2
@@ -375,6 +391,12 @@ esp_err_t setCFstatusToCam(void)
         // s->set_sharpness(s, CFstatus.ImageSharpness);   // auto-sharpness is not officially supported, default to 0
         Camera.SetCamSharpness(CFstatus.ImageAutoSharpness, CFstatus.ImageSharpness);
         s->set_denoise(s, CFstatus.ImageDenoiseLevel); // The OV2640 does not support it, OV3660 and OV5640 (0 to 8)
+
+        s->set_colorbar(s, CFstatus.ImageColorbar);   // sensor test pattern (diagnostic; 0 for normal use)
+
+        // OV3660/OV5640 native night mode (AEC auto-frame-rate): 0x3A00 bit2, same as the config path.
+        if (CCstatus.CamSensor_id == OV3660_PID || CCstatus.CamSensor_id == OV5640_PID)
+            s->set_reg(s, 0x3A00, 0x04, CFstatus.ImageNightMode ? 0x04 : 0x00);
 
         TickType_t xDelay2 = 100 / portTICK_PERIOD_MS;
         vTaskDelay(xDelay2);
@@ -479,7 +501,7 @@ void parseCamQueryToCFstatus(char *_query)
 
             if (httpd_query_key_value(_query, "aecgc", _valuechar, 30) == ESP_OK)
             {
-                std::string _aecgc = std::string(_valuechar);
+                std::string _aecgc = toUpper(std::string(_valuechar));   // accept "x8" as well as "X8"
                 if (isStringNumeric(_aecgc))
                 {
                     int _aecgc_ = std::stoi(_valuechar);
@@ -549,7 +571,8 @@ void parseCamQueryToCFstatus(char *_query)
                 if (isStringNumeric(_bri))
                 {
                     int _bri_ = std::stoi(_valuechar);
-                    CFstatus.ImageBrightness = clipInt(_bri_, 2, -2);
+                    int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                    CFstatus.ImageBrightness = clipInt(_bri_, lim, -lim);
                 }
             }
 
@@ -559,7 +582,8 @@ void parseCamQueryToCFstatus(char *_query)
                 if (isStringNumeric(_con))
                 {
                     int _con_ = std::stoi(_valuechar);
-                    CFstatus.ImageContrast = clipInt(_con_, 2, -2);
+                    int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                    CFstatus.ImageContrast = clipInt(_con_, lim, -lim);
                 }
             }
 
@@ -569,7 +593,8 @@ void parseCamQueryToCFstatus(char *_query)
                 if (isStringNumeric(_sat))
                 {
                     int _sat_ = std::stoi(_valuechar);
-                    CFstatus.ImageSaturation = clipInt(_sat_, 2, -2);
+                    int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 4, 4);
+                    CFstatus.ImageSaturation = clipInt(_sat_, lim, -lim);
                 }
             }
 
@@ -705,7 +730,8 @@ void parseCamQueryToCFstatus(char *_query)
                 if (isStringNumeric(_aecv))
                 {
                     int _aecv_ = std::stoi(_valuechar);
-                    CFstatus.ImageAecValue = clipInt(_aecv_, 1200, 0);
+                    // OV3660/OV5640 accept longer manual exposures (driver clamps to frame timing).
+                    CFstatus.ImageAecValue = clipInt(_aecv_, camSensorClampLimit(CCstatus.CamSensor_id, 1200, 1968, 1968), 0);
                 }
             }
 
@@ -721,7 +747,8 @@ void parseCamQueryToCFstatus(char *_query)
                 if (isStringNumeric(_agcg))
                 {
                     int _agcg_ = std::stoi(_valuechar);
-                    CFstatus.ImageAgcGain = clipInt(_agcg_, 30, 0);
+                    // OV2640 gain tops out at 30; the OV3660/OV5640 drivers accept 0..64.
+                    CFstatus.ImageAgcGain = clipInt(_agcg_, camSensorClampLimit(CCstatus.CamSensor_id, 30, 64, 64), 0);
                 }
             }
 
@@ -765,6 +792,30 @@ void parseCamQueryToCFstatus(char *_query)
             {
                 std::string _dcw = std::string(_valuechar);
                 CFstatus.ImageDcw = alphanumericToBoolean(_dcw);
+            }
+
+            if (httpd_query_key_value(_query, "xclk", _valuechar, 30) == ESP_OK)
+            {
+                std::string _xclk = std::string(_valuechar);
+                if (isStringNumeric(_xclk))
+                {
+                    // Camera master clock (MHz). Applying only re-initialises the camera when the
+                    // value actually differs from the running clock, so sending it per preview
+                    // frame is cheap in steady state.
+                    CFstatus.ImageXclk = clipInt(std::stoi(_valuechar), 20, 6);
+                }
+            }
+
+            if (httpd_query_key_value(_query, "nightm", _valuechar, 30) == ESP_OK)
+            {
+                std::string _nightm = std::string(_valuechar);
+                CFstatus.ImageNightMode = alphanumericToBoolean(_nightm) ? 1 : 0;
+            }
+
+            if (httpd_query_key_value(_query, "cbar", _valuechar, 30) == ESP_OK)
+            {
+                std::string _cbar = std::string(_valuechar);
+                CFstatus.ImageColorbar = alphanumericToBoolean(_cbar) ? 1 : 0;
             }
 
             if (httpd_query_key_value(_query, "den", _valuechar, 30) == ESP_OK)

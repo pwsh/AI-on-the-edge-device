@@ -492,7 +492,7 @@
                 <class id="TakeImage_CamBrightness_text" style="color:black;">Brightness</class>
             </td>
             <td>
-                <input required type="number" id="TakeImage_CamBrightness_value1" size="13" min="-2" max="2" onchange="cameraParameterChanged()"
+                <input required type="number" id="TakeImage_CamBrightness_value1" size="13" min="-3" max="3" onchange="cameraParameterChanged()"
                     oninput="(!validity.rangeUnderflow||(value=-2)) && (!validity.rangeOverflow||(value=2)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
             <td>$TOOLTIP_TakeImage_CamBrightness</td>
@@ -503,7 +503,7 @@
                 <class id="TakeImage_CamContrast_text" style="color:black;">Contrast</class>
             </td>
             <td>
-                <input required type="number" id="TakeImage_CamContrast_value1" size="13" min="-2" max="2" onchange="cameraParameterChanged()"
+                <input required type="number" id="TakeImage_CamContrast_value1" size="13" min="-3" max="3" onchange="cameraParameterChanged()"
                     oninput="(!validity.rangeUnderflow||(value=-2)) && (!validity.rangeOverflow||(value=2)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
             <td>$TOOLTIP_TakeImage_CamContrast</td>
@@ -514,7 +514,7 @@
                 <class id="TakeImage_CamSaturation_text" style="color:black;">Saturation</class>
             </td>
             <td>
-                <input required type="number" id="TakeImage_CamSaturation_value1" size="13" min="-2" max="2" onchange="cameraParameterChanged()"
+                <input required type="number" id="TakeImage_CamSaturation_value1" size="13" min="-4" max="4" onchange="cameraParameterChanged()"
                     oninput="(!validity.rangeUnderflow||(value=-2)) && (!validity.rangeOverflow||(value=2)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
             <td>$TOOLTIP_TakeImage_CamSaturation</td>
@@ -646,7 +646,7 @@
                 <class id="TakeImage_CamAecValue_text" style="color:black;">Auto Exposure Value</class>
             </td>
             <td>
-                <input required type="number" id="TakeImage_CamAecValue_value1" size="13" min="0" max="1200" onchange="cameraParameterChanged()"
+                <input required type="number" id="TakeImage_CamAecValue_value1" size="13" min="0" max="1968" onchange="cameraParameterChanged()"
                     oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=1200)) && (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
             <td>$TOOLTIP_TakeImage_CamAecValue</td>
@@ -681,7 +681,7 @@
                 <class id="TakeImage_CamAgcGain_text" style="color:black;">Gain Manual Value</class>
             </td>
             <td>
-                <input required type="number" id="TakeImage_CamAgcGain_value1" size="13" min="0" max="30" onchange="cameraParameterChanged()"
+                <input required type="number" id="TakeImage_CamAgcGain_value1" size="13" min="0" max="64" onchange="cameraParameterChanged()"
                     oninput="(!validity.rangeUnderflow||(value=0)) && (!validity.rangeOverflow||(value=30)) &&
                         (!validity.stepMismatch||(value=parseInt(this.value)));">
             </td>
@@ -3336,9 +3336,9 @@ function gateCamSettingsForSensor() {
                 else if (name === "CamDenoise") el.value = "0";
             }
         });
-        camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
-        camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
-        camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+        // Clamp every tuning field (brightness/contrast/saturation/sharpness/AE level/gain/exposure/
+        // denoise + zoom) to the DETECTED sensor's range - e.g. the OV3660 allows brightness ±3.
+        camApplyTuningRanges(caps);
     });
 }
 

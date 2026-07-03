@@ -13,7 +13,7 @@ Available options:
 - `x128`
 
 Default Value for ov2640: `x4`<br>
-Default Value for ov5640: `x8`
+Default Value for ov3660 / ov5640: `x8`
 
 See [here](../datasheets/Camera.ov2640_ds_1.8_.pdf) for the ov2640 camera datasheet.<br>
 See [here](../datasheets/OV5640_datasheet.pdf) for the ov5640 camera datasheet.

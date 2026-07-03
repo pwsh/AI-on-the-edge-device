@@ -2,7 +2,9 @@
 
 **Image-Sharpness**
 
-Range (`-2` .. `2`)
+Range: `-2` .. `2` (OV2640, firmware emulation) / `-3` .. `3` (OV3660, OV5640, native)
+
+The configuration pages clamp the field to the range of the **detected** camera.
 
 Default Value: `0`
 

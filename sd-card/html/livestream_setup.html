@@ -65,9 +65,15 @@
 
             <fieldset>
                 <legend>Image</legend>
-                <div class="row"><label>Brightness</label><input type="range" id="TakeImage_CamBrightness_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamBrightness')" onchange="onCtrlChange()"><span class="val" id="v_CamBrightness"></span></div>
-                <div class="row"><label>Contrast</label><input type="range" id="TakeImage_CamContrast_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamContrast')" onchange="onCtrlChange()"><span class="val" id="v_CamContrast"></span></div>
-                <div class="row"><label>Saturation</label><input type="range" id="TakeImage_CamSaturation_value1" min="-2" max="2" step="1" value="0" oninput="showVal('CamSaturation')" onchange="onCtrlChange()"><span class="val" id="v_CamSaturation"></span></div>
+                <div class="row"><label>Brightness</label><input type="range" id="TakeImage_CamBrightness_value1" min="-3" max="3" step="1" value="0" oninput="showVal('CamBrightness')" onchange="onCtrlChange()"><span class="val" id="v_CamBrightness"></span></div>
+                <div class="row"><label>Contrast</label><input type="range" id="TakeImage_CamContrast_value1" min="-3" max="3" step="1" value="0" oninput="showVal('CamContrast')" onchange="onCtrlChange()"><span class="val" id="v_CamContrast"></span></div>
+                <div class="row"><label>Saturation</label><input type="range" id="TakeImage_CamSaturation_value1" min="-4" max="4" step="1" value="0" oninput="showVal('CamSaturation')" onchange="onCtrlChange()"><span class="val" id="v_CamSaturation"></span></div>
+                <div class="row"><label>Sharpness</label><input type="range" id="TakeImage_CamSharpness_value1" min="-3" max="3" step="1" value="0" oninput="showVal('CamSharpness')" onchange="onCtrlChange()"><span class="val" id="v_CamSharpness"></span></div>
+                <div class="row"><label>Auto sharpness (OV2640)</label>
+                    <select id="TakeImage_CamAutoSharpness_value1" onchange="onCtrlChange()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
+                <div class="row"><label>Denoise (OV3660/OV5640)</label><input type="range" id="TakeImage_CamDenoise_value1" min="0" max="8" step="1" value="0" oninput="showVal('CamDenoise')" onchange="onCtrlChange()"><span class="val" id="v_CamDenoise"></span></div>
+                <div class="row"><label>Special effect</label>
+                    <select id="TakeImage_CamSpecialEffect_value1" onchange="onCtrlChange()"><option value="no_effect" selected>no effect</option><option value="negative">negative</option><option value="grayscale">grayscale</option><option value="red">red</option><option value="green">green</option><option value="blue">blue</option><option value="retro">retro</option></select></div>
                 <div class="row"><label>Mirror image</label>
                     <select id="TakeImage_CamHmirror_value1" onchange="onCtrlChange()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
                 <div class="row"><label>Flip image</label>
@@ -93,8 +99,36 @@
                 <div class="row"><label>Auto exposure</label>
                     <select id="TakeImage_CamAec_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
                 <div class="row"><label>Auto exposure level</label><input type="number" id="TakeImage_CamAeLevel_value1" min="-5" max="5" step="1" value="0" onchange="onCtrlChange()"></div>
+                <div class="row"><label>AEC DSP (aec2)</label>
+                    <select id="TakeImage_CamAec2_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Manual exposure (AEC value)</label><input type="number" id="TakeImage_CamAecValue_value1" min="0" max="1968" step="1" value="600" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Auto gain (AGC)</label>
+                    <select id="TakeImage_CamAgc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Manual gain (AGC gain)</label><input type="number" id="TakeImage_CamAgcGain_value1" min="0" max="64" step="1" value="8" onchange="onCtrlChange()"></div>
+                <div class="row"><label>Gain ceiling</label>
+                    <select id="TakeImage_CamGainceiling_value1" onchange="onCtrlChange()"><option value="x2">2X</option><option value="x4">4X</option><option value="x8" selected>8X</option><option value="x16">16X</option><option value="x32">32X</option><option value="x64">64X</option><option value="x128">128X</option></select></div>
+                <div class="row"><label>AWB gain</label>
+                    <select id="TakeImage_CamAwbGain_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
                 <div class="row"><label>Lens correction</label>
                     <select id="TakeImage_CamLenc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Correction &amp; advanced</legend>
+                <div class="row"><label>Gamma correction (raw_gma)</label>
+                    <select id="TakeImage_CamRawGma_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Black-pixel correction</label>
+                    <select id="TakeImage_CamBpc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>White-pixel correction</label>
+                    <select id="TakeImage_CamWpc_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Downsize (DCW)</label>
+                    <select id="TakeImage_CamDcw_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Camera clock XCLK (MHz)</label><input type="number" id="TakeImage_CamXclk_value1" min="6" max="20" step="1" value="20" onchange="onCtrlChange()"></div>
+                <div class="hint">Changing XCLK re-initialises the camera - the preview pauses for a moment.</div>
+                <div class="row"><label>Night mode (OV3660/OV5640)</label>
+                    <select id="TakeImage_CamNightMode_value1" onchange="onCtrlChange()"><option value="true" selected>enabled</option><option value="false">disabled</option></select></div>
+                <div class="row"><label>Colour-bar test pattern</label>
+                    <select id="TakeImage_CamColorbar_value1" onchange="onCtrlChange()"><option value="true">enabled</option><option value="false" selected>disabled</option></select></div>
             </fieldset>
 
             <fieldset>
@@ -123,7 +157,11 @@
             ["CamHmirror", "mirror"], ["CamVflip", "flip"],
             ["CamZoom", "zoom"], ["CamZoomSize", "zooms"], ["CamZoomOffsetX", "zoomx"], ["CamZoomOffsetY", "zoomy"],
             ["CamQuality", "qual"], ["CamWbMode", "wbm"], ["CamAwb", "awb"],
-            ["CamAec", "aec"], ["CamAeLevel", "ael"], ["LEDIntensity", "ledi"], ["CamLenc", "lenc"]
+            ["CamAec", "aec"], ["CamAeLevel", "ael"], ["LEDIntensity", "ledi"], ["CamLenc", "lenc"],
+            ["CamSharpness", "shp"], ["CamAutoSharpness", "ashp"], ["CamDenoise", "den"], ["CamSpecialEffect", "spe"],
+            ["CamAec2", "aec2"], ["CamAecValue", "aecv"], ["CamAgc", "agc"], ["CamAgcGain", "agcg"],
+            ["CamGainceiling", "aecgc"], ["CamAwbGain", "awbg"], ["CamRawGma", "rgma"], ["CamBpc", "bpc"],
+            ["CamWpc", "wpc"], ["CamDcw", "dcw"], ["CamXclk", "xclk"], ["CamNightMode", "nightm"], ["CamColorbar", "cbar"]
         ];
 
         function el(name) { return document.getElementById("TakeImage_" + name + "_value1"); }
@@ -174,13 +212,23 @@
                         ? parseInt(param["TakeImage"]["WaitBeforeTakingPicture"]["value1"], 10) : 0;
             document.getElementById("flash").checked = (waitb > 0);
 
-            ["CamBrightness", "CamContrast", "CamSaturation"].forEach(showVal);
+            ["CamBrightness", "CamContrast", "CamSaturation", "CamSharpness", "CamDenoise"].forEach(showVal);
             // Clamp the zoom fields to the connected sensor's actual range (CAM_SENSOR_CAPS, common.js)
             withCamSensorCaps(function (model, caps) {
                 if (!caps) return;
-                camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
-                camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
-                camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+                // Clamp every tuning control to the DETECTED sensor's range (brightness/contrast/
+                // saturation/sharpness/AE level/gain/exposure/denoise + zoom) and hide no-op ones.
+                camApplyTuningRanges(caps);
+                caps.unsupported.forEach(function (name) {
+                    var e = document.getElementById("TakeImage_" + name + "_value1");
+                    var row = e ? e.closest('div.row') : null;
+                    if (row) row.style.display = 'none';
+                    if (e && name === "CamAutoSharpness") e.value = "false";
+                    if (e && name === "CamDenoise") e.value = "0";
+                });
+                ["CamBrightness", "CamContrast", "CamSaturation", "CamSharpness", "CamDenoise", "CamAgcGain", "CamAeLevel"].forEach(function (n) {
+                    if (document.getElementById("v_" + n)) showVal(n);
+                });
             });
             onZoomToggle();    // enable/disable the zoom sub-fields for the current zoom state
             mountLedTogglesSetup();   // per-LED on/off toggles (realtime), seeded from [GPIO] config

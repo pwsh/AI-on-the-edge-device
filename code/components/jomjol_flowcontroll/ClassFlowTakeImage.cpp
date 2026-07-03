@@ -23,16 +23,9 @@
 
 static const char *TAG = "TAKEIMAGE";
 
-// Per-sensor clamp limit for brightness / contrast / saturation. The OV2640 is the tuned reference
-// sensor (kept at the historical +-2, so the ESP32-CAM is byte-for-byte unchanged); the OV3660 and
-// OV5640 accept a wider native envelope. See jomjol_controlcamera/SENSOR_CAPABILITIES.md for the
-// driver-level ranges. Unknown sensors fall back to the conservative OV2640 range.
-static int sensorClampLimit(uint16_t pid, int ov2640, int ov3660, int ov5640)
-{
-    if (pid == OV3660_PID) return ov3660;
-    if (pid == OV5640_PID) return ov5640;
-    return ov2640;
-}
+// Per-sensor clamp limits live in camSensorClampLimit() (ClassControllCamera.h), shared with the
+// live-stream / reference-editor query parser so every path accepts the same per-sensor ranges.
+
 
 esp_err_t ClassFlowTakeImage::camera_capture(void)
 {
@@ -232,7 +225,7 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageBrightness = std::stoi(splitted[1]);
-                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
                 CCstatus.ImageBrightness = clipInt(_ImageBrightness, lim, -lim);
             }
         }
@@ -242,7 +235,7 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageContrast = std::stoi(splitted[1]);
-                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
+                int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 3, 3);
                 CCstatus.ImageContrast = clipInt(_ImageContrast, lim, -lim);
             }
         }
@@ -252,7 +245,7 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageSaturation = std::stoi(splitted[1]);
-                int lim = sensorClampLimit(CCstatus.CamSensor_id, 2, 4, 4);
+                int lim = camSensorClampLimit(CCstatus.CamSensor_id, 2, 4, 4);
                 CCstatus.ImageSaturation = clipInt(_ImageSaturation, lim, -lim);
             }
         }
@@ -395,7 +388,9 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageAecValue = std::stoi(splitted[1]);
-                CCstatus.ImageAecValue = clipInt(_ImageAecValue, 1200, 0);
+                // OV3660/OV5640 accept longer manual exposures; the driver additionally clamps to
+                // the sensor's current frame timing (VTS), so an over-ask is safe.
+                CCstatus.ImageAecValue = clipInt(_ImageAecValue, camSensorClampLimit(CCstatus.CamSensor_id, 1200, 1968, 1968), 0);
             }
         }
 
@@ -409,7 +404,8 @@ bool ClassFlowTakeImage::ReadParameter(FILE *pfile, string &aktparamgraph)
             if (isStringNumeric(splitted[1]))
             {
                 int _ImageAgcGain = std::stoi(splitted[1]);
-                CCstatus.ImageAgcGain = clipInt(_ImageAgcGain, 30, 0);
+                // OV2640 gain tops out at 30; the OV3660/OV5640 drivers accept 0..64.
+                CCstatus.ImageAgcGain = clipInt(_ImageAgcGain, camSensorClampLimit(CCstatus.CamSensor_id, 30, 64, 64), 0);
             }
         }
 

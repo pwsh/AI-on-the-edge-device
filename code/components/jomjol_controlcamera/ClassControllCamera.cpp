@@ -255,28 +255,40 @@ bool CCamera::getCameraInitSuccessful(void)
     return CCstatus.CameraInitSuccessful;
 }
 
+esp_err_t CCamera::ApplyXclkIfChanged(int xclkMhz)
+{
+    sensor_t *s = backend->sensorGet();
+    if (s == NULL)
+    {
+        return ESP_FAIL;
+    }
+    if (xclkMhz < 6 || xclkMhz > 20 || (int)(s->xclk_freq_hz / 1000000) == xclkMhz)
+    {
+        return ESP_OK;   // unchanged (or out of envelope): nothing to do
+    }
+    // InitCam overwrites Quality/FrameSize in CCstatus from camera_config, so preserve the
+    // configured values across the call.
+    int _q = CCstatus.ImageQuality;
+    framesize_t _f = CCstatus.ImageFrameSize;
+    camera_config.xclk_freq_hz = xclkMhz * 1000000;   // InitCam re-inits the sensor at this clock
+    esp_err_t ret = InitCam();
+    CCstatus.ImageQuality = _q;
+    CCstatus.ImageFrameSize = _f;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Camera re-initialised at XCLK " + std::to_string(xclkMhz) + " MHz");
+    return ret;
+}
+
 esp_err_t CCamera::setSensorDatenFromCCstatus(void)
 {
     sensor_t *s = backend->sensorGet();
 
     if (s != NULL)
     {
-        // Apply the configured master clock (XCLK). A bare set_xclk only nudges the LEDC and the OV3660's
-        // frame timing (hence exposure) doesn't follow it, so when the clock actually differs we RE-INIT
-        // the camera at the new XCLK (InitCam picks it up from camera_config). This resets the sensor, so
-        // do it FIRST and let the setters below re-apply everything. InitCam overwrites Quality/FrameSize
-        // from camera_config, so preserve the configured values across the call.
-        if (CCstatus.ImageXclk >= 6 && CCstatus.ImageXclk <= 20 &&
-            (int)(s->xclk_freq_hz / 1000000) != CCstatus.ImageXclk)
-        {
-            int _q = CCstatus.ImageQuality; framesize_t _f = CCstatus.ImageFrameSize;
-            camera_config.xclk_freq_hz = CCstatus.ImageXclk * 1000000;   // InitCam re-inits the sensor at this clock
-            InitCam();
-            CCstatus.ImageQuality = _q; CCstatus.ImageFrameSize = _f;
-            s = backend->sensorGet();
-            if (s == NULL) return ESP_FAIL;
-            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Camera re-initialised at XCLK " + std::to_string(CCstatus.ImageXclk) + " MHz");
-        }
+        // Apply the configured master clock (XCLK) - re-inits the camera when it actually changed.
+        // This resets the sensor, so do it FIRST and let the setters below re-apply everything.
+        ApplyXclkIfChanged(CCstatus.ImageXclk);
+        s = backend->sensorGet();
+        if (s == NULL) return ESP_FAIL;
 
         s->set_framesize(s, CCstatus.ImageFrameSize);
 		

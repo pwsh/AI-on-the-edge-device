@@ -2,7 +2,9 @@
 
 **Auto-Gain-Control-Value**
 
-Range (`0` .. `30`)
+Range: `0` .. `30` (OV2640) / `0` .. `64` (OV3660, OV5640)
+
+The configuration pages clamp the field to the range of the **detected** camera.
 
 Default Value: `15`
 

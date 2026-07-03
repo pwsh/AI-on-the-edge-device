@@ -291,7 +291,7 @@
                 <class id="TakeImage_CamBrightness_text" style="color:black;">Brightness: </class>
             </td>
             <td>
-                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamBrightness_value1" size="13" value=0  min="-2" max="2" onchange="cameraParameterChanged()" 
+                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamBrightness_value1" size="13" value=0  min="-3" max="3" onchange="cameraParameterChanged()" 
 					oninput="this.nextElementSibling.value = this.value">
                 <output id="TakeImage_CamBrightness_value1_output" style="vertical-align:middle; min-width:15px; padding-right:5px; text-align:right; float:left">0</output>
             </td>
@@ -312,7 +312,7 @@
                 <class id="TakeImage_CamContrast_text" style="color:black;">Contrast: </class>
             </td>
             <td>
-                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamContrast_value1" size="13" value=0  min="-2" max="2" onchange="cameraParameterChanged()" 
+                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamContrast_value1" size="13" value=0  min="-3" max="3" onchange="cameraParameterChanged()" 
 					oninput="this.nextElementSibling.value = this.value">
                 <output id="TakeImage_CamContrast_value1_output" style="vertical-align:middle; min-width:15px; padding-right:5px; text-align:right; float:left">0</output>
             </td>
@@ -333,7 +333,7 @@
                 <class id="TakeImage_CamSaturation_text" style="color:black;">Saturation: </class>
             </td>
             <td>
-                <input  style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamSaturation_value1" size="13" value=0 min="-2" max="2" onchange="cameraParameterChanged()" 
+                <input  style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamSaturation_value1" size="13" value=0 min="-4" max="4" onchange="cameraParameterChanged()" 
 					oninput="this.nextElementSibling.value = this.value">
                 <output id="TakeImage_CamSaturation_value1_output" style="vertical-align:middle; min-width:15px; padding-right:5px; text-align:right; float:left">0</output>
             </td>
@@ -356,7 +356,7 @@
                 <class id="TakeImage_CamAeLevel_text" style="color:black;">Auto Exposure Level: </class>
             </td>
             <td>
-                <input  style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamAeLevel_value1" size="13" value=0 min="-2" max="2" onchange="cameraParameterChanged()" 
+                <input  style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamAeLevel_value1" size="13" value=0 min="-5" max="5" onchange="cameraParameterChanged()" 
 					oninput="this.nextElementSibling.value = this.value">
                 <output id="TakeImage_CamAeLevel_value1_output" style="vertical-align:middle; min-width:15px; padding-right:5px; text-align:right; float:left">0</output>
             </td>
@@ -379,12 +379,213 @@
                 <class id="TakeImage_CamSharpness_text" style="color:black;">Sharpness: </class>
             </td>
             <td>
-                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamSharpness_value1" size="13" value=0  min="-2" max="2" onchange="cameraParameterChanged()" 
+                <input style="clear: both; width: 80%;vertical-align:middle" type="range" id="TakeImage_CamSharpness_value1" size="13" value=0  min="-3" max="3" onchange="cameraParameterChanged()" 
 					oninput="this.nextElementSibling.value = this.value">
                 <output id="TakeImage_CamSharpness_value1_output" style="vertical-align:middle; min-width:15px; padding-right:5px; text-align:right; float:left">0</output>
             </td>
 			<td>$TOOLTIP_TakeImage_CamSharpness</td>
         </tr>
+
+        <tr class="expert">
+            <td class="indent1">
+                <class id="TakeImage_CamQuality_text" style="color:black;">Image Quality: </class>
+            </td>
+            <td>
+                <input required style="clear: both" type="number" id="TakeImage_CamQuality_value1" size="13" value="10" min="5" max="63" onchange="cameraParameterChanged()">
+            </td>
+			<td>$TOOLTIP_TakeImage_CamQuality</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamGainceiling_text" style="color:black;">Gain Ceiling</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamGainceiling_value1" onchange="cameraParameterChanged()">
+					<option value="x2">2X</option>
+					<option value="x4">4X</option>
+					<option value="x8" selected>8X</option>
+					<option value="x16">16X</option>
+					<option value="x32">32X</option>
+					<option value="x64">64X</option>
+					<option value="x128">128X</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamGainceiling</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamAgc_text" style="color:black;">Auto Gain Control</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamAgc_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamAgc</td>
+			
+            <td class="indent1">
+                <class id="TakeImage_CamAgcGain_text" style="color:black;">Manual Gain: </class>
+            </td>
+            <td>
+                <input required style="clear: both" type="number" id="TakeImage_CamAgcGain_value1" size="13" value="8" min="0" max="64" onchange="cameraParameterChanged()">
+            </td>
+			<td>$TOOLTIP_TakeImage_CamAgcGain</td>
+        </tr>
+		
+        <tr class="expert">
+            <td class="indent1">
+                <class id="TakeImage_CamAecValue_text" style="color:black;">Manual Exposure: </class>
+            </td>
+            <td>
+                <input required style="clear: both" type="number" id="TakeImage_CamAecValue_value1" size="13" value="600" min="0" max="1968" onchange="cameraParameterChanged()">
+            </td>
+			<td>$TOOLTIP_TakeImage_CamAecValue</td>
+			
+            <td class="indent1">
+                <class id="TakeImage_CamDenoise_text" style="color:black;">Denoise (OV3660/5640): </class>
+            </td>
+            <td>
+                <input required style="clear: both" type="number" id="TakeImage_CamDenoise_value1" size="13" value="0" min="0" max="8" onchange="cameraParameterChanged()">
+            </td>
+			<td>$TOOLTIP_TakeImage_CamDenoise</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamAwb_text" style="color:black;">Auto White Balance</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamAwb_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamAwb</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamAwbGain_text" style="color:black;">AWB Gain</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamAwbGain_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamAwbGain</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamWbMode_text" style="color:black;">White Balance Mode</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamWbMode_value1" onchange="cameraParameterChanged()">
+					<option value="auto" selected>auto</option>
+					<option value="sunny">sunny</option>
+					<option value="cloudy">cloudy</option>
+					<option value="office">office</option>
+					<option value="home">home</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamWbMode</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamRawGma_text" style="color:black;">Gamma Correction</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamRawGma_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamRawGma</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamLenc_text" style="color:black;">Lens Correction</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamLenc_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamLenc</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamBpc_text" style="color:black;">Black Pixel Correction</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamBpc_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamBpc</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamWpc_text" style="color:black;">White Pixel Correction</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamWpc_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamWpc</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamDcw_text" style="color:black;">Downsize (DCW)</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamDcw_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamDcw</td>
+        </tr>
+		
+        <tr class="expert">
+            <td class="indent1">
+                <class id="TakeImage_CamXclk_text" style="color:black;">Camera Clock XCLK (MHz): </class>
+            </td>
+            <td>
+                <input required style="clear: both" type="number" id="TakeImage_CamXclk_value1" size="13" value="20" min="6" max="20" onchange="cameraParameterChanged()">
+            </td>
+			<td>$TOOLTIP_TakeImage_CamXclk</td>
+			
+			<td class="indent1">
+				<class id="TakeImage_CamNightMode_text" style="color:black;">Night Mode (OV3660/5640)</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamNightMode_value1" onchange="cameraParameterChanged()">
+					<option value="true" selected>enabled (true)</option>
+					<option value="false">disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamNightMode</td>
+        </tr>
+		
+        <tr class="expert">
+			<td class="indent1">
+				<class id="TakeImage_CamColorbar_text" style="color:black;">Colour-bar Test Pattern</class>
+			</td>
+			<td>
+				<select id="TakeImage_CamColorbar_value1" onchange="cameraParameterChanged()">
+					<option value="true">enabled (true)</option>
+					<option value="false" selected>disabled (false)</option>
+				</select>
+			</td>
+			<td>$TOOLTIP_TakeImage_CamColorbar</td>
+			
+            <td></td><td></td><td></td>
+        </tr>
+		
     </table>
 
     <table>
@@ -415,6 +616,28 @@
         isActReference = false,
         param,
         category;
+
+        // Camera settings added for full parity with the config page. Each entry:
+        // [param name, live-query key]. Values are read via .value (selects use true/false or the
+        // firmware's named modes), so no selectedIndex gymnastics are needed for these.
+        var EXTRA_CAM_CTRLS = [
+            ["CamQuality", "qual"], ["CamGainceiling", "aecgc"], ["CamAgc", "agc"], ["CamAgcGain", "agcg"],
+            ["CamAecValue", "aecv"], ["CamDenoise", "den"], ["CamAwb", "awb"], ["CamAwbGain", "awbg"],
+            ["CamWbMode", "wbm"], ["CamRawGma", "rgma"], ["CamLenc", "lenc"], ["CamBpc", "bpc"],
+            ["CamWpc", "wpc"], ["CamDcw", "dcw"], ["CamXclk", "xclk"], ["CamNightMode", "nightm"],
+            ["CamColorbar", "cbar"]
+        ];
+        function extraCamQuery() {           // -> "&qual=..&aecgc=.." for test_take / cam_settings
+            var q = "";
+            EXTRA_CAM_CTRLS.forEach(function (c) {
+                var e = document.getElementById("TakeImage_" + c[0] + "_value1");
+                if (e) q += "&" + c[1] + "=" + encodeURIComponent(e.value);
+            });
+            return q;
+        }
+        function extraCamWrite() { EXTRA_CAM_CTRLS.forEach(function (c) { WriteParameter(param, category, "TakeImage", c[0], false); }); }
+        function extraCamRead()  { EXTRA_CAM_CTRLS.forEach(function (c) { ReadParameter(param, "TakeImage", c[0], false); }); }
+        function extraCamEnDis(state) { EXTRA_CAM_CTRLS.forEach(function (c) { EnDisableItem(state, param, category, "TakeImage", c[0], false); }); }
 
         function cameraParameterChanged() {
             document.getElementById("savereferenceimage").disabled = true;
@@ -484,7 +707,8 @@
 				
 			EnDisableItem(true, param, category, "TakeImage", "CamSpecialEffect", false);
 				
-			EnDisableItem(true, param, category, "TakeImage", "LEDIntensity", false);			
+			EnDisableItem(true, param, category, "TakeImage", "LEDIntensity", false);
+			extraCamEnDis(true);			
 
             document.getElementById("ExpertModus_enabled").disabled = false;
 
@@ -577,7 +801,8 @@
             }		    
                     
             url = url + "&aec=" + _aec_temp + "&ael=" + _ael_temp + "&aec2=" + _aec2_temp;
-            url = url + "&mirror=" + _mirror_temp + "&flip=" + _flip_temp;			
+            url = url + "&mirror=" + _mirror_temp + "&flip=" + _flip_temp;
+            url = url + extraCamQuery();			
 
             var durchlaufe = 0;
 
@@ -717,7 +942,8 @@
             }		    
 
             url = url + "&aec=" + _aec_temp + "&ael=" + _ael_temp + "&aec2=" + _aec2_temp;
-            url = url + "&mirror=" + _mirror_temp + "&flip=" + _flip_temp;			
+            url = url + "&mirror=" + _mirror_temp + "&flip=" + _flip_temp;
+            url = url + extraCamQuery();			
 
             var durchlaufe = 0;
 
@@ -806,6 +1032,7 @@
 			WriteParameter(param, category, "TakeImage", "CamSpecialEffect", false);
 			
 			WriteParameter(param, category, "TakeImage", "LEDIntensity", false);
+			extraCamWrite();
 
 			EnDisableItem(false, param, category, "TakeImage", "CamBrightness", false);
 			EnDisableItem(false, param, category, "TakeImage", "CamSaturation", false);
@@ -827,7 +1054,8 @@
 				
 			EnDisableItem(false, param, category, "TakeImage", "CamSpecialEffect", false);
 				
-			EnDisableItem(false, param, category, "TakeImage", "LEDIntensity", false);			
+			EnDisableItem(false, param, category, "TakeImage", "LEDIntensity", false);
+			extraCamEnDis(false);			
 			
             document.getElementById("ExpertModus_enabled").disabled = true;
 			
@@ -866,7 +1094,8 @@
 			
 			ReadParameter(param, "TakeImage", "CamSpecialEffect", false);
 			
-			ReadParameter(param, "TakeImage", "LEDIntensity", false);			
+			ReadParameter(param, "TakeImage", "LEDIntensity", false);
+			extraCamRead();			
 
             var canvas = document.getElementById("canvas");
             drawRotated(false);
@@ -908,23 +1137,27 @@
         function gateCamSettingsForSensor() {
             withCamSensorCaps(function (model, caps) {
                 if (!caps) return;   // unknown sensor: leave every control visible
-                if (caps.unsupported.indexOf("CamAutoSharpness") > -1) {
-                    var sel = document.getElementById("TakeImage_CamAutoSharpness_value1");
-                    var lbl = document.getElementById("TakeImage_CamAutoSharpness_text");
-                    if (sel) {
+                // Hide the cells (label + control + help) of every setting that is a no-op on the
+                // detected sensor, and normalise its value so it can't affect related controls.
+                caps.unsupported.forEach(function (name) {
+                    var sel = document.getElementById("TakeImage_" + name + "_value1");
+                    var lbl = document.getElementById("TakeImage_" + name + "_text");
+                    if (!sel) return;
+                    if (name === "CamAutoSharpness") {
                         sel.value = "false";   // treat auto-sharpness as off -> manual Sharpness stays enabled
-                        var selTd = sel.closest('td');
-                        var tipTd = selTd ? selTd.nextElementSibling : null;   // the help cell after the select
-                        [lbl ? lbl.closest('td') : null, selTd, tipTd].forEach(function (td) {
-                            if (td) td.style.display = 'none';
-                        });
+                        var shp = document.getElementById("TakeImage_CamSharpness_value1");
+                        if (shp) shp.disabled = false;
                     }
-                    var shp = document.getElementById("TakeImage_CamSharpness_value1");
-                    if (shp) shp.disabled = false;
-                }
-                camSetRange("TakeImage_CamZoomOffsetX_value1", -caps.zoom.offX, caps.zoom.offX);
-                camSetRange("TakeImage_CamZoomOffsetY_value1", -caps.zoom.offY, caps.zoom.offY);
-                camSetRange("TakeImage_CamZoomSize_value1", 0, caps.zoom.size);
+                    else if (name === "CamDenoise") sel.value = "0";
+                    var selTd = sel.closest('td');
+                    var tipTd = selTd ? selTd.nextElementSibling : null;   // the help cell after the control
+                    [lbl ? lbl.closest('td') : null, selTd, tipTd].forEach(function (td) {
+                        if (td) td.style.display = 'none';
+                    });
+                });
+                // Clamp every tuning slider (brightness/contrast/saturation/sharpness/AE level +
+                // zoom) to the DETECTED sensor's range - e.g. the OV3660 allows brightness ±3.
+                camApplyTuningRanges(caps);
             });
         }
 

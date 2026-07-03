@@ -2,7 +2,9 @@
 
 **Image-Saturation**
 
-Range (`-2` .. `2`)
+Range: `-2` .. `2` (OV2640) / `-4` .. `4` (OV3660, OV5640)
+
+The configuration pages clamp the field to the range of the **detected** camera.
 
 Default Value: `0`
 

@@ -2,7 +2,7 @@
 
 Derived from the actual `esp32-camera` driver source (`sensors/ov*.c` for per-sensor `set_*` real-vs-stub, `set_pixformat`, and the per-frame-size `set_pll` configs; `driver/sensor.c` for the resolution table and max frame size) cross-checked with what this firmware applies and clamps. Reviewed 2026-05-31.
 
-> ✅ supported · ❌ `return -1` / `set_dummy` stub · ⭐ no native support but the project adds it. Ranges are the sensor-native settable min..max; this firmware additionally clamps brightness/contrast/saturation to ±2 in the UI.
+> ✅ supported · ❌ `return -1` / `set_dummy` stub · ⭐ no native support but the project adds it. Ranges are the sensor-native settable min..max; the firmware and configuration pages clamp every setting to the range of the **detected** sensor (camSensorClampLimit in ClassControllCamera.h / CAM_SENSOR_CAPS in common.js).
 
 > **Night mode:** there is *no* night-mode function in any OV driver — the OV3660 has night-mode / auto-frame-rate registers but they are left off by the init tables. Low light is handled by Auto exposure (AEC/AEC2) + gain.
 
@@ -65,10 +65,10 @@ Only the three JPEG-capable sensors are documented here. The VGA-only OV7670 / O
 | **Special effect** — Colour effect applied to the whole image. Modes: 0 None, 1 Negative, 2 Grayscale, 3 Red tint, 4 Green tint, 5 Blue tint, 6 Sepia. | ✅ 0..6 | ✅ 0..6 | ✅ 0..6 |
 | **Auto exposure (AEC)** — Automatically adjusts exposure time to the scene brightness. Off = use the manual exposure value below. | ✅ on/off | ✅ on/off | ✅ on/off |
 | **AEC DSP (aec2)** — Secondary DSP-side auto-exposure path; helps in low light / fine exposure. (No dedicated ‘night mode’ function exists — low light is handled by AEC/AEC2 + gain.) | ✅ on/off | ✅ on/off | ✅ on/off |
-| **Manual exposure (AEC value)** — Exposure time used when AEC is off. Higher = brighter but more motion blur and, at the extreme, lower frame rate. | ✅ 0..1200 | ✅ 0..1200 | ✅ 0..1200 |
+| **Manual exposure (AEC value)** — Exposure time used when AEC is off. Higher = brighter but more motion blur and, at the extreme, lower frame rate. | ✅ 0..1200 | ✅ 0..1968* | ✅ 0..1968* |
 | **AE level (exposure compensation)** — Biases the auto-exposure target brighter or darker without leaving auto mode. | ✅ −2..2 | ✅ −5..5 | ✅ −5..5 |
 | **Auto gain (AGC)** — Automatically raises sensor gain (ISO) in low light. Off = use the manual gain below. | ✅ on/off | ✅ on/off | ✅ on/off |
-| **Manual gain (AGC gain)** — Sensor gain when AGC is off. Higher = brighter but noisier image. | ✅ 0..30 | ✅ 0..30 | ✅ 0..30 |
+| **Manual gain (AGC gain)** — Sensor gain when AGC is off. Higher = brighter but noisier image. | ✅ 0..30 | ✅ 0..64 | ✅ 0..64 |
 | **Gain ceiling** — Maximum gain the auto-gain may use. Modes: 2X, 4X, 8X, 16X, 32X, 64X, 128X. Higher = brighter low-light but more noise. | ✅ 2X–128X | ✅ 2X–128X | ✅ 2X–128X |
 | **Auto white balance (AWB)** — Automatically removes colour casts so whites look white. | ✅ on/off | ✅ on/off | ✅ on/off |
 | **AWB gain** — Lets the auto-white-balance apply per-channel gain (finer colour correction). | ✅ on/off | ✅ on/off | ✅ on/off |
@@ -84,6 +84,8 @@ Only the three JPEG-capable sensors are documented here. The VGA-only OV7670 / O
 | **Colour bar** — Sensor test pattern (diagnostic). Not exposed by this firmware. | ✅ on/off | ✅ on/off | ✅ on/off |
 | **Auto focus** — Drives a VCM focus motor. OV5640 only, at the driver level; not used by this firmware. | ❌ | ❌ | ✅ driver |
 | **Digital zoom (firmware)** — Crops a window out of the sensor frame (a firmware feature, not a sensor register). Offset X/Y recentres the crop; size sets how far in. | ✅ X±480 Y±360 sz0..29 | ✅ X±704 Y±528 sz0..43 | ✅ X±960 Y±720 sz0..59 |
+
+\* the OV3660/OV5640 driver additionally limits the manual exposure to the sensor's current frame timing (VTS).
 
 ### Pixel formats & colour depth
 

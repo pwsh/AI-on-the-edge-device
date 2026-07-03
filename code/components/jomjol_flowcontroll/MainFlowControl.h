@@ -44,6 +44,10 @@ typedef struct
 
     int ImageDenoiseLevel; // The OV2640 does not support it, OV3660 and OV5640 (0 to 8)
 
+    int ImageXclk = 20;     // camera master clock (MHz, 6-20); a change re-inits the camera
+    int ImageNightMode = 1; // OV3660/OV5640 native night mode (AEC auto-frame-rate, 0 or 1)
+    int ImageColorbar = 0;  // sensor colour-bar test pattern (diagnostic, 0 or 1)
+
     int ImageWidth;
     int ImageHeight;
 
