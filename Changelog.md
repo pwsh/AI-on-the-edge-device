@@ -1,3 +1,25 @@
+# [17.3.0] - 2026-07-03
+
+### General
+
+- **Camera setting ranges now match the DETECTED sensor** (fixes "can't set the OV3660's full
+  brightness/contrast"): the live-preview path (camera-setup stream and the reference editor) clamped
+  brightness/contrast/saturation to the OV2640's ±2 on **every** sensor, the sliders on all pages were
+  hardcoded to ±2, and AGC gain / manual exposure were capped at the OV2640's 30 / 1200 everywhere.
+  A single per-sensor limit table now drives **all** clamp sites, and the configuration, reference-editor
+  and livestream-setup pages clamp every tuning field to the connected camera's real range — on the
+  OV3660/OV5640 that unlocks brightness/contrast **±3**, saturation **±4**, AE level ±5, manual gain
+  **0..64**, manual exposure **0..1968** and denoise 0..8 (an OV2640 keeps its familiar ±2 / 0..30 / 0..1200).
+- **Every camera setting is now available on the reference-editor and camera-setup (livestream) pages**,
+  not just the config page: image quality, gain ceiling, auto/manual gain, manual exposure, AEC DSP,
+  denoise, auto white balance + AWB gain, white-balance mode, gamma correction, black/white-pixel
+  correction, downsize (DCW), **camera clock (XCLK)**, **night mode** and the colour-bar test pattern.
+  Live preview applies all of them per frame (an XCLK change re-initialises the camera only when the
+  value actually changes); settings that are a no-op on the connected sensor are hidden.
+- **Tooltips updated with per-sensor ranges** (saturation, sharpness, manual gain, manual exposure,
+  gain ceiling — several were missing the OV3660/OV5640 entirely), and the camera-capabilities reference
+  page no longer claims the UI pins everything to ±2 / gain 0..30.
+
 # [17.2.2] - 2026-07-03
 
 ### Reliability
