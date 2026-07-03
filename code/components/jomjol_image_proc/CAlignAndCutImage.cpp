@@ -232,8 +232,19 @@ CImageBasis* CAlignAndCutImage::CutAndSave(int x1, int y1, int dx, int dy)
     dx = x2 - x1;
     dy = y2 - y1;
 
+    // Same guards as the file-writing variant: an unloaded source or degenerate box would make the
+    // copy loop dereference out of bounds; a NULL return lets callers skip the candidate.
+    if (rgb_image == NULL || width <= 0 || height <= 0 || x1 < 0 || y1 < 0 || dx <= 0 || dy <= 0) {
+        return NULL;
+    }
+
     int memsize = dx * dy * channels;
     uint8_t* odata = (unsigned char*)malloc_psram_heap(std::string(TAG) + "->odata", memsize, MALLOC_CAP_SPIRAM);
+    if (odata == NULL) {
+        // Writing through a failed allocation panics the calling task (crashed the httpd task when
+        // PSRAM was exhausted) - report no cut instead and let the caller carry on.
+        return NULL;
+    }
 
     stbi_uc* p_target;
     stbi_uc* p_source;
@@ -251,6 +262,10 @@ CImageBasis* CAlignAndCutImage::CutAndSave(int x1, int y1, int dx, int dy)
 
     CImageBasis* rs = new CImageBasis("CutAndSave", odata, channels, dx, dy, bpp);
     RGBImageRelease();
-    rs->SetIndepended();
+    // Hand the buffer's ownership (INCLUDING its size) to the image: the external-buffer constructor
+    // leaves memsize at 0, and the destructor treats memsize==0 as "nothing was allocated" and does
+    // NOT free - so every cut leaked its pixel buffer (~2 MB per ROI auto-tune run) until PSRAM ran
+    // out and the next allocation failure crashed the device.
+    rs->SetIndepended(memsize);
     return rs;
 }

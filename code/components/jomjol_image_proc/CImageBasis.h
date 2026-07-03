@@ -61,7 +61,9 @@ class CImageBasis
         bool ImageOkay();
         bool CopyFromMemory(uint8_t* _source, int _size);
 
-        void SetIndepended(){externalImage = false;};
+        // Take ownership of an externally provided buffer so the destructor frees it. Pass the
+        // buffer size: the destructor treats memsize==0 as "never allocated" and would NOT free.
+        void SetIndepended(int _memsize = 0){externalImage = false; if (_memsize > 0) memsize = _memsize;};
 
         void CreateEmptyImage(int _width, int _height, int _channels);
         void EmptyImage();
