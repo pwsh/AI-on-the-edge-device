@@ -149,6 +149,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - **Camera clock (XCLK) as a runtime setting** (`CamXclk`, 6–20 MHz) — applied by re-initialising the camera so the sensor timing actually follows — plus a `CamColorbar` test-pattern toggle for diagnostics.
 - **OV3660/OV5640 native night mode** (`CamNightMode`, default on) – lets the auto-exposure drop the frame rate in low light for longer integration and less gain noise (no effect on the OV2640).
 - **Smarter alignment-marker feedback** *(17.2.1)* – the marker editor's live green/orange/red verdict now judges a spot **relative to what the image offers** (so soft/washed-out cameras can still reach green), warns when the box overlaps a digit/analog ROI (changing content breaks alignment), and a **"Suggest Position"** button jumps each marker to the strongest static feature on its half of the image.
+- *(17.2.2)* Fixes a **device crash in the on-device ROI Auto-tune** (a per-candidate memory leak exhausted PSRAM — the first run after a boot worked, the next one panicked). If you are on 17.2.0/17.2.1, update.
 
 ### ✨ v17.1
 - **Per-LED control of the external strip** – turn individual WS281x pixels on/off from a line/grid/circle toggle widget (on the config *and* camera-setup pages) that updates the hardware in realtime; the 5V power budget now counts only the **enabled** LEDs. Plus an optional **alignment-grid overlay** on the live stream to line up the camera.

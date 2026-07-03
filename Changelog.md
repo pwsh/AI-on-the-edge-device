@@ -1,3 +1,18 @@
+# [17.2.2] - 2026-07-03
+
+### Reliability
+
+- **ROI Auto-tune no longer crashes the device** (affects v17.2.0 and v17.2.1 — please update): every
+  candidate box the firmware-side auto-tune evaluated **leaked its pixel buffer** (~2&nbsp;MB per run).
+  The in-memory cut hands its buffer to an image object whose destructor treated a zero `memsize` as
+  "never allocated" and skipped the free — `SetIndepended()` transferred ownership but not the size.
+  After one or two runs PSRAM was exhausted, the next cut's allocation failed and the **unchecked**
+  copy loop wrote through the NULL pointer → panic in the web-server task and a reboot (the classic
+  symptom: the first auto-tune after a boot works, the next one crashes). Ownership transfer now
+  includes the buffer size so every cut is freed, and the in-memory cut gained the same guards as the
+  file-writing variant (unloaded source, degenerate box, failed allocation → the candidate is skipped
+  instead of crashing). Verified: six consecutive auto-tune runs with free PSRAM stable to the byte.
+
 # [17.2.1] - 2026-07-02
 
 ### General
