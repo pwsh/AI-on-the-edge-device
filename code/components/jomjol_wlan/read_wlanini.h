@@ -15,6 +15,9 @@ struct wlan_config {
     std::string dns = "";
     std::string http_username = "";
     std::string http_password = "";
+    // Web-password (HTTP basic auth) master switch: 1 = on, 0 = off, -1 = not set in wlan.ini.
+    // When unset (legacy files), auth is enabled by the PRESENCE of both credentials, as before.
+    int http_auth = -1;
     int rssi_threshold = 0;                 // Default: 0 -> ROAMING disabled
 };
 extern struct wlan_config wlan_config;

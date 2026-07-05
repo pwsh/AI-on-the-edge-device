@@ -71,6 +71,12 @@ int LoadWlanFromFile(std::string fn)
         line = std::string(zw);
     }
 
+    // Reset to defaults before parsing so a key that is now absent/commented-out reflects its
+    // default (this function is re-run when wlan.ini is rewritten at runtime - e.g. clearing the
+    // web credentials or removing a static IP - not only once at boot). Done only after the file
+    // is confirmed readable, so a transient read error can't wipe the live config.
+    wlan_config = {};
+
     while ((line.size() > 0) || !(feof(pFile)))
     {
         //ESP_LOGD(TAG, "line: %s", line.c_str());
@@ -144,6 +150,16 @@ int LoadWlanFromFile(std::string fn)
                 }
                 wlan_config.dns = tmp;
                 LogFile.WriteToFile(ESP_LOG_INFO, TAG, "DNS: " + wlan_config.dns);
+            }
+
+            else if ((splitted.size() > 1) && (toUpper(splitted[0]) == "HTTP_AUTH")){
+                tmp = trim(splitted[1]);
+                if ((tmp.length() > 1) && (tmp[0] == '"') && (tmp[tmp.length()-1] == '"')){
+                    tmp = tmp.substr(1, tmp.length()-2);
+                }
+                tmp = toUpper(tmp);
+                wlan_config.http_auth = ((tmp == "TRUE") || (tmp == "1")) ? 1 : 0;
+                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "HTTP_AUTH: " + std::string(wlan_config.http_auth ? "enabled" : "disabled"));
             }
 
             else if ((splitted.size() > 1) && (toUpper(splitted[0]) == "HTTP_USERNAME")){

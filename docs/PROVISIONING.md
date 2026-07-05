@@ -56,6 +56,12 @@ are preserved (they are not in `update.zip`).
 
 ## Bootstrapping when the Web UI can't be reached
 
+**Web password (optional):** the whole web interface + REST API can be protected with HTTP basic
+auth. Configure it on the Wi-Fi settings page (`wlan_config.html`): a **Web password protection**
+on/off switch plus username/password, stored in `wlan.ini` (`http_auth`, `http_username`,
+`http_password`). It applies immediately, no reboot. Off by default; the credentials travel
+unencrypted (plain HTTP), so treat it as protection against casual access on the LAN, not more.
+
 If the device has firmware but no/old Web UI and you can't open the normal UI:
 - **SoftAP** mode serves a minimal page (Wi-Fi config + reboot + file upload) when `wlan.ini` /
   `config.ini` are missing — use it to get on the network, then OTA the rest.

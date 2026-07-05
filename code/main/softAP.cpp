@@ -31,6 +31,7 @@
 #include "statusled.h"
 #include "server_ota.h"
 #include "basic_auth.h"
+#include "read_wlanini.h"
 #include "server_GPIO.h"   // driveSystemStatusWs281x() - onboard RGB status (S3)
 
 #include "lwip/err.h"
@@ -366,78 +367,121 @@ esp_err_t config_ini_handler(httpd_req_t *req)
 #endif
 
     LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "config_ini_handler");
-    char _query[400];
+    char _query[512];
     char _valuechar[100];    
-    std::string fn = "/sdcard/firmware/";
-    std::string _task = "";
-    std::string ssid = "";
-    std::string pwd = "";
-    std::string hn = "";    // hostname
-    std::string ip = "";
-    std::string gw = "";    // gateway
-    std::string nm = "";    // netmask
-    std::string dns = "";
-    std::string rssithreshold = ""; //rssi threshold for WIFI roaming
     std::string text = "";
 
+    // wlan.ini is rewritten from scratch below, so every field a caller does NOT send must be
+    // preserved from the current configuration - otherwise saving a subset (e.g. only the web
+    // password, or the AP-portal form which knows nothing about it) silently wipes the rest.
+    // A parameter that IS sent replaces the stored value ("" clears it), except the Wi-Fi
+    // credentials, where an empty value also preserves (an empty SSID is never a valid save,
+    // and the form cannot display the current Wi-Fi password to re-submit it).
+    std::string ssid = wlan_config.ssid;
+    std::string pwd = wlan_config.password;
+    std::string hn = wlan_config.hostname;    // hostname
+    std::string ip = wlan_config.ipaddress;
+    std::string gw = wlan_config.gateway;     // gateway
+    std::string nm = wlan_config.netmask;     // netmask
+    std::string dns = wlan_config.dns;
+    std::string rssithreshold = std::to_string(wlan_config.rssi_threshold); //rssi threshold for WIFI roaming
+    std::string httpuser = wlan_config.http_username;    // web password protection (HTTP basic auth)
+    std::string httppwd = wlan_config.http_password;
+    // Master switch; when never configured (-1, legacy), presence of both credentials = on.
+    bool httpauth = (wlan_config.http_auth == -1)
+                        ? (!httpuser.empty() && !httppwd.empty())
+                        : (wlan_config.http_auth == 1);
 
-    if (httpd_req_get_url_query_str(req, _query, 400) == ESP_OK)
+    // Everything written between the quotes of a wlan.ini line: strip CR/LF (would inject
+    // config lines) and double quotes (would corrupt the quoted format).
+    auto iniSafe = [](std::string v) {
+        std::string out;
+        for (char c : v) {
+            if (c != '\r' && c != '\n' && c != '"') {
+                out += c;
+            }
+        }
+        return out;
+    };
+
+    if (httpd_req_get_url_query_str(req, _query, sizeof(_query)) == ESP_OK)
     {
         ESP_LOGD(TAG, "Query: %s", _query);
         
-        if (httpd_query_key_value(_query, "ssid", _valuechar, 100) == ESP_OK)
+        if ((httpd_query_key_value(_query, "ssid", _valuechar, 100) == ESP_OK) && (strlen(_valuechar) > 0))
         {
             ESP_LOGD(TAG, "ssid is found: %s", _valuechar);
-            ssid = UrlDecode(std::string(_valuechar));
+            ssid = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
-        if (httpd_query_key_value(_query, "pwd", _valuechar, 100) == ESP_OK)
+        if ((httpd_query_key_value(_query, "pwd", _valuechar, 100) == ESP_OK) && (strlen(_valuechar) > 0))
         {
-            ESP_LOGD(TAG, "pwd is found: %s", _valuechar);
-            pwd = UrlDecode(std::string(_valuechar));
-        }
-
-        if (httpd_query_key_value(_query, "ssid", _valuechar, 100) == ESP_OK)
-        {
-            ESP_LOGD(TAG, "ssid is found: %s", _valuechar);
-            ssid = UrlDecode(std::string(_valuechar));
+            ESP_LOGD(TAG, "pwd is found");
+            pwd = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "hn", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "hostname is found: %s", _valuechar);
-            hn = UrlDecode(std::string(_valuechar));
+            hn = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "ip", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "ip is found: %s", _valuechar);
-            ip = UrlDecode(std::string(_valuechar));
+            ip = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "gw", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "gateway is found: %s", _valuechar);
-            gw = UrlDecode(std::string(_valuechar));
+            gw = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "nm", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "netmask is found: %s", _valuechar);
-            nm = UrlDecode(std::string(_valuechar));
+            nm = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "dns", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "dns is found: %s", _valuechar);
-            dns = UrlDecode(std::string(_valuechar));
+            dns = iniSafe(UrlDecode(std::string(_valuechar)));
         }
 
         if (httpd_query_key_value(_query, "rssithreshold", _valuechar, 100) == ESP_OK)
         {
             ESP_LOGD(TAG, "rssithreshold is found: %s", _valuechar);
-            rssithreshold = UrlDecode(std::string(_valuechar));
+            rssithreshold = std::to_string(atoi(UrlDecode(std::string(_valuechar)).c_str()));
         }
+
+        if (httpd_query_key_value(_query, "httpauth", _valuechar, 100) == ESP_OK)
+        {
+            ESP_LOGD(TAG, "httpauth is found: %s", _valuechar);
+            std::string v = toUpper(UrlDecode(std::string(_valuechar)));
+            httpauth = ((v == "TRUE") || (v == "1"));
+        }
+
+        if (httpd_query_key_value(_query, "httpuser", _valuechar, 100) == ESP_OK)
+        {
+            ESP_LOGD(TAG, "httpuser is found: %s", _valuechar);
+            httpuser = iniSafe(UrlDecode(std::string(_valuechar)));
+        }
+
+        // Empty = keep the stored web password (the form cannot display it to re-submit).
+        if ((httpd_query_key_value(_query, "httppwd", _valuechar, 100) == ESP_OK) && (strlen(_valuechar) > 0))
+        {
+            ESP_LOGD(TAG, "httppwd is found");
+            httppwd = iniSafe(UrlDecode(std::string(_valuechar)));
+        }
+    }
+
+    // Credentials are only meaningful as a pair: clearing the username while the protection is
+    // off also drops the stored password. (This is the way to remove credentials entirely.)
+    if (!httpauth && httpuser.empty())
+    {
+        httppwd = "";
     }
 
     FILE* configfilehandle = fopen(WLAN_CONFIG_FILE, "w");
@@ -522,10 +566,36 @@ esp_err_t config_ini_handler(httpd_req_t *req)
         rssithreshold = "RSSIThreshold = 0\n";
     fputs(rssithreshold.c_str(), configfilehandle);
 
+    text  = "\n;++++++++++++++++++++++++++++++++++\n";
+    text += "; Web password protection (HTTP basic auth) for the web interface + REST API\n";
+    text += "; http_auth: master switch (true/false); username AND password are required when true\n";
+    text += "; Note: credentials are sent unencrypted (HTTP) - protection against casual access on the LAN\n\n";
+    fputs(text.c_str(), configfilehandle);
+
+    text = std::string("http_auth = ") + (httpauth ? "true" : "false") + "\n";
+    fputs(text.c_str(), configfilehandle);
+
+    if (httpuser.length())
+        text = "http_username = \"" + httpuser + "\"\n";
+    else
+        text = ";http_username = \"\"\n";
+    fputs(text.c_str(), configfilehandle);
+
+    if (httppwd.length())
+        text = "http_password = \"" + httppwd + "\"\n";
+    else
+        text = ";http_password = \"\"\n";
+    fputs(text.c_str(), configfilehandle);
+
     fflush(configfilehandle);
     fclose(configfilehandle);
 
-    std::string zw = "ota without parameter - should not be the case!";
+    // Apply the new state live: reload wlan.ini into wlan_config and re-arm (or disarm) the
+    // web-password filter. Wi-Fi settings still need the reboot; the web password does not.
+    LoadWlanFromFile(WLAN_CONFIG_FILE);
+    init_basic_auth();
+
+    std::string zw = "wlan.ini saved";
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_send(req, zw.c_str(), zw.length()); 
 

@@ -274,6 +274,37 @@ esp_err_t info_get_handler(httpd_req_t *req)
         httpd_resp_sendstr(req, zw->c_str());
         return ESP_OK;        
     }
+    else if (_task.compare("WlanIni") == 0)
+    {
+        // Current network + web-password settings for the Wi-Fi settings form (wlan_config.html),
+        // so a partial edit starts from what is stored instead of blank fields. NEVER includes
+        // the Wi-Fi or web passwords themselves.
+        auto jsonEsc = [](const std::string &v) {
+            std::string out;
+            for (char c : v) {
+                if (c == '"' || c == '\\') { out += '\\'; out += c; }
+                else if ((unsigned char)c >= 0x20) { out += c; }
+            }
+            return out;
+        };
+        bool authIntent = (wlan_config.http_auth == -1)
+                              ? (!wlan_config.http_username.empty() && !wlan_config.http_password.empty())
+                              : (wlan_config.http_auth == 1);
+        std::string zw = "{\"ssid\":\"" + jsonEsc(wlan_config.ssid) +
+                         "\",\"hostname\":\"" + jsonEsc(wlan_config.hostname) +
+                         "\",\"ip\":\"" + jsonEsc(wlan_config.ipaddress) +
+                         "\",\"gateway\":\"" + jsonEsc(wlan_config.gateway) +
+                         "\",\"netmask\":\"" + jsonEsc(wlan_config.netmask) +
+                         "\",\"dns\":\"" + jsonEsc(wlan_config.dns) +
+                         "\",\"rssithreshold\":" + std::to_string(wlan_config.rssi_threshold) +
+                         ",\"httpauth\":" + (authIntent ? "true" : "false") +
+                         ",\"httpauthactive\":" + (basic_auth_enabled() ? "true" : "false") +
+                         ",\"httpuser\":\"" + jsonEsc(wlan_config.http_username) + "\"}";
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, zw.c_str(), zw.length());
+        return ESP_OK;
+    }
     else if (_task.compare("FlowStatus") == 0)
     {
         std::string zw;

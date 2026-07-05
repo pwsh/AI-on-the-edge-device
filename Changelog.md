@@ -1,3 +1,17 @@
+# [Unreleased]
+
+### General
+
+- **Web password protection is now a proper on/off setting, configurable from the web UI**: the Wi-Fi
+  settings page gains a **"Web password protection"** switch (enabled/disabled) plus web-username and
+  web-password fields — previously HTTP basic auth could only be enabled by hand-editing `http_username`
+  / `http_password` into `wlan.ini` on the SD card, and saving Wi-Fi settings from the page silently
+  **wiped** those hand-edits. A new `http_auth` master switch in `wlan.ini` (`true`/`false`) turns the
+  protection on and off without deleting the stored credentials; legacy files without the switch keep
+  the old behaviour (credentials present = enabled). Changes apply **immediately** — no reboot.
+  The Wi-Fi settings form is now also **pre-filled with the stored settings** (passwords excluded), so a
+  partial edit no longer blanks out everything else, and an empty password field keeps the stored one.
+
 # [17.3.0] - 2026-07-03
 
 ### General

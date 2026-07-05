@@ -1,7 +1,9 @@
 #include "basic_auth.h"
 #include "read_wlanini.h"
+#include "ClassLogFile.h"
 #include <esp_tls_crypto.h>
 #include <esp_log.h>
+#include <string>
 
 
 #define HTTPD_401 "401 UNAUTHORIZED"
@@ -15,10 +17,38 @@ typedef struct {
 
 basic_auth_info_t basic_auth_info = { NULL, NULL };
 
+// Own copies of the credentials: init_basic_auth() can be re-run after wlan.ini is rewritten
+// (web-password settings apply live), and wlan_config's strings may reallocate on reload -
+// raw c_str() pointers into them would dangle.
+static std::string auth_username;
+static std::string auth_password;
+
+bool basic_auth_enabled() {
+    return basic_auth_info.username != NULL && basic_auth_info.password != NULL;
+}
+
 void init_basic_auth() {
-    if (!wlan_config.http_username.empty() && !wlan_config.http_password.empty()) {
-        basic_auth_info.username = wlan_config.http_username.c_str();
-        basic_auth_info.password = wlan_config.http_password.c_str();
+    bool haveCreds = !wlan_config.http_username.empty() && !wlan_config.http_password.empty();
+    // The explicit http_auth switch wins. When it is not set (legacy wlan.ini without the key),
+    // the presence of both credentials enables auth, as it always did.
+    bool enabled = (wlan_config.http_auth == -1) ? haveCreds : (wlan_config.http_auth == 1);
+
+    if (enabled && !haveCreds) {
+        LogFile.WriteToFile(ESP_LOG_ERROR, TAG,
+                "http_auth is enabled but http_username/http_password are not both set - web password stays DISABLED");
+        enabled = false;
+    }
+
+    if (enabled) {
+        auth_username = wlan_config.http_username;
+        auth_password = wlan_config.http_password;
+        basic_auth_info.username = auth_username.c_str();
+        basic_auth_info.password = auth_password.c_str();
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Web password protection ENABLED (user '" + auth_username + "')");
+    } else {
+        basic_auth_info.username = NULL;
+        basic_auth_info.password = NULL;
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Web password protection disabled");
     }
 }
 

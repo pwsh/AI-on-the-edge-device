@@ -22,8 +22,17 @@
 <tr><td>netmask</td><td><input type="text" name="netmask" id="netmask"></td><td>Leave empty if set by router</td>
 </tr><tr><td>DNS</td><td><input type="text" name="dns" id="dns"></td><td>Leave empty if set by router</td></tr>
 <tr><td>RSSI Threshold</td><td><input type="number" name="name" id="threshold" min="-100"  max="0" step="1" value = "0"></td><td>WLAN Mesh Parameter: Threshold for RSSI value to check for start switching access point in a mesh system. Possible values: -100 to 0, 0 = disabled - Value will be transferred to wlan.ini at next startup)</td></tr>
+<tr><td colspan="3"><hr></td></tr>
+<tr><td>Web password protection</td><td>
+    <select id="httpauth">
+        <option value="false" selected>disabled</option>
+        <option value="true">enabled</option>
+    </select></td>
+    <td>Require a username + password for the whole web interface and REST API (HTTP basic auth). Applies <b>immediately</b> after saving - no reboot needed; the browser will prompt for the credentials.</td></tr>
+<tr><td>Web username</td><td><input type="text" id="httpuser" autocomplete="off"></td><td>Required when protection is enabled</td></tr>
+<tr><td>Web password</td><td><input type="text" id="httppwd" autocomplete="off"></td><td>Required when protection is enabled. Leave empty to keep the currently stored password. ATTENTION: sent unencrypted (HTTP).</td></tr>
 </table>
-<p>Leave a field empty to keep its default (DHCP for the IP settings, auto hostname). After saving, reboot the device to apply the new Wi-Fi settings.</p>
+<p>The form is pre-filled with the stored settings (passwords are never shown). Leave the WLAN password empty to keep the current one; leave the IP fields empty for DHCP. After saving, reboot the device to apply new <b>Wi-Fi</b> settings - the web password setting applies immediately.</p>
 <button class="button" type="button" onclick="wr();">Write wlan.ini</button>
 <input id="newfile" type="file">
 <button class="button" style="width:300px" id="doUpdate" type="button" onclick="upload()">Upload Files</button>
@@ -32,6 +41,17 @@
 
 <script language="JavaScript">
     function wr() {
+        var authOn = document.getElementById("httpauth").value === "true";
+        var authUser = document.getElementById("httpuser").value;
+        var authPwd = document.getElementById("httppwd").value;
+        if (authOn && authUser.length === 0) {
+            alert("Web password protection is enabled but the web username is empty - please set both a username and a password.");
+            return;
+        }
+        if (authOn && authPwd.length === 0 && !storedPwdExists) {
+            alert("Web password protection is enabled but no web password is set - please enter one.");
+            return;
+        }
         var api = "/config?ssid=" + encodeURIComponent(document.getElementById("ssid").value)
             + "&pwd=" + encodeURIComponent(document.getElementById("password").value)
             + "&hn=" + encodeURIComponent(document.getElementById("hostname").value)
@@ -39,11 +59,40 @@
             + "&gw=" + encodeURIComponent(document.getElementById("gateway").value)
             + "&nm=" + encodeURIComponent(document.getElementById("netmask").value)
             + "&dns=" + encodeURIComponent(document.getElementById("dns").value)
-            + "&rssithreshold=" + encodeURIComponent(document.getElementById("threshold").value);
+            + "&rssithreshold=" + encodeURIComponent(document.getElementById("threshold").value)
+            + "&httpauth=" + (authOn ? "true" : "false")
+            + "&httpuser=" + encodeURIComponent(authUser);
+        // An empty password field means "keep the stored one" - the device cannot show it here.
+        if (authPwd.length > 0) {
+            api += "&httppwd=" + encodeURIComponent(authPwd);
+        }
         fetch(api)
-            .then(function () { alert("wlan.ini saved. Reboot the device to apply the new Wi-Fi settings."); })
+            .then(function () {
+                storedPwdExists = storedPwdExists || authPwd.length > 0;
+                document.getElementById("httppwd").value = "";
+                alert("wlan.ini saved. Wi-Fi settings apply after a reboot; the web password setting is active NOW"
+                      + (authOn ? " - the browser will ask for the credentials." : "."));
+            })
             .catch(function () { alert("Failed to save wlan.ini - the device did not respond."); });
     }
+
+    // Pre-fill the form with the stored settings so a partial edit (e.g. only enabling the web
+    // password) does not blank out everything else. Passwords are never sent back by the device.
+    var storedPwdExists = false;
+    fetch("/info?type=WlanIni", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d) return;
+            var set = function (id, v) { if (typeof v !== "undefined" && v !== null) document.getElementById(id).value = v; };
+            set("ssid", d.ssid); set("hostname", d.hostname); set("ip", d.ip);
+            set("gateway", d.gateway); set("netmask", d.netmask); set("dns", d.dns);
+            set("threshold", d.rssithreshold);
+            document.getElementById("httpauth").value = d.httpauth ? "true" : "false";
+            set("httpuser", d.httpuser);
+            // A username on record implies a stored password too (they are only saved as a pair).
+            storedPwdExists = !!(d.httpuser && d.httpuser.length);
+        })
+        .catch(function () { /* older firmware without WlanIni support - start blank as before */ });
 
 
     function upload() {
