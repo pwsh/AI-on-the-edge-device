@@ -144,6 +144,10 @@ There are several options for what to do with that value:
 ## What's New in v17 🆕
 A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
 
+### ✨ v17.4
+- **Web password as a switch** – protect the whole web interface + REST API with HTTP basic auth, configured from the Wi-Fi settings page (on/off switch + credentials, stored in `wlan.ini`, applies without a reboot). The Wi-Fi form now pre-fills with the stored settings, so a partial edit can't wipe the rest.
+- **Self-describing data CSVs** – column headers in the daily data files, a real table (with colour-coded status) in the Data Viewer, and headers in the export zip. Confidence-vote corrections and rate-limit overrides are now visible in the status column instead of a bare "no error".
+
 ### ✨ v17.3
 - **Camera controls that match your sensor** – every tuning range (brightness, contrast, saturation, sharpness, AE level, gain, exposure, denoise, zoom) now adapts to the **detected** camera on all pages, unlocking the OV3660/OV5640's wider envelopes (e.g. brightness/contrast ±3, saturation ±4, gain 0..64) that were previously clamped to OV2640 limits.
 - **Full camera-settings parity** – the reference-editor and live camera-setup pages now expose **every** camera setting (quality, gain ceiling, manual gain/exposure, denoise, white balance, gamma, pixel corrections, DCW, XCLK, night mode, colour-bar test pattern), applied live per preview frame; no-op settings for the connected sensor are hidden.

@@ -1,4 +1,4 @@
-# [Unreleased]
+# [17.4.0] - 2026-07-06
 
 ### General
 
@@ -11,6 +11,16 @@
   the old behaviour (credentials present = enabled). Changes apply **immediately** — no reboot.
   The Wi-Fi settings form is now also **pre-filled with the stored settings** (passwords excluded), so a
   partial edit no longer blanks out everything else, and an empty password field keeps the stored one.
+- **Data CSVs now carry column headers everywhere**: each new daily data file on the SD card starts with
+  a header line (8 fixed fields + one column per ROI readout), the **Data Viewer renders a proper table**
+  with headers and colour-coded status (OK muted, accepted-with-override amber, rejected red) instead of
+  raw comma lines, and the **data export** adds the header to files from older firmware so every CSV in
+  the zip is self-describing exactly once. The graph page is unaffected.
+- **Override events are visible in the status** instead of reporting a bare "no error": a confidence-vote
+  correction now reads `no error - confidence vote override (previous X replaced after N confirming
+  reads)`, and a rate breach accepted on confident reads reads `no error - rate too high - accepted on
+  confident reads (rate R)` (or the physical-max variant). The `no error` prefix is kept so MQTT/Home
+  Assistant, the webhook and OpenMetrics continue to treat these accepted readings as OK.
 
 # [17.3.0] - 2026-07-03
 
