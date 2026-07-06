@@ -58,6 +58,15 @@ void ClassLogFile::WriteToData(std::string _timestamp, std::string _name, std::s
     pFile = fopen(logpath.c_str(), "a+");
 
     if (pFile!=NULL) {
+        // Start every NEW daily file with a header line so the CSV is self-describing (8 fixed
+        // fields, then one column per ROI readout - digits first, then analog). The consumers
+        // (data.html viewer, data_export.html, graph.html) tolerate files with or without the
+        // header, since files written by older firmware do not have one.
+        fseek(pFile, 0, SEEK_END);
+        if (ftell(pFile) == 0) {
+            fputs("Time,Sequence,Raw Value,Value,Previous Value,Rate,Change,Status,ROI Readouts (digits then analog; one column per ROI)\n", pFile);
+        }
+
         fputs(_timestamp.c_str(), pFile);
         fputs(",", pFile);
         fputs(_name.c_str(), pFile);

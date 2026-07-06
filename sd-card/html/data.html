@@ -131,6 +131,7 @@
             data.split("\n").forEach(function (line) {
                 line = line.trim();
                 if (!line) return;
+                if (line.indexOf("Time,Sequence") === 0) return;   // on-disk header line (new firmware) - the table has its own
                 var f = line.split(",");
                 if (f.length < 8) {   // unexpected format: show the raw line rather than losing it
                     h += '<tr><td colspan="' + CSV_COLUMNS.length + '">' + esc(line) + "</td></tr>";

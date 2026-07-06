@@ -173,21 +173,25 @@ function fetchFiles(urls, filesData, index, retry, zipFilename) {
     xhr.send(null);
 }
 
-function generateZipFile(urls, filesData, zipFilename) {
+async function generateZipFile(urls, filesData, zipFilename) {
     setStatus("Creating Zip File...");
 
     var zip = new JSZip();
 
     // Column names for the data CSVs (8 fixed fields, then one column per ROI readout - digits
-    // first, then analog). The files on the device are stored without a header; add one to the
-    // export so the columns are self-describing in a spreadsheet.
+    // first, then analog). Newer firmware already writes this header at the top of each daily
+    // file; files from older firmware are headerless - prepend the header only when missing, so
+    // every CSV in the export is self-describing exactly once.
     var CSV_HEADER = "Time,Sequence,Raw Value,Value,Previous Value,Rate,Change,Status,ROI Readouts (digits then analog; one column per ROI)\n";
 
     for (var i = 0; i < urls.length; i++) {
         var name = getFilenameFromUrl(urls[i]);
         var data = filesData[i];
         if (name.toLowerCase().indexOf(".csv") !== -1) {
-            data = new Blob([CSV_HEADER, data]);
+            var head = await data.slice(0, 13).text();   // "Time,Sequence"
+            if (head.indexOf("Time,Sequence") !== 0) {
+                data = new Blob([CSV_HEADER, data]);
+            }
         }
         zip.file(name, data);
     }
