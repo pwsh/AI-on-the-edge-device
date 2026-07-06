@@ -960,6 +960,10 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
 
     for (int j = 0; j < NUMBERS.size(); ++j) {
         bool confidenceOverride = false;   // §10: set when the confidence vote accepts a lower value
+        // When an override ACCEPTS a value that a guard would have rejected, the reading is valid but
+        // the event must stay visible: this note is appended to the final "no error" status (data log,
+        // MQTT error topic, REST, overview) so such rounds are easy to find. No commas (CSV format).
+        std::string statusOverrideNote = "";
         NUMBERS[j]->ReturnRawValue = "";
         NUMBERS[j]->ReturnRateValue = "";
         NUMBERS[j]->ReturnValue = "";
@@ -1131,6 +1135,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                             RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " to " +
                             RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " after " +
                             std::to_string(NUMBERS[j]->NegRateVoteCount) + " confirming reads (suspected high outlier overridden)");
+                        statusOverrideNote = "confidence vote override (previous " +
+                            RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " replaced after " +
+                            std::to_string(NUMBERS[j]->NegRateVoteCount) + " confirming reads)";
                         NUMBERS[j]->NegRateVoteCount = 0;
                         confidenceOverride = true;            // accept the lower value; skip the rejections below
                     }
@@ -1205,6 +1212,8 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 }
                 else if (_pl == predictive::Plausibility::ExceedsPhysicalMax) {   // confidence override -> accept the jump
                     LogFile.WriteToFile(ESP_LOG_INFO, TAG, NUMBERS[j]->name + ": rate exceeds physical max but ACCEPTED (last 3 reads all >= confidence threshold) - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma));
+                    statusOverrideNote = "rate exceeds physical max - accepted on confident reads (rate " +
+                        RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma) + ")";
                 }
             }
 
@@ -1240,6 +1249,8 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 }
                 else if (abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) {   // confidence override -> accept
                     LogFile.WriteToFile(ESP_LOG_INFO, TAG, NUMBERS[j]->name + ": rate exceeds MaxRateValue but ACCEPTED (last 3 reads all >= confidence threshold) - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma));
+                    statusOverrideNote = "rate too high - accepted on confident reads (rate " +
+                        RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma) + ")";
                 }
             }
 
@@ -1282,7 +1293,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         NUMBERS[j]->ReturnValue = RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma);
         NUMBERS[j]->ReturnPreValue = RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
 
-        NUMBERS[j]->ErrorMessageText = "no error";
+        NUMBERS[j]->ErrorMessageText = statusOverrideNote.empty()
+                                           ? "no error"
+                                           : ("no error - " + statusOverrideNote);
         UpdatePreValueINI = true;
 
         string _zw = NUMBERS[j]->name + ": Raw: " + NUMBERS[j]->ReturnRawValue + ", Value: " + NUMBERS[j]->ReturnValue + ", Status: " + NUMBERS[j]->ErrorMessageText;

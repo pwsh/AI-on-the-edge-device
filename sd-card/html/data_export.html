@@ -178,8 +178,18 @@ function generateZipFile(urls, filesData, zipFilename) {
 
     var zip = new JSZip();
 
-    for (var i = 0; i < urls.length; i++) {        
-        zip.file(getFilenameFromUrl(urls[i]), filesData[i]);
+    // Column names for the data CSVs (8 fixed fields, then one column per ROI readout - digits
+    // first, then analog). The files on the device are stored without a header; add one to the
+    // export so the columns are self-describing in a spreadsheet.
+    var CSV_HEADER = "Time,Sequence,Raw Value,Value,Previous Value,Rate,Change,Status,ROI Readouts (digits then analog; one column per ROI)\n";
+
+    for (var i = 0; i < urls.length; i++) {
+        var name = getFilenameFromUrl(urls[i]);
+        var data = filesData[i];
+        if (name.toLowerCase().indexOf(".csv") !== -1) {
+            data = new Blob([CSV_HEADER, data]);
+        }
+        zip.file(name, data);
     }
 
     zip.generateAsync({type:"blob"})

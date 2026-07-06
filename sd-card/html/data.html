@@ -47,9 +47,36 @@
             }
 
             #data {
+                font-size: small;
+                overflow: auto;
+            }
+
+            #data table {
+                border-collapse: collapse;
+                width: 100%;
                 font-family: 'Courier New', Courier, monospace;
                 font-size: small;
             }
+
+            #data th {
+                position: sticky;
+                top: 0;
+                background: var(--panel, #f0f2f4);
+                text-align: left;
+                padding: 3px 8px;
+                border-bottom: 2px solid var(--border, #bbb);
+                white-space: nowrap;
+            }
+
+            #data td {
+                padding: 2px 8px;
+                border-bottom: 1px solid var(--border, #e2e2e2);
+                white-space: nowrap;
+            }
+
+            #data td.st-ok { color: var(--muted, #6a737b); }
+            #data td.st-note { color: #b7791f; font-weight: bold; }   /* accepted with an override note */
+            #data td.st-err { color: #c0392b; font-weight: bold; }    /* rejected reading */
 
             .button {
                 padding: 5px 10px;
@@ -88,6 +115,39 @@
             funcRequest(getDomainname() + '/data');
         } 
 
+        // Data-file columns (see ClassFlowPostProcessing::WriteDataLog / ClassLogFile::WriteToData):
+        // 8 fixed fields, then one column per ROI readout (digits first, then analog).
+        var CSV_COLUMNS = ["Time", "Sequence", "Raw Value", "Value", "Previous Value",
+                           "Rate", "Change", "Status", "ROI Readouts"];
+
+        function esc(t) {
+            return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function renderTable(data) {
+            var h = "<table><tr>";
+            CSV_COLUMNS.forEach(function (c) { h += "<th>" + c + "</th>"; });
+            h += "</tr>";
+            data.split("\n").forEach(function (line) {
+                line = line.trim();
+                if (!line) return;
+                var f = line.split(",");
+                if (f.length < 8) {   // unexpected format: show the raw line rather than losing it
+                    h += '<tr><td colspan="' + CSV_COLUMNS.length + '">' + esc(line) + "</td></tr>";
+                    return;
+                }
+                // Status colour: plain "no error" = OK; "no error - ..." = accepted with an override
+                // note (confidence vote / rate accepted on confident reads); anything else = rejected.
+                var st = f[7];
+                var cls = (st === "no error") ? "st-ok" : (st.indexOf("no error") === 0 ? "st-note" : "st-err");
+                h += "<tr>";
+                for (var i = 0; i < 7; i++) h += "<td>" + esc(f[i]) + "</td>";
+                h += '<td class="' + cls + '">' + esc(st) + "</td>";
+                h += "<td>" + esc(f.slice(8).join(" ")) + "</td></tr>";
+            });
+            return h + "</table>";
+        }
+
         async function funcRequest(url){
             await fetch(url)
             .then((res) => {
@@ -98,7 +158,7 @@
                 return res.text();
             })
             .then((data) => {
-                document.getElementById('data').innerHTML = "<br>" + data.split("\n").join("\n<br>") + "&nbsp;";
+                document.getElementById('data').innerHTML = renderTable(data);
 
                 window.scrollBy(0,document.body.scrollHeight);
 
