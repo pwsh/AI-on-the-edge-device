@@ -1,3 +1,12 @@
+# [Unreleased]
+
+### General
+
+- **Change-rate-threshold holds are now visible in the status**: when `ChangeRateThreshold` absorbs a
+  reading that differed from the held value (a slowly creeping meter inside the jitter band), the status
+  reports `no error - held by change-rate threshold (read X)` instead of a bare "no error" — so a held
+  value is distinguishable from a genuinely unchanged meter in the data log, MQTT and the overview.
+
 # [17.4.0] - 2026-07-06
 
 ### General

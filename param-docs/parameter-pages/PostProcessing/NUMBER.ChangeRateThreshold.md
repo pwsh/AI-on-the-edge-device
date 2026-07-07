@@ -12,6 +12,12 @@ This compensates for small recognition fluctuations that happen when the meter s
 applied **only to the last digit** of the read value (see the example below): if the value is within
 `PreValue ± Threshold`, the old value is held.
 
+When the band absorbs a reading that actually differed, the status reports
+`no error - held by change-rate threshold (read X)` (data log, MQTT, REST), so a held value is
+distinguishable from a genuinely unchanged meter. Note this also means a slowly creeping meter is
+reported **up to `Threshold` counts behind** until it moves past the band — set `0` to disable if you
+prefer the value to track every accepted reading exactly.
+
 !!! Note
     If you edit the config file manually, you must prefix this parameter with `<NUMBER>` followed by a dot (eg. `main.ChangeRateThreshold`). The reason is that this parameter is specific for each `<NUMBER>` (`<NUMBER>` is the name of the number sequence defined in the ROI's).
 

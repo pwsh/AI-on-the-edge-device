@@ -1107,6 +1107,12 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 double _difference2 = (NUMBERS[j]->PreValue + (NUMBERS[j]->ChangeRateThreshold / pow(10, NUMBERS[j]->Nachkomma)));
 
                 if ((NUMBERS[j]->Value >= _difference1) && (NUMBERS[j]->Value <= _difference2)) {
+                    // Annotate only when the band actually absorbed a DIFFERENT reading - a value
+                    // identical to PreValue (meter standing still) is a plain "no error".
+                    if (NUMBERS[j]->Value != NUMBERS[j]->PreValue) {
+                        statusOverrideNote = "held by change-rate threshold (read " +
+                            RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ")";
+                    }
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
                     NUMBERS[j]->ReturnValue = std::to_string(NUMBERS[j]->PreValue);
                 }
