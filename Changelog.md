@@ -1,6 +1,12 @@
-# [Unreleased]
+# [17.4.1] - 2026-07-06
 
 ### General
+
+- **The Change Rate Threshold tooltip is visible again**: the parameter's doc page contains an
+  "Example" heading which — once rendered into the tooltip — made the config page misclassify the whole
+  row as a *section heading*: the row never received its name-hover tooltip and Post-Processing was
+  split by a bogus collapsible "Example" section. Section detection now ignores headings inside
+  tooltip text.
 
 - **Unchecking `ChangeRateThreshold` now actually disables it**: the firmware's built-in default was
   `2`, so removing the parameter (what the config page's checkbox does) silently kept the ±2 jitter
