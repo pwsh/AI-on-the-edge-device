@@ -4491,7 +4491,11 @@ function buildConfigUI() {
 
     var sections = [], cur = null;
     rows.forEach(function (row) {
+        // A section heading is an h4 in the row STRUCTURE - not one inside a parameter's tooltip
+        // (a doc page with a "## ..." heading renders an h4 into the tooltip text, which made the
+        // whole parameter row masquerade as a section head and lose its name-hover tooltip).
         var h = row.querySelector('h4');
+        if (h && h.closest('.tooltiptext')) h = null;
         if (h) { cur = { head: row, h: h, rows: [] }; sections.push(cur); }
         else if (cur) { cur.rows.push(row); }
     });
