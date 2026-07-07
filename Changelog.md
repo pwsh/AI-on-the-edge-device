@@ -2,6 +2,11 @@
 
 ### General
 
+- **Unchecking `ChangeRateThreshold` now actually disables it**: the firmware's built-in default was
+  `2`, so removing the parameter (what the config page's checkbox does) silently kept the ±2 jitter
+  band active. The default is now `0` (off) — the shipped configuration still enables it explicitly
+  with `2`, so fresh installs are unchanged, but an unchecked/absent parameter means what it says.
+  The tooltip now explains the checkbox semantics and that `0` disables the hold.
 - **Change-rate-threshold holds are now visible in the status**: when `ChangeRateThreshold` absorbs a
   reading that differed from the held value (a slowly creeping meter inside the jitter band), the status
   reports `no error - held by change-rate threshold (read X)` instead of a bare "no error" — so a held

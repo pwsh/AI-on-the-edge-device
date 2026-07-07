@@ -1,11 +1,15 @@
 # Parameter `ChangeRateThreshold`
-Default Value: `2`
+Default Value: `2` (in the shipped configuration; **unchecked / not configured = disabled**)
 
-Range: `0` .. `9`.
+Range: `0` .. `9`. `0` disables the hold.
 
 Suppresses tiny flicker in the **last digit** so a stationary meter doesn't drift. If a new reading
 differs from the last accepted value by no more than this many counts of the **smallest digit**, the
 reading is treated as unchanged and the previous Value/PreValue is kept (no further calculation is done).
+
+**Checkbox semantics:** unchecking this parameter (or removing it from the config) disables the hold
+completely — the value then follows every accepted reading exactly. Enable it with a value of 1-9 to
+absorb that many counts of last-digit jitter.
 
 This compensates for small recognition fluctuations that happen when the meter sits still for a long time
 (e.g. overnight) or the last pointer/digit wobbles slightly backwards — common on water meters. It is

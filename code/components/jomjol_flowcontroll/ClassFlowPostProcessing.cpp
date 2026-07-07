@@ -879,7 +879,11 @@ void ClassFlowPostProcessing::InitNUMBERS() {
         _number->DecimalShiftInitial = 0;
         _number->isExtendedResolution = false;
         _number->AnalogToDigitTransitionStart=9.2;
-        _number->ChangeRateThreshold = 2;
+        // Default OFF: the jitter band only applies when ChangeRateThreshold is explicitly
+        // configured. The shipped config.ini template sets it to 2, so fresh installs keep the
+        // anti-flicker behaviour - but UNCHECKING the parameter on the config page (which comments
+        // the line out) now genuinely disables the hold instead of silently reverting to 2.
+        _number->ChangeRateThreshold = 0;
 
         _number->Value = 0; // last value read out, incl. corrections
         _number->ReturnValue = ""; // corrected return value, possibly with error message
