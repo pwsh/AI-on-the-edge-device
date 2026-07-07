@@ -1,3 +1,10 @@
+# [Unreleased]
+
+### General
+
+- **The rate is rounded to one decimal more than the sequence's precision** (e.g. `0.010` instead of
+  `0.009523809532679263`) everywhere it is reported: data log, MQTT, InfluxDB, REST and the overview.
+
 # [17.4.1] - 2026-07-06
 
 ### General

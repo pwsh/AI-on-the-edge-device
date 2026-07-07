@@ -1185,7 +1185,9 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
             // LastValueTimeDifference = LastValueTimeDifference / 60;       // in minutes
             LastPreValueTimeDifference = LastPreValueTimeDifference / 60; // in minutes
             NUMBERS[j]->FlowRateAct = (NUMBERS[j]->Value - NUMBERS[j]->PreValue) / LastPreValueTimeDifference;
-            NUMBERS[j]->ReturnRateValue =  to_string(NUMBERS[j]->FlowRateAct);
+            // Round the rate to ONE decimal more than the sequence's display precision - the raw
+            // double (e.g. 0.009523809532679263) is noise in the data log / MQTT / REST.
+            NUMBERS[j]->ReturnRateValue = RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma + 1);
 
             // Rate-limit confidence override: when a DigitConfidenceThreshold is configured (>0) and the
             // last 3 reads were ALL at/above it (per-sequence confidence = weakest digit), the digits are
