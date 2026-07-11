@@ -145,6 +145,7 @@ There are several options for what to do with that value:
 A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
 
 ### ✨ v17.4
+- *(17.4.2)* The reported **rate** is rounded to one decimal more than the sequence's precision (e.g. `0.010`) instead of a raw 16-digit double — everywhere: data log, MQTT, InfluxDB, REST.
 - *(17.4.1)* Readings **held** by `ChangeRateThreshold` are now annotated in the status (`no error - held by change-rate threshold (read X)`), **unchecking the parameter actually disables it** (the hidden built-in default of 2 is gone), and its tooltip — previously swallowed by a section-detection bug — is back and explains the checkbox semantics.
 - **Web password as a switch** – protect the whole web interface + REST API with HTTP basic auth, configured from the Wi-Fi settings page (on/off switch + credentials, stored in `wlan.ini`, applies without a reboot). The Wi-Fi form now pre-fills with the stored settings, so a partial edit can't wipe the rest.
 - **Self-describing data CSVs** – column headers in the daily data files, a real table (with colour-coded status) in the Data Viewer, and headers in the export zip. Confidence-vote corrections and rate-limit overrides are now visible in the status column instead of a bare "no error".
