@@ -179,14 +179,18 @@ void InfluxDB::InfluxDBdestroy() {
  * @param _content The content or value to publish.
  * @param _timeUTC The timestamp in UTC. If greater than 0, it will be included in the payload.
  *
+ * @return true if the request was performed successfully and the server answered with an HTTP
+ *         status code < 300, false otherwise.
+ *
  * The function logs the process and handles HTTP communication with the InfluxDB server.
  * It constructs the appropriate API URI based on the InfluxDB version and sends the data
  * using an HTTP POST request.
  */
-void InfluxDB::InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC) {
+bool InfluxDB::InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC) {
     std::string apiURI;        
     std::string payload;
     char nowTimestamp[21];
+    bool success = false;
 
     connectHTTP();
 
@@ -222,7 +226,13 @@ void InfluxDB::InfluxDBPublish(std::string _measurement, std::string _key, std::
 
             err = esp_http_client_perform(httpClient);
             if (err == ESP_OK) {
-                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Data published successfully: " + payload);
+                int statusCode = esp_http_client_get_status_code(httpClient);
+                if (statusCode < 300) {
+                    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Data published successfully: " + payload);
+                    success = true;
+                } else {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to publish data: HTTP status " + std::to_string(statusCode));
+                }
             } else {
                 LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to publish data: " + std::string(esp_err_to_name(err)));
             }
@@ -241,12 +251,20 @@ void InfluxDB::InfluxDBPublish(std::string _measurement, std::string _key, std::
             esp_http_client_set_post_field(httpClient, payload.c_str(), payload.length());
             err = ESP_ERROR_CHECK_WITHOUT_ABORT(esp_http_client_perform(httpClient));
             if (err == ESP_OK) {
-                LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Data published successfully: " + payload);
+                int statusCode = esp_http_client_get_status_code(httpClient);
+                if (statusCode < 300) {
+                    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Data published successfully: " + payload);
+                    success = true;
+                } else {
+                    LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to publish data: HTTP status " + std::to_string(statusCode));
+                }
             } else {
                 LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Failed to publish data: " + std::string(esp_err_to_name(err)));
             }
         break;
     }
+
+    return success;
 }
 
 #endif //ENABLE_INFLUXDB

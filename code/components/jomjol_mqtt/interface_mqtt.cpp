@@ -1,6 +1,8 @@
 #ifdef ENABLE_MQTT
 #include "interface_mqtt.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_log.h"
 #if DEBUG_DETAIL_ON
     #include "esp_timer.h"
@@ -48,7 +50,7 @@ bool MQTTPublish(std::string _key, std::string _content, int qos, bool retained_
     }
 
     if (failedOnRound == getCountFlowRounds()) {    // we already failed in this round, do not retry until the next round
-        return true; // Fail quietly
+        return false; // Fail quietly (no additional log spam), but still report the failure to the caller
     }
 
     #ifdef DEBUG_DETAIL_ON  
@@ -67,6 +69,7 @@ bool MQTTPublish(std::string _key, std::string _content, int qos, bool retained_
         #endif
         if (msg_id == -1) {
             LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Failed to publish topic '" + _key + "', re-trying...");   
+            vTaskDelay(pdMS_TO_TICKS(250));             // Give a transient network/broker hiccup a moment to clear
             #ifdef DEBUG_DETAIL_ON 
                 starttime = esp_timer_get_time();
             #endif

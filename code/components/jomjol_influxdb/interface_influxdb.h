@@ -67,13 +67,14 @@ enum InfluxDBVersion {
  * @fn void InfluxDBdestroy()
  * Destroys the InfluxDB connection.
  * 
- * @fn void InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC)
+ * @fn bool InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC)
  * Publishes data to the InfluxDB server.
  * 
  * @param _measurement The measurement name.
  * @param _key The key for the data point.
  * @param _content The content or value of the data point.
  * @param _timeUTC The timestamp in UTC for the data point.
+ * @return true if the data point was accepted by the server (HTTP status < 300), false otherwise.
  */
 
 class InfluxDB {
@@ -103,8 +104,8 @@ public:
 
     // Destroy the InfluxDB connection
     void InfluxDBdestroy();
-    // Publish data to the InfluxDB server
-    void InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC);
+    // Publish data to the InfluxDB server; returns true only if the server accepted the data point
+    bool InfluxDBPublish(std::string _measurement, std::string _key, std::string _content, long int _timeUTC);
 };
 
 

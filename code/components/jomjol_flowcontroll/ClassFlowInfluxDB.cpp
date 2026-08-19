@@ -180,19 +180,22 @@ bool ClassFlowInfluxDB::doFlow(string zwtime)
             auto P  = [&](const std::string &f){ return PublishConfig::IsEnabled(PublishConfig::INFLUX, f); };
             auto R  = [&](const std::string &f){ return changed && P(f); };
             std::string _np = ((*NUMBERS)[i]->name == "default") ? "" : ((*NUMBERS)[i]->name + "/");
+            // Did every reading we actually attempted for this number reach the server? Only the
+            // R()-gated ones count - see the LastPubInflux update at the end of the loop.
+            bool readingsOk = true;
 
             if (R("value") && result.length() > 0)
-                influxDB.InfluxDBPublish(measurement, namenumber, result, timeutc);
+                readingsOk &= influxDB.InfluxDBPublish(measurement, namenumber, result, timeutc);
 
             // Opt-in numeric fields (default off): raw, rate, prevalue, confidence.
             if (R("raw") && resultraw.length() > 0)
-                influxDB.InfluxDBPublish(measurement, _np + "raw", resultraw, timeutc);
+                readingsOk &= influxDB.InfluxDBPublish(measurement, _np + "raw", resultraw, timeutc);
             if (R("rate") && resultrate.length() > 0)
-                influxDB.InfluxDBPublish(measurement, _np + "rate", resultrate, timeutc);
+                readingsOk &= influxDB.InfluxDBPublish(measurement, _np + "rate", resultrate, timeutc);
             if (R("prevalue") && (*NUMBERS)[i]->ReturnPreValue.length() > 0)
-                influxDB.InfluxDBPublish(measurement, _np + "prevalue", (*NUMBERS)[i]->ReturnPreValue, timeutc);
+                readingsOk &= influxDB.InfluxDBPublish(measurement, _np + "prevalue", (*NUMBERS)[i]->ReturnPreValue, timeutc);
             if (R("confidence") && (*NUMBERS)[i]->ReturnConfidence >= 0)
-                influxDB.InfluxDBPublish(measurement, _np + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), timeutc);
+                readingsOk &= influxDB.InfluxDBPublish(measurement, _np + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), timeutc);
 
             // Leak detection: a 0/1 leak flag + seconds of continuous usage (state/safety -> every round).
             if ((*NUMBERS)[i]->LeakDetectionEnabled) {
@@ -202,7 +205,11 @@ bool ClassFlowInfluxDB::doFlow(string zwtime)
                     influxDB.InfluxDBPublish(measurement, _np + "continuous_usage", std::to_string((*NUMBERS)[i]->ContinuousUsageSeconds), timeutc);
             }
 
-            (*NUMBERS)[i]->LastPubInflux = result;
+            // In "send only changed readings" mode a round that failed has to be retried in the next
+            // round, so the last-published marker only advances once every attempted reading
+            // succeeded - otherwise the changed value is never re-sent until it changes again.
+            if (readingsOk)
+                (*NUMBERS)[i]->LastPubInflux = result;
         }
 
         // Performance diagnostic: last digitization round (loop) processing time in ms, published

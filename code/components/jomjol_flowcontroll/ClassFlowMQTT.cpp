@@ -314,15 +314,24 @@ bool ClassFlowMQTT::doFlow(string zwtime)
                                                        PublishConfig::IsEnabled(PublishConfig::HA, f); };
             auto R = [&](const std::string &f){ return readingsChanged && P(f); };
 
+            // Did every reading topic we actually attempted for this number make it to the broker?
+            // Only those gated by R() count - see the LastPubMqtt update at the end of the loop.
+            bool readingsOk = true;
+            auto pubReading = [&](const std::string &topic, const std::string &payload) {
+                bool ok = MQTTPublish(topic, payload, qos, SetRetainFlag);
+                success |= ok;
+                readingsOk &= ok;
+            };
+
             if ((domoticzintopic.length() > 0) && (result.length() > 0))
                 success |= MQTTPublish(domoticzintopic, domoticzpayload, qos, SetRetainFlag);
 
             if (R("value") && result.length() > 0)
-                success |= MQTTPublish(namenumber + "value", result, qos, SetRetainFlag);
+                pubReading(namenumber + "value", result);
             if (R("prevalue") && resultpre.length() > 0)
-                success |= MQTTPublish(namenumber + "prevalue", resultpre, qos, SetRetainFlag);
+                pubReading(namenumber + "prevalue", resultpre);
             if (R("confidence") && (*NUMBERS)[i]->ReturnConfidence >= 0)
-                success |= MQTTPublish(namenumber + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence), qos, SetRetainFlag);
+                pubReading(namenumber + "confidence", std::to_string((int)(*NUMBERS)[i]->ReturnConfidence));
             // The HA "problem" binary sensor derives from the error topic, so publish error if either
             // error or problem is wanted.
             if ((P("error") || PublishConfig::IsEnabled(PublishConfig::HA, "problem")) && resulterror.length() > 0)
@@ -330,7 +339,7 @@ bool ClassFlowMQTT::doFlow(string zwtime)
 
             if (resultrate.length() > 0) {
                 if (R("rate"))
-                    success |= MQTTPublish(namenumber + "rate", resultrate, qos, SetRetainFlag);
+                    pubReading(namenumber + "rate", resultrate);
 
                 if (R("rate_per_time_unit")) {
                     std::string resultRatePerTimeUnit;
@@ -338,20 +347,20 @@ bool ClassFlowMQTT::doFlow(string zwtime)
                         resultRatePerTimeUnit = to_string((*NUMBERS)[i]->FlowRateAct * 60); // per minutes => per hour
                     else // Keep per minute
                         resultRatePerTimeUnit = resultrate;
-                    success |= MQTTPublish(namenumber + "rate_per_time_unit", resultRatePerTimeUnit, qos, SetRetainFlag);
+                    pubReading(namenumber + "rate_per_time_unit", resultRatePerTimeUnit);
                 }
             }
 
             if (R("rate_per_digitization_round") && resultchangabs.length() > 0) {
-                success |= MQTTPublish(namenumber + "changeabsolut", resultchangabs, qos, SetRetainFlag); // Legacy alias
-                success |= MQTTPublish(namenumber + "rate_per_digitization_round", resultchangabs, qos, SetRetainFlag);
+                pubReading(namenumber + "changeabsolut", resultchangabs); // Legacy alias
+                pubReading(namenumber + "rate_per_digitization_round", resultchangabs);
             }
 
             if (R("raw") && resultraw.length() > 0)
-                success |= MQTTPublish(namenumber + "raw", resultraw, qos, SetRetainFlag);
+                pubReading(namenumber + "raw", resultraw);
 
             if (R("timestamp") && resulttimestamp.length() > 0)
-                success |= MQTTPublish(namenumber + "timestamp", resulttimestamp, qos, SetRetainFlag);
+                pubReading(namenumber + "timestamp", resulttimestamp);
 
             // Leak detection (water/gas): binary leak flag (ON/OFF for a HA binary_sensor) + the time
             // the meter has been advancing continuously (seconds). State/safety -> sent every round.
@@ -364,10 +373,14 @@ bool ClassFlowMQTT::doFlow(string zwtime)
 
             if (R("json")) {
                 std::string json = flowpostprocessing->getJsonFromNumber(i, "\n");
-                success |= MQTTPublish(namenumber + "json", json, qos, SetRetainFlag);
+                pubReading(namenumber + "json", json);
             }
 
-            (*NUMBERS)[i]->LastPubMqtt = result;
+            // In "send only changed readings" mode a round that failed has to be retried in the next
+            // round, so the last-published marker only advances once every attempted reading topic
+            // succeeded - otherwise the changed value is never re-sent until it changes again.
+            if (readingsOk)
+                (*NUMBERS)[i]->LastPubMqtt = result;
         }
     }
 
