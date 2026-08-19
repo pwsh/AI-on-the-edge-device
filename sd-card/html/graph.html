@@ -8,7 +8,7 @@
     <script type="text/javascript" src="app.js?v=$COMMIT_HASH"></script>
 
     <title>Data Graph</title>
-    <script type="text/javascript" src='plotly-basic-2.18.2.min.js?v=$COMMIT_HASH'></script>
+    <script type="text/javascript" src='plotly-basic-2.35.3.min.js?v=$COMMIT_HASH'></script>
 
     <script type="text/javascript" src="common.js?v=$COMMIT_HASH"></script> 
     <script type="text/javascript" src="readconfigcommon.js?v=$COMMIT_HASH"></script>  
@@ -156,9 +156,9 @@
                     showlegend: true,
                     colorway: ['green', 'black', 'blue', 'black'],
 
-                    yaxis: {title: 'Value'},
+                    yaxis: {title: {text: 'Value'}},
                     yaxis2: {
-                        title: 'Change',
+                        title: {text: 'Change'},
                         overlaying: 'y',
                         side: 'right'
                     },
@@ -188,7 +188,7 @@
     }
     </script>
     <link href="firework.css?v=$COMMIT_HASH" rel="stylesheet">
-    <script type="text/javascript" src="jquery-3.6.0.min.js?v=$COMMIT_HASH"></script>  
+    <script type="text/javascript" src="jquery-3.7.1.min.js?v=$COMMIT_HASH"></script>  
     <script type="text/javascript" src="firework.js?v=$COMMIT_HASH"></script>
 </head>
 

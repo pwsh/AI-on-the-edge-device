@@ -213,7 +213,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
     httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html lang=\"en\" xml:lang=\"en\"><head>");
     httpd_resp_sendstr_chunk(req, "<link href=\"/file_server.css\" rel=\"stylesheet\">");
     httpd_resp_sendstr_chunk(req, "<link href=\"/firework.css\" rel=\"stylesheet\">");
-    httpd_resp_sendstr_chunk(req, "<script type=\"text/javascript\" src=\"/jquery-3.6.0.min.js\"></script>");
+    httpd_resp_sendstr_chunk(req, "<script type=\"text/javascript\" src=\"/jquery-3.7.1.min.js\"></script>");
     httpd_resp_sendstr_chunk(req, "<script type=\"text/javascript\" src=\"/firework.js\"></script></head>");
 
     httpd_resp_sendstr_chunk(req, "<body>");

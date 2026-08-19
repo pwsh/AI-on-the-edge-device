@@ -1,7 +1,7 @@
 # Provisioning & Migration
 
 How to get a device running from scratch, and how to migrate an existing one to a new version —
-**without pulling the SD card** wherever possible. Applies to ESP-IDF 6.0.1 / v17.
+**without pulling the SD card** wherever possible. Applies to ESP-IDF 6.0.2 / v17.
 
 ## Release artifacts
 

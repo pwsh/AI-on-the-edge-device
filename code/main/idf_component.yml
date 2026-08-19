@@ -3,9 +3,9 @@
 ## Versions are pinned to exact releases (not "*") so a fresh resolve is reproducible and can't
 ## silently pull a newer registry release; bump these deliberately and re-test (see PLAN sec 3.3).
 dependencies:
-  espressif/mqtt: "==1.0.0"
+  espressif/mqtt: "==1.1.0"
   espressif/cjson: "==1.7.19~2"
   # Flash-storage path (ESP32-WROVER single-slot): a LittleFS image in the `storage` partition holds
   # the web UI + best-models + config and is mounted at /sdcard when no SD card is present. Only
   # linked when USE_FLASH_FS is defined (gc-sections strips it from the SD-only ESP32-CAM build).
-  joltwallet/littlefs: "==1.22.1"
+  joltwallet/littlefs: "==1.22.3"
