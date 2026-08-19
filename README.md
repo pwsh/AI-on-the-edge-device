@@ -145,6 +145,7 @@ There are several options for what to do with that value:
 A summary of the functionality changes since **v16**. See the [Changelog](Changelog.md) for the full detail.
 
 ### ✨ v17.4
+- *(17.4.3)* Dependency refresh (ESP-IDF 6.0.2, TFLite-Micro 1.3.8, camera driver 2.1.7, mDNS 1.11.3 security fixes, jQuery 3.7.1, Plotly 2.35.3) and a fix so a failed MQTT/InfluxDB publish round no longer drops a changed reading in *send only changed* mode.
 - *(17.4.2)* The reported **rate** is rounded to one decimal more than the sequence's precision (e.g. `0.010`) instead of a raw 16-digit double — everywhere: data log, MQTT, InfluxDB, REST.
 - *(17.4.1)* Readings **held** by `ChangeRateThreshold` are now annotated in the status (`no error - held by change-rate threshold (read X)`), **unchecking the parameter actually disables it** (the hidden built-in default of 2 is gone), and its tooltip — previously swallowed by a section-detection bug — is back and explains the checkbox semantics.
 - **Web password as a switch** – protect the whole web interface + REST API with HTTP basic auth, configured from the Wi-Fi settings page (on/off switch + credentials, stored in `wlan.ini`, applies without a reboot). The Wi-Fi form now pre-fills with the stored settings, so a partial edit can't wipe the rest.
@@ -169,7 +170,7 @@ A summary of the functionality changes since **v16**. See the [Changelog](Change
 - **Rate-limit correctness** – an unset pipe diameter no longer caps valid readings at zero flow, the pipe-diameter override is now opt-in, and three consecutive confident reads can override a rate-limit rejection.
 
 ### 🧩 Hardware & platform
-- Rebuilt on **ESP-IDF 6.0.1** (modern GCC&nbsp;15 / C++ toolchain).
+- Rebuilt on **ESP-IDF 6.0.2** (modern GCC&nbsp;15 / C++ toolchain).
 - **New: ESP32-S3 support** (8&nbsp;MB and 16&nbsp;MB variants) alongside the classic **ESP32-CAM**. ESP32-S3 boards run **with or without an SD card** — the web UI, CNN models and configuration can live in on-board flash. The **ESP32-WROVER** is also supported.
 - Camera sensors supported: **OV2640, OV3660 and OV5640**.
 - **LED brightness & 5V current safety** – the external WS281x (NeoPixel) strip gains an explicit **output % control**, and the firmware **caps its draw to the board's safe 5V budget (500&nbsp;mA)** — automatically dimming a long/bright strip so it can't brown out the board. A **5V power-injection** toggle (off by default) raises the cap to your own supply's rating when the strip is powered separately. (The internal flash LED keeps its existing 0–100&nbsp;% intensity.)

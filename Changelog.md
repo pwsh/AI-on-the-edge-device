@@ -1,3 +1,25 @@
+# [17.4.3] - 2026-08-18
+
+### General
+
+- **A failed MQTT/InfluxDB round no longer loses a changed reading in "send only changed" mode**: when
+  a publish failed (the log's sporadic `Failed to publish topic '…', skipping all MQTT publishings in
+  this round!`), the last-published marker still advanced, so the new value was never re-sent until the
+  meter moved again. The marker now only advances when the reading topics were actually delivered, so
+  the next round retries; a failed publish also waits 250 ms before its single retry, and the
+  "already failed this round" short-circuit now reports failure instead of pretending success.
+  InfluxDB writes additionally treat an HTTP error status (>= 300) as a failure.
+
+### Dependencies
+
+- **ESP-IDF 6.0.1 → 6.0.2** (bugfix release; no toolchain change).
+- **esp-tflite-micro v1.3.5 → v1.3.8** (upstream TFLM sync, esp-nn conv dispatch fix), **esp32-camera
+  v2.1.6 → v2.1.7** (SCCB repeated-start read fix), **mdns 1.11.1 → 1.11.3** (fixes an unbounded
+  recursion in name decompression + several fuzzer-found parsing bugs), **stb** bumped to current
+  master (stb_image 2.28 → 2.30; the unchanged legacy `stb_image_resize.h` is now taken from
+  `deprecated/`), **espressif/mqtt 1.0.0 → 1.1.0**, **joltwallet/littlefs 1.22.1 → 1.22.3**.
+- Web UI: **jQuery 3.6.0 → 3.7.1**, **Plotly (basic) 2.18.2 → 2.35.3**, FileSaver.js 2.0.4 → 2.0.5.
+
 # [17.4.2] - 2026-07-10
 
 ### General
