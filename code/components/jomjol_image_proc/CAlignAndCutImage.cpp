@@ -158,19 +158,16 @@ void CAlignAndCutImage::CutAndSave(std::string _template1, int x1, int y1, int d
         return;
     }
 
-    stbi_uc* p_target;
-    stbi_uc* p_source;
-
     RGBImageLock();
 
-    for (int x = x1; x < x2; ++x)
-        for (int y = y1; y < y2; ++y)
-        {
-            p_target = odata + (channels * ((y - y1) * dx + (x - x1)));
-            p_source = rgb_image + (channels * (y * width + x));
-            for (int _channels = 0; _channels < channels; ++_channels)
-                p_target[_channels] = p_source[_channels];
-        }
+    // Each source row segment [x1..x2) is contiguous, as is the matching destination row.
+    const size_t rowbytes = (size_t)dx * channels;
+    for (int y = y1; y < y2; ++y)
+    {
+        memcpy(odata + (size_t)channels * ((y - y1) * dx),
+               rgb_image + (size_t)channels * ((size_t)y * width + x1),
+               rowbytes);
+    }
 
 #ifdef STBI_ONLY_JPEG
     stbi_write_jpg(_template1.c_str(), dx, dy, channels, odata, 100);
@@ -246,19 +243,16 @@ CImageBasis* CAlignAndCutImage::CutAndSave(int x1, int y1, int dx, int dy)
         return NULL;
     }
 
-    stbi_uc* p_target;
-    stbi_uc* p_source;
-
     RGBImageLock();
 
-    for (int x = x1; x < x2; ++x)
-        for (int y = y1; y < y2; ++y)
-        {
-            p_target = odata + (channels * ((y - y1) * dx + (x - x1)));
-            p_source = rgb_image + (channels * (y * width + x));
-            for (int _channels = 0; _channels < channels; ++_channels)
-                p_target[_channels] = p_source[_channels];
-        }
+    // Each source row segment [x1..x2) is contiguous, as is the matching destination row.
+    const size_t rowbytes = (size_t)dx * channels;
+    for (int y = y1; y < y2; ++y)
+    {
+        memcpy(odata + (size_t)channels * ((y - y1) * dx),
+               rgb_image + (size_t)channels * ((size_t)y * width + x1),
+               rowbytes);
+    }
 
     CImageBasis* rs = new CImageBasis("CutAndSave", odata, channels, dx, dy, bpp);
     RGBImageRelease();

@@ -67,6 +67,12 @@ public:
 
     ClassFlowAlignment(std::vector<ClassFlow *> *lfc);
 
+    // The annotated frame behind alg_roi.jpg is only re-encoded (a full-frame software JPEG encode)
+    // when something can consume it: a recent web request, a webhook image upload, SaveAllFiles, or
+    // the periodic max-age refresh. Call NotePreviewRequested() whenever alg_roi.jpg is served.
+    static void NotePreviewRequested(void);
+    static void SetPreviewAlways(bool _always);
+
     CAlignAndCutImage *GetAlignAndCutImage() { return AlignAndCutImage; };
 
     // Crop offset, consumed by the CNN flow to shift its ROI coordinates into crop space.

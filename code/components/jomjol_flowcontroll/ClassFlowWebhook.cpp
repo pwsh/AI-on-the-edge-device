@@ -114,6 +114,9 @@ bool ClassFlowWebhook::ReadParameter(FILE* pfile, string& aktparamgraph)
             {
                 this->WebhookUploadImg = 2;
             }
+            if (this->WebhookUploadImg != 0) {
+                ClassFlowAlignment::SetPreviewAlways(true);   // the upload needs a fresh annotated frame every round
+            }
         }
     }
     

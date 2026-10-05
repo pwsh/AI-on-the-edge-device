@@ -1,4 +1,6 @@
 #include <string>
+#include <algorithm>
+#include <cstring>
 #include "CRotateImage.h"
 #include "psram.h"
 
@@ -47,6 +49,11 @@ void CRotateImage::Rotate(float _angle, int _centerx, int _centery)
         org_height = height;
     }
 
+    // A zero-degree rotation without flip is the identity - nothing to resample.
+    if (!doflip && _angle == 0.0f) {
+        return;
+    }
+
     m[0][0] = cos(_angle);
     m[0][1] = sin(_angle);
     m[0][2] = (1 - m[0][0]) * x_center - m[0][1] * y_center;
@@ -79,8 +86,10 @@ void CRotateImage::Rotate(float _angle, int _centerx, int _centery)
 
     RGBImageLock();
 
-    for (int x = 0; x < width; ++x)
-        for (int y = 0; y < height; ++y)
+    // Row-major order (y outer): the target writes are sequential, which is far kinder to the
+    // PSRAM cache than walking down columns.
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
         {
             p_target = odata + (channels * (y * width + x));
 
@@ -181,8 +190,8 @@ void CRotateImage::RotateAntiAliasing(float _angle, int _centerx, int _centery)
 
     RGBImageLock();
 
-    for (int x = 0; x < width; ++x)
-        for (int y = 0; y < height; ++y)
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
         {
             p_target = odata + (channels * (y * width + x));
 
@@ -265,32 +274,30 @@ void CRotateImage::Translate(int _dx, int _dy)
 
 
 
-    int x_source, y_source;
-    stbi_uc* p_target;
-    stbi_uc* p_source;
-
     RGBImageLock();
 
-    for (int x = 0; x < width; ++x)
-        for (int y = 0; y < height; ++y)
+    // Row-wise: each target row is [255 fill | contiguous source span | 255 fill], so use memcpy/memset
+    // instead of a per-pixel, per-channel loop.
+    const int xlo = std::max(0, _dx);
+    const int xhi = std::min(width, width + _dx);
+    const size_t rowbytes = (size_t)width * channels;
+    for (int y = 0; y < height; ++y)
+    {
+        uint8_t* t_row = odata + (size_t)y * rowbytes;
+        const int y_source = y - _dy;
+
+        if ((y_source < 0) || (y_source >= height) || (xlo >= xhi))
         {
-            p_target = odata + (channels * (y * width + x));
-
-            x_source = x - _dx;
-            y_source = y - _dy;
-
-            if ((x_source >= 0) && (x_source < width) && (y_source >= 0) && (y_source < height))
-            {
-                p_source = rgb_image + (channels * (y_source * width + x_source));
-                for (int _channels = 0; _channels < channels; ++_channels)
-                    p_target[_channels] = p_source[_channels];
-            }
-            else
-            {
-                for (int _channels = 0; _channels < channels; ++_channels)
-                    p_target[_channels] = 255;
-            }
+            memset(t_row, 255, rowbytes);
+            continue;
         }
+
+        memset(t_row, 255, (size_t)xlo * channels);
+        memcpy(t_row + (size_t)xlo * channels,
+               rgb_image + ((size_t)y_source * width + (xlo - _dx)) * channels,
+               (size_t)(xhi - xlo) * channels);
+        memset(t_row + (size_t)xhi * channels, 255, (size_t)(width - xhi) * channels);
+    }
 
     //    memcpy(rgb_image, odata, memsize);
     memCopy(odata, rgb_image, memsize);

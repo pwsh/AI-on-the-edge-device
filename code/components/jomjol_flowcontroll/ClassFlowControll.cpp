@@ -979,6 +979,7 @@ esp_err_t ClassFlowControll::GetJPGStream(std::string _fn, httpd_req_t *req)
         }
     }
     else if (_fn == "alg_roi.jpg") {
+        ClassFlowAlignment::NotePreviewRequested();   // keep the annotated preview fresh while someone is looking
         #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG      // no CImageBasis needed to create alg_roi.jpg (ca. 790kB less RAM)
             if (aktstatus.find("Initialization (delayed)") != -1) {
                 std::string filename = "/sdcard/html/Flowstate_initialization_delayed.jpg";

@@ -18,6 +18,30 @@
 #include <cstdlib>      // strtol / strtof
 #include <cerrno>       // errno / ERANGE
 #include <cstdio>       // remove
+#include "esp_timer.h"
+
+#ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
+// Demand-driven alg_roi.jpg refresh (see ClassFlowAlignment::NotePreviewRequested)
+static const int64_t PREVIEW_ACTIVE_WINDOW_US = 120LL * 1000000;   // re-encode every round for 2 min after a request
+static const int64_t PREVIEW_MAX_AGE_US       = 300LL * 1000000;   // otherwise refresh at least every 5 min
+static volatile int64_t s_previewRequestedUs  = 0;
+static volatile int64_t s_lastPreviewEncodeUs = 0;
+static volatile bool    s_previewAlways       = false;
+#endif
+
+void ClassFlowAlignment::NotePreviewRequested(void)
+{
+#ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
+    s_previewRequestedUs = esp_timer_get_time();
+#endif
+}
+
+void ClassFlowAlignment::SetPreviewAlways(bool _always)
+{
+#ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
+    s_previewAlways = _always;
+#endif
+}
 
 static const char *TAG = "ALIGN";
 
@@ -38,6 +62,9 @@ void ClassFlowAlignment::SetInitialParameter(void)
     ImageTMP = NULL;
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
     AlgROI = (ImageData *)malloc_psram_heap(std::string(TAG) + "->AlgROI", sizeof(ImageData), MALLOC_CAP_8BIT | MALLOC_CAP_SPIRAM);
+    if (AlgROI) {
+        AlgROI->size = 0;   // malloc'd, not constructed: 0 = no preview encoded yet
+    }
 #endif
     previousElement = NULL;
     disabled = false;
@@ -312,9 +339,12 @@ bool ClassFlowAlignment::doFlow(string time)
         }
     }
 
-    if (AlgROI) {
-        ImageBasis->writeToMemoryAsJPG((ImageData *)AlgROI, 90);
-    }
+    // No pre-alignment encode here: it was always overwritten by the annotated encode below before
+    // anything could read it, and cost a full-frame software JPEG encode every round.
+    const int64_t nowUs = esp_timer_get_time();
+    const bool previewNeeded = s_previewAlways || SaveAllFiles || (AlgROI && AlgROI->size == 0) ||
+                               (s_previewRequestedUs != 0 && (nowUs - s_previewRequestedUs) < PREVIEW_ACTIVE_WINDOW_US) ||
+                               ((nowUs - s_lastPreviewEncodeUs) > PREVIEW_MAX_AGE_US);
 #endif
 
     if (!ImageTMP) {
@@ -411,7 +441,7 @@ bool ClassFlowAlignment::doFlow(string time)
     }
 
 #ifdef ALGROI_LOAD_FROM_MEM_AS_JPG
-    if (AlgROI) {
+    if (AlgROI && previewNeeded) {
         // no align algo if set to 3 = off => no draw ref //add disable aligment algo |01.2023
         // also skipped when the reference markers are unusable (DrawRef loads them -> would crash).
         if (refsUsable && References[0].alignment_algo != 3) {
@@ -421,6 +451,7 @@ bool ClassFlowAlignment::doFlow(string time)
         flowctrl.DigitDrawROI(ImageTMP);
         flowctrl.AnalogDrawROI(ImageTMP);
         ImageTMP->writeToMemoryAsJPG((ImageData *)AlgROI, 90);
+        s_lastPreviewEncodeUs = nowUs;
     }
 #endif
 
