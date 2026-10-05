@@ -1,3 +1,20 @@
+# [Unreleased]
+
+### Dependencies
+
+- **ESP-IDF 6.0.2 → 6.1** (stable). `dependencies.lock` now records `idf: 6.1.0`.
+
+### Performance
+
+- **The annotated `alg_roi.jpg` preview is now encoded on demand** instead of twice every round: the
+  redundant pre-alignment full-frame JPEG encode is gone, and the annotated encode only runs while the
+  preview was requested in the last 2 minutes, a webhook uploads the image, *SaveAllFiles* is on, or the
+  last encode is older than 5 minutes (so a first view after a long idle can show an older frame until
+  the next round).
+- **Faster alignment/ROI image handling**: the per-round translate step and the ROI crops now copy whole
+  rows (`memcpy`/`memset`) instead of per pixel, rotation walks the image row-wise, and a 0° rotation
+  is skipped. Output is byte-identical.
+
 # [17.4.3] - 2026-08-18
 
 ### General
