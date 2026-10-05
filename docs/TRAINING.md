@@ -206,11 +206,20 @@ Once `label_tool.py` has moved your images into `data/labeled/<type>/`, three co
 model running on the device. Everything below assumes the digit case; swap the type and section for
 analog.
 
-| Step | Command (from `tools/model-training`, venv active) | Produces |
-| --- | --- | --- |
-| 1. Train | `python train.py --type dig-class11 --name 2610 --data data/labeled/dig-class11 --balance` | `output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite` (+ float model, metrics, model card) |
-| 2. Check | `python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11` | accuracy + `false_predictions.csv` — compare with the same command on the stock model |
-| 3. Deploy | `python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite --device <ip> --section Digits --activate` | model in `/config/` on the device, `config.ini` pointing at it, device rebooted |
+Run these from `tools/model-training` with the venv active (one command per line — the comments
+say what each produces):
+
+```bash
+# 1. Train  -> output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite (+ float model, metrics, model card)
+python train.py --type dig-class11 --name 2610 --data data/labeled/dig-class11 --balance
+
+# 2. Check  -> accuracy + false_predictions.csv; run it on the stock model too and compare
+python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11
+python evaluate.py ../../sd-card/config/dig-class11_1910_s2_q.tflite        data/labeled/dig-class11
+
+# 3. Deploy -> model in /config/ on the device, config.ini pointing at it, device rebooted
+python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite --device <ip> --section Digits --activate
+```
 
 Then confirm on the device (§7). The three sections below explain each step.
 
