@@ -4,6 +4,21 @@
 
 - **ESP-IDF 6.0.2 → 6.1** (stable). `dependencies.lock` now records `idf: 6.1.0`.
 
+### Training your own models
+
+- **New guide `docs/TRAINING.md` and toolkit `tools/model-training/`**: collect → download → pre-label &
+  de-duplicate → keyboard labelling tool → train (dig-class11 / dig-class100 / ana-cont / ana-class100, upstream-
+  faithful architectures) → float + int8 export verified against the firmware's model contract → evaluate →
+  deploy. Local Python, CPU is enough, no Jupyter/Colab. Preprocessing ports the firmware's ROI resize bit-exactly.
+- **ROI image logging as a training-data collector**: filenames now carry the model's raw prediction *and*
+  confidence (`<label>_c<NN>_<number>_<roi>_<ts>.jpg`); new `ROIImagesMode = changed` saves a crop only when
+  the read changes or the model was unsure, instead of every round; `ROIImages` without a location no longer
+  writes to the SD root; `SaveAllFiles` keeps the raw crop and writes the resized input as `<name>_in.jpg`.
+- **Folder ZIP download streams** (store-only, ZIP64, central directory in PSRAM) instead of building the
+  archive on the SD card first — large image folders download immediately and need no free SD space.
+- **File browser: Delete on a folder / DELETE ALL** now remove sub-folders recursively (previously a no-op on
+  nested folders such as `/log/source/raw`); the SD root, `/config`, `/html` and `/firmware` stay protected.
+
 ### Performance
 
 - **The annotated `alg_roi.jpg` preview is now encoded on demand** instead of twice every round: the

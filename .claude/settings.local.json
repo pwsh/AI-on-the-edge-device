@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 --version)",
+      "Bash(python3 -m pip --version)",
+      "Bash(platformio --version)",
+      "Bash(git submodule *)",
+      "Bash(timeout 8 curl -sI https://pypi.org)",
+      "Bash(python3 -m venv .pio-venv)",
+      "Bash(.pio-venv/bin/pip install *)",
+      "Bash(.pio-venv/bin/pio --version)",
+      "Bash(PLATFORMIO_CORE_DIR=/home/eric/Documents/repos/AI-on-the-edge-device/.pio-core /home/eric/Documents/repos/AI-on-the-edge-device/.pio-venv/bin/pio run -e esp32cam)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.espressif.com)",
+      "WebFetch(domain:api.github.com)"
+    ]
+  }
+}

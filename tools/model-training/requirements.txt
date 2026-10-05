@@ -1,0 +1,9 @@
+# Model-training toolkit for AI-on-the-edge-device (Python 3.10 - 3.12).
+# Keras must stay <= 3.10 / TensorFlow <= 2.18: newer versions emit TFLite ops that the
+# TFLite-Micro op resolver in the firmware does not have.
+tensorflow-cpu==2.18.*
+keras>=3.5,<=3.10.0
+numpy>=1.26,<2.1          # TensorFlow 2.18 needs numpy < 2.1
+pillow>=10.0
+imagehash>=4.3
+requests>=2.31
