@@ -1209,6 +1209,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                         int64_t _ti = esp_timer_get_time();
                         GENERAL[n]->ROI[roi]->result_klasse = tflite->GetClassFromImageBasis(GENERAL[n]->ROI[roi]->image, &_digitConf);
                         _nnInferUs += esp_timer_get_time() - _ti; _nnInferCnt++;
+                        int _rawKlasse = GENERAL[n]->ROI[roi]->result_klasse;   // raw CNN argmax, before ConfReject/TemporalVote
                         GENERAL[n]->ROI[roi]->result_confidence = _digitConf;
                         ESP_LOGD(TAG, "General result (Digit)%i: %d (conf %.2f)", roi, GENERAL[n]->ROI[roi]->result_klasse, _digitConf);
 
@@ -1270,8 +1271,9 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                             // Unsure = below the history confidence floor, rejected/overridden (ConfReject,
                             // TemporalVote) or an "N" read - the samples most worth labelling by hand.
                             bool _unsure = (_digitConf < DigitHistoryConfidenceFloor) || _digitOverridden ||
-                                           (GENERAL[n]->ROI[roi]->result_klasse == 10);
-                            logRoiImage(logPath, _imagename, GENERAL[n]->ROI[roi], NULL, &GENERAL[n]->ROI[roi]->result_klasse,
+                                           (_rawKlasse == 10);
+                            // Training data: label = raw CNN class, not the ConfReject/TemporalVote result_klasse.
+                            logRoiImage(logPath, _imagename, GENERAL[n]->ROI[roi], NULL, &_rawKlasse,
                                         time, _digitConf, _unsure);
                         }
                     } break;

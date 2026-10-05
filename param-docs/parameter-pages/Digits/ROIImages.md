@@ -9,5 +9,8 @@ card and wear it over time).
 - **enabled / `true`**: ROI images are written to *ROI Images Location* (default `/log/digit`), kept for
   *ROI Images Retention* days.
 
+The label in the file name is the model's raw prediction and the `cNN` token its confidence; the device's
+displayed reading may differ because of confidence thresholds and temporal voting.
+
 This is the digit-ROI equivalent of [Save Raw Images](../TakeImage/RawImages.md). For back-compatibility,
 if `ROIImages` is not present at all, a configured *ROI Images Location* still enables saving.

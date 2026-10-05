@@ -16,6 +16,8 @@ Useful to turn ROI image logging into a low-effort collector of training data.
 Image file names start with the label, followed by the model confidence in percent (if known), e.g.
 `7_c93_main_dig3_20260105-142301.jpg` (`<label>_c<confidence>_<number>_<roi>_<timestamp>.jpg`).
 Digits that are reused by Fast Read / Predictive Read (no inference this round) are not saved.
+The label in the file name is the model's raw prediction and the `cNN` token its confidence; the device's
+displayed reading may differ because of confidence thresholds and temporal voting.
 
 !!! Note
     Images are saved in folders per day and hour below [ROI Images Location](ROIImagesLocation.md) and are

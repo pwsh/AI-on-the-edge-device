@@ -11,6 +11,8 @@ Useful to turn ROI image logging into a low-effort collector of training data.
 Image file names start with the reading, followed by the model confidence in percent (if known), e.g.
 `3.7_c96_ana1_20260105-142301.jpg` (`<reading>_c<confidence>_<roi>_<timestamp>.jpg`; with the 100-class
 analog models the number name precedes the ROI name, e.g. `3.7_c88_main_ana1_...`).
+The label in the file name is the model's raw prediction and the `cNN` token its confidence; the device's
+displayed reading may differ because of confidence thresholds and temporal voting.
 
 !!! Note
     Images are saved in folders per day and hour below [ROI Images Location](ROIImagesLocation.md) and are
