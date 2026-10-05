@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <string>
+#include <vector>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <sys/param.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
@@ -938,6 +941,77 @@ static esp_err_t upload_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* Directories that must survive a "delete" from the file browser: the SD root and the folders the firmware itself
+ * depends on. They are only ever cleared flat (files, no subfolders) and are never removed. */
+static bool is_protected_tree(const std::string& _path)
+{
+    std::string p = _path;
+    while (p.size() > 1 && p.back() == '/') {
+        p.pop_back();
+    }
+    return (p == "/sdcard") || (p == "/sdcard/config") || (p == "/sdcard/html") || (p == "/sdcard/firmware");
+}
+
+/* Recursively delete everything below _directory (and the directory itself if _removeSelf). Files are removed in
+ * small batches so memory use stays bounded for folders with thousands of files (e.g. the raw image log), and the
+ * HTTP task yields between batches. wlan.ini is never touched. Returns the number of files deleted. */
+static int delete_directory_recursive(const std::string& _directory, bool _removeSelf)
+{
+    const int BATCH = 64;
+    int deleted = 0;
+    struct dirent *entry;
+
+    // Pass 1..n: delete files in batches until a pass makes no progress
+    while (true) {
+        std::vector<std::string> batch;
+        DIR *dir = opendir(_directory.c_str());
+        if (!dir) {
+            LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to open dir: " + _directory);
+            return deleted;
+        }
+        while (((entry = readdir(dir)) != NULL) && ((int)batch.size() < BATCH)) {
+            if ((entry->d_type != DT_DIR) && (strcmp("wlan.ini", entry->d_name) != 0)) {
+                batch.push_back(_directory + "/" + std::string(entry->d_name));
+            }
+        }
+        closedir(dir);
+
+        int done = 0;
+        for (const std::string& f : batch) {
+            if (unlink(f.c_str()) == 0) {
+                done++;
+            }
+        }
+        deleted += done;
+        if (done == 0) {
+            break;
+        }
+        vTaskDelay(1);   // let other tasks (and the idle task / watchdog) run
+    }
+
+    // Sub-directories (typically few): collect, then recurse
+    std::vector<std::string> subdirs;
+    DIR *dir = opendir(_directory.c_str());
+    if (dir) {
+        while ((entry = readdir(dir)) != NULL) {
+            if ((entry->d_type == DT_DIR) && (strcmp(entry->d_name, ".") != 0) && (strcmp(entry->d_name, "..") != 0)) {
+                subdirs.push_back(_directory + "/" + std::string(entry->d_name));
+            }
+        }
+        closedir(dir);
+    }
+    for (const std::string& sd : subdirs) {
+        deleted += delete_directory_recursive(sd, true);
+    }
+
+    if (_removeSelf) {
+        if (rmdir(_directory.c_str()) != 0) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "Could not remove directory (not empty?): " + _directory);
+        }
+    }
+    return deleted;
+}
+
 /* Handler to delete a file from the server */
 static esp_err_t delete_post_handler(httpd_req_t *req)
 {
@@ -983,7 +1057,13 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
         zw = "/sdcard" + zw;
         ESP_LOGD(TAG, "Directory to delete: %s", zw.c_str());
 
-        delete_all_in_directory(zw);
+        if (is_protected_tree(zw)) {
+            delete_all_in_directory(zw);   // legacy flat behaviour: files only, keep system sub-folders
+        }
+        else {
+            int n = delete_directory_recursive(zw, false);   // contents incl. sub-folders, keep the folder itself
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Deleted contents of " + zw + " (" + std::to_string(n) + " files)");
+        }
 //        directory = std::string(filepath);
 //        directory = "/fileserver" + directory;
         ESP_LOGD(TAG, "Location after delete directory content: %s", directory.c_str());
@@ -1024,9 +1104,21 @@ static esp_err_t delete_post_handler(httpd_req_t *req)
             LogFile.WriteToFile(ESP_LOG_INFO, TAG, "File does not exist: " + string(filename));
         }
 
-        /* Delete file */
-        unlink(filepath);
-        LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "File deleted: " + string(filename));
+        if ((stat(filepath, &file_stat) == 0) && S_ISDIR(file_stat.st_mode)) {
+            /* A folder: remove it together with its contents (unlink() cannot delete directories) */
+            if (is_protected_tree(std::string(filepath))) {
+                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "Failed to delete protected directory : " + string(filename));
+                httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Not allowed to delete this directory");
+                return ESP_FAIL;
+            }
+            int n = delete_directory_recursive(std::string(filepath), true);
+            LogFile.WriteToFile(ESP_LOG_INFO, TAG, "Directory deleted: " + string(filename) + " (" + std::to_string(n) + " files)");
+        }
+        else {
+            /* Delete file */
+            unlink(filepath);
+            LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "File deleted: " + string(filename));
+        }
         ESP_LOGI(TAG, "File deletion completed");
 
         directory = std::string(filepath);
