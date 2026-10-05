@@ -200,6 +200,23 @@ improvement; a few hundred per class is better. Class balance matters more than 
 
 ---
 
+## After labelling: from images to a running model
+
+Once `label_tool.py` has moved your images into `data/labeled/<type>/`, three commands take you to a
+model running on the device. Everything below assumes the digit case; swap the type and section for
+analog.
+
+| Step | Command (from `tools/model-training`, venv active) | Produces |
+| --- | --- | --- |
+| 1. Train | `python train.py --type dig-class11 --name 2610 --data data/labeled/dig-class11 --balance` | `output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite` (+ float model, metrics, model card) |
+| 2. Check | `python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11` | accuracy + `false_predictions.csv` — compare with the same command on the stock model |
+| 3. Deploy | `python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite --device <ip> --section Digits --activate` | model in `/config/` on the device, `config.ini` pointing at it, device rebooted |
+
+Then confirm on the device (§7). The three sections below explain each step.
+
+`--name` is just the version tag in the file name (`2610` = October 2026 — any short string works; the
+device shows the file name, so pick something you'll recognise in the Model dropdown).
+
 ## 5. Train
 
 ```bash
@@ -207,6 +224,24 @@ python train.py --type dig-class11 --name 2610 \
                 --data data/labeled/dig-class11 /path/to/community/images
 #                     ^ your images          ^ optional extra folders, see below
 ```
+
+What you should see: a per-epoch progress line, then a summary like
+
+```
+Keras model, validation: accuracy 99.3 %
+Exporting float and int8 models (quantisation calibrated on 500 real images) ...
+dig-class11_2610_s2.tflite (112 KiB), validation: accuracy 99.3 %
+dig-class11_2610_s2_q.tflite (34 KiB), validation: accuracy 99.3 %
+Quantisation loss: +0.00 percentage points of accuracy
+3 wrong predictions (train + val) written to output/dig-class11_2610_s2/false_predictions.csv
+Wrote output/dig-class11_2610_s2/: ... metrics.json, model-card.md
+Deploy: python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite --device <ip> --activate
+```
+
+(numbers illustrative). Good = the `_q` accuracy within ~1 point of Keras and above the stock model's
+score on your images (§6). A `FIRMWARE CONTRACT VIOLATED` line means the file must not go on the
+device. If training stops after a handful of epochs with low accuracy, you have too few or badly
+balanced images — check the class counts printed at the start. **Use the `_q.tflite` on the device.**
 
 * Architectures, augmentation and export settings follow the upstream training notebooks
   (`dig-class11_…_s2`, `ana-cont_…_s2`, …), so results are directly comparable with the stock models.
@@ -258,24 +293,43 @@ python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite \
                  --device 10.0.42.12 --section Digits --activate
 ```
 
-* Uploads the file to `/config/` on the device (processing is paused for the upload).
-* `--activate` downloads `config.ini`, keeps a timestamped backup next to the script, rewrites the
-  `Model =` line of the chosen section, uploads it back and asks before rebooting.
+What it does, in order (it prints each step):
 
-Manual alternative: **System → File server → config → upload**, then **Configuration → Digits →
-Model**, select the file, save, reboot.
+1. Checks the model file against the firmware contract (same check as `train.py`).
+2. Pauses the device's processing.
+3. Uploads the model to `/config/<file>.tflite` and reads it back to verify it byte-for-byte.
+4. With `--activate`: downloads `config.ini`, saves a timestamped copy under `backups/`, rewrites the
+   `Model =` line of the chosen section, uploads it, reads it back and verifies it. If verification
+   fails it puts the original back and stops — it never reboots on an unverified config.
+5. Asks `Reboot the device now to load the new model? [y/N]` (`--yes` skips the question,
+   `--no-reboot` never reboots). Resumes processing either way.
 
-After the reboot check **Overview** and the **Recognition** page: every ROI should show the right
-digit with a high confidence bar. If a model is refused you'll see
-`tflite does not fit the firmware` in the log — see Troubleshooting.
+Without `--activate` only steps 1–3 happen: the file is on the device and you select it yourself under
+**Configuration → Digits → Model** (expert mode), **Save**, then **Reboot**.
+
+**Manual alternative** (no script): **System → File server → `config` → Upload** the `_q.tflite`, then
+**Configuration → Digits → Model** → pick it → **Save** → **Reboot**.
+
+**Confirm it worked** — after the reboot (about 30 s):
+
+* **Recognition** page: every ROI shows the expected digit with a high confidence bar.
+* **System → Log**: a line naming your model file at start-up and no `tflite does not fit the firmware`
+  error (that means the output size / input type is wrong — see Troubleshooting).
+* `http://<ip>/json`: `"error": "no error"` and a plausible `value` on the next round.
+
+**Roll back** if the reading is worse: **Configuration → Digits → Model** → select the previous file
+(the stock models are still in `/config/`) → Save → Reboot. Or re-upload the `config.ini` backup from
+`backups/` with the file server and reboot.
 
 ---
 
 ## 8. Iterate
 
 Leave `ROIImages = true`, `ROIImagesMode = changed` on. The device now saves exactly the reads it is
-unsure about with the **new** model. Every few weeks: `fetch_images.py` → `prelabel.py` →
-`label_tool.py` (now mostly `unsure/`) → `train.py` on everything → `evaluate.py` → `deploy.py`.
+unsure about with the **new** model. Every few weeks: `fetch_images.py` → `prelabel.py` (now with
+**your** model as `--model`) → `label_tool.py` (mostly `unsure/`) → `train.py` on everything in
+`data/labeled/` with a new `--name` → `evaluate.py` → `deploy.py`. Keep the labelled images — they
+are the asset; models are cheap to regenerate.
 
 ---
 
