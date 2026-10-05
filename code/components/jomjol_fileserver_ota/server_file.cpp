@@ -12,6 +12,7 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <new>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <sys/param.h>
@@ -28,6 +29,8 @@ extern "C" {
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
 
 #include "esp_vfs.h"
 #include <esp_spiffs.h>
@@ -341,16 +344,406 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath, const
 
 // ---- Download a directory (recursively) as a streamed ZIP ------------------
 // Triggered from the file-server directory listing ("Download folder as ZIP" button / per-folder
-// link -> GET /fileserver/<dir>/?zip=1). Reuses miniz (already linked for the OTA/backup paths): the
-// archive is built to a temp file on the SD card, streamed to the client as an attachment, then
-// removed - the same approach as the config backup (server_backup.cpp).
-#define ZIPDIR_TMP_PREFIX "/sdcard/ziptmp_dl"   // + "<seq>.zip" per request (unique so concurrent downloads don't collide)
-static uint32_t s_zipSeq = 0;
+// link -> GET /fileserver/<dir>/?zip=1). The archive is generated on the fly and streamed with chunked
+// transfer while the tree is walked: no temp file, no compression (method 0 "store" - the content is
+// mostly JPEGs anyway), no free SD space needed, and the client gets bytes from the first file on.
+// Each entry uses general-purpose flag bit 3 (sizes/CRC follow the data in a data descriptor), so the
+// file only has to be read once. The central directory records are collected in PSRAM in fixed-size
+// blocks (~46 bytes + name length per entry) and emitted at the end; ZIP64 records are used
+// automatically when an entry count / size / offset no longer fits the classic 16/32-bit fields.
+
+// ZIPSTREAM_CORE_BEGIN - pure, platform-independent store-only ZIP writer (also compiled by the host
+// test harness, so keep it free of ESP-IDF dependencies). The caller streams each entry's data bytes
+// itself (through the same output, in order) between zs_begin_entry() and zs_end_entry().
+struct ZipStreamWriter {
+    typedef bool (*WriteFn)(void *ctx, const uint8_t *data, size_t len);
+    typedef void *(*AllocFn)(size_t size);
+    typedef void (*FreeFn)(void *ptr);
+    struct CdBlock { uint8_t *data; uint32_t used; uint32_t cap; };
+
+    WriteFn write;
+    void *ctx;
+    AllocFn alloc;
+    FreeFn dealloc;
+    uint64_t offset;            // bytes emitted so far (header + data + descriptors)
+    uint64_t entries;           // completed entries (= central directory records)
+    uint64_t cdBytes;           // total size of the collected central directory
+    std::vector<CdBlock> cd;    // central directory records, in blocks from AllocFn (PSRAM on the device)
+
+    // Entry in progress
+    bool inEntry;
+    bool curZip64;              // local header carries a ZIP64 extra -> 8-byte data descriptor sizes
+    uint16_t curFlags, curTime, curDate;
+    uint64_t curLocalOffset;
+    std::string curName;
+
+    // ZIP64 thresholds; only lowered by the test harness to exercise the ZIP64 paths
+    uint64_t zip64SizeLimit;    // entry size  >= this -> ZIP64 (default 0xFFFFFFFF)
+    uint64_t zip64OffsetLimit;  // offset      >= this -> ZIP64 (default 0xFFFFFFFF)
+    uint64_t zip64CountLimit;   // entry count >= this -> ZIP64 EOCD (default 0xFFFF)
+};
+
+#define ZS_CD_BLOCK_SIZE  32768
+
+static inline void zs_put16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static inline void zs_put32(uint8_t *p, uint32_t v) { zs_put16(p, (uint16_t)v); zs_put16(p + 2, (uint16_t)(v >> 16)); }
+static inline void zs_put64(uint8_t *p, uint64_t v) { zs_put32(p, (uint32_t)v); zs_put32(p + 4, (uint32_t)(v >> 32)); }
+
+static void zs_init(ZipStreamWriter *z, ZipStreamWriter::WriteFn write, void *ctx,
+                    ZipStreamWriter::AllocFn alloc, ZipStreamWriter::FreeFn dealloc)
+{
+    z->write = write;
+    z->ctx = ctx;
+    z->alloc = alloc;
+    z->dealloc = dealloc;
+    z->offset = 0;
+    z->entries = 0;
+    z->cdBytes = 0;
+    z->cd.clear();
+    z->inEntry = false;
+    z->curZip64 = false;
+    z->curFlags = z->curTime = z->curDate = 0;
+    z->curLocalOffset = 0;
+    z->curName.clear();
+    z->zip64SizeLimit = 0xFFFFFFFFull;
+    z->zip64OffsetLimit = 0xFFFFFFFFull;
+    z->zip64CountLimit = 0xFFFFull;
+}
+
+// Releases the central directory blocks (safe to call more than once / after a failure).
+static void zs_free(ZipStreamWriter *z)
+{
+    for (size_t i = 0; i < z->cd.size(); i++) {
+        z->dealloc(z->cd[i].data);
+    }
+    z->cd.clear();
+    std::vector<ZipStreamWriter::CdBlock>().swap(z->cd);
+    std::string().swap(z->curName);
+}
+
+static bool zs_emit(ZipStreamWriter *z, const uint8_t *data, size_t len)
+{
+    if (!z->write(z->ctx, data, len)) {
+        return false;
+    }
+    z->offset += len;
+    return true;
+}
+
+// Reserve len bytes at the end of the central directory (new block when the current one is full).
+static uint8_t *zs_cd_reserve(ZipStreamWriter *z, size_t len)
+{
+    if (z->cd.empty() || (z->cd.back().cap - z->cd.back().used) < len) {
+        size_t cap = (len > ZS_CD_BLOCK_SIZE) ? len : ZS_CD_BLOCK_SIZE;
+        uint8_t *p = (uint8_t *)z->alloc(cap);
+        if (!p) {
+            return NULL;
+        }
+        ZipStreamWriter::CdBlock b = { p, 0, (uint32_t)cap };
+        z->cd.push_back(b);
+    }
+    ZipStreamWriter::CdBlock &b = z->cd.back();
+    uint8_t *p = b.data + b.used;
+    b.used += (uint32_t)len;
+    z->cdBytes += len;
+    return p;
+}
+
+// Emit the local file header. sizeHint is the expected entry size (stat), only used to decide
+// whether the entry needs ZIP64 (8-byte sizes in the data descriptor).
+static bool zs_begin_entry(ZipStreamWriter *z, const char *name, uint64_t sizeHint, uint16_t dosTime, uint16_t dosDate)
+{
+    size_t nameLen = strlen(name);
+    if (z->inEntry || nameLen == 0 || nameLen > 0xFFFF) {
+        return false;
+    }
+
+    uint16_t flags = 0x0008;                                    // bit 3: CRC/sizes in data descriptor
+    for (size_t i = 0; i < nameLen; i++) {
+        if ((uint8_t)name[i] >= 0x80) { flags |= 0x0800; break; }   // bit 11: name is UTF-8
+    }
+    z->curZip64 = (sizeHint >= z->zip64SizeLimit);
+    z->curFlags = flags;
+    z->curTime = dosTime;
+    z->curDate = dosDate;
+    z->curLocalOffset = z->offset;
+    z->curName.assign(name, nameLen);
+
+    uint8_t h[30 + 20];
+    zs_put32(h + 0, 0x04034b50);                                // local file header signature
+    zs_put16(h + 4, z->curZip64 ? 45 : 20);                     // version needed to extract
+    zs_put16(h + 6, flags);
+    zs_put16(h + 8, 0);                                         // method 0 = store
+    zs_put16(h + 10, dosTime);
+    zs_put16(h + 12, dosDate);
+    zs_put32(h + 14, 0);                                        // CRC-32 (in data descriptor)
+    zs_put32(h + 18, z->curZip64 ? 0xFFFFFFFF : 0);             // compressed size
+    zs_put32(h + 22, z->curZip64 ? 0xFFFFFFFF : 0);             // uncompressed size
+    zs_put16(h + 26, (uint16_t)nameLen);
+    zs_put16(h + 28, z->curZip64 ? 20 : 0);                     // extra field length
+    size_t extraLen = 0;
+    if (z->curZip64) {                                          // ZIP64 extra: sizes (0, real ones follow)
+        zs_put16(h + 30, 0x0001);
+        zs_put16(h + 32, 16);
+        zs_put64(h + 34, 0);
+        zs_put64(h + 42, 0);
+        extraLen = 20;
+    }
+    if (!zs_emit(z, h, 30) || !zs_emit(z, (const uint8_t *)name, nameLen) ||
+        (extraLen && !zs_emit(z, h + 30, extraLen))) {
+        return false;
+    }
+    z->inEntry = true;
+    return true;
+}
+
+// Finish the entry: the caller has already sent exactly `size` data bytes (CRC-32 `crc`) through the
+// writer's output. Emits the data descriptor and records the central directory entry.
+static bool zs_end_entry(ZipStreamWriter *z, uint32_t crc, uint64_t size)
+{
+    if (!z->inEntry) {
+        return false;
+    }
+    z->inEntry = false;
+    z->offset += size;                                          // data bytes went out via the caller
+
+    uint8_t d[24];
+    size_t dLen;
+    zs_put32(d + 0, 0x08074b50);                                // data descriptor signature
+    zs_put32(d + 4, crc);
+    if (z->curZip64) {
+        zs_put64(d + 8, size);                                  // compressed size (store: = size)
+        zs_put64(d + 16, size);
+        dLen = 24;
+    } else {
+        zs_put32(d + 8, (uint32_t)size);
+        zs_put32(d + 12, (uint32_t)size);
+        dLen = 16;
+    }
+    if (!zs_emit(z, d, dLen)) {
+        return false;
+    }
+
+    // Central directory record (+ ZIP64 extra holding only the fields that overflow)
+    bool bigSize = z->curZip64 || (size >= z->zip64SizeLimit) || (size >= 0xFFFFFFFFull);
+    bool bigOffs = (z->curLocalOffset >= z->zip64OffsetLimit) || (z->curLocalOffset >= 0xFFFFFFFFull);
+    uint16_t extraLen = (bigSize || bigOffs) ? (uint16_t)(4 + (bigSize ? 16 : 0) + (bigOffs ? 8 : 0)) : 0;
+    size_t nameLen = z->curName.size();
+    uint8_t *r = zs_cd_reserve(z, 46 + nameLen + extraLen);
+    if (!r) {
+        return false;
+    }
+    uint16_t ver = extraLen ? 45 : 20;
+    zs_put32(r + 0, 0x02014b50);                                // central file header signature
+    zs_put16(r + 4, ver);                                       // version made by (MS-DOS host)
+    zs_put16(r + 6, ver);                                       // version needed to extract
+    zs_put16(r + 8, z->curFlags);
+    zs_put16(r + 10, 0);                                        // method 0 = store
+    zs_put16(r + 12, z->curTime);
+    zs_put16(r + 14, z->curDate);
+    zs_put32(r + 16, crc);
+    zs_put32(r + 20, bigSize ? 0xFFFFFFFF : (uint32_t)size);    // compressed size
+    zs_put32(r + 24, bigSize ? 0xFFFFFFFF : (uint32_t)size);    // uncompressed size
+    zs_put16(r + 28, (uint16_t)nameLen);
+    zs_put16(r + 30, extraLen);
+    zs_put16(r + 32, 0);                                        // comment length
+    zs_put16(r + 34, 0);                                        // disk number start
+    zs_put16(r + 36, 0);                                        // internal attributes
+    zs_put32(r + 38, 0);                                        // external attributes
+    zs_put32(r + 42, bigOffs ? 0xFFFFFFFF : (uint32_t)z->curLocalOffset);
+    memcpy(r + 46, z->curName.data(), nameLen);
+    if (extraLen) {
+        uint8_t *x = r + 46 + nameLen;
+        zs_put16(x, 0x0001);                                    // ZIP64 extended information
+        zs_put16(x + 2, (uint16_t)(extraLen - 4));
+        x += 4;
+        if (bigSize) { zs_put64(x, size); zs_put64(x + 8, size); x += 16; }
+        if (bigOffs) { zs_put64(x, z->curLocalOffset); }
+    }
+    z->entries++;
+    return true;
+}
+
+// Emit the central directory, the ZIP64 end records (when needed) and the end of central directory.
+static bool zs_finish(ZipStreamWriter *z)
+{
+    if (z->inEntry) {
+        return false;
+    }
+    uint64_t cdOffset = z->offset;
+    for (size_t i = 0; i < z->cd.size(); i++) {
+        if (!zs_emit(z, z->cd[i].data, z->cd[i].used)) {
+            return false;
+        }
+    }
+
+    bool zip64 = (z->entries >= z->zip64CountLimit) || (z->entries >= 0xFFFFull) ||
+                 (cdOffset >= z->zip64OffsetLimit) || (cdOffset >= 0xFFFFFFFFull) ||
+                 (z->cdBytes >= 0xFFFFFFFFull);
+    if (zip64) {
+        uint64_t eocd64Offset = z->offset;
+        uint8_t e[56 + 20];
+        zs_put32(e + 0, 0x06064b50);                            // ZIP64 end of central directory record
+        zs_put64(e + 4, 44);                                    // size of the remaining record
+        zs_put16(e + 12, 45);                                   // version made by
+        zs_put16(e + 14, 45);                                   // version needed
+        zs_put32(e + 16, 0);                                    // this disk
+        zs_put32(e + 20, 0);                                    // disk with central directory
+        zs_put64(e + 24, z->entries);                           // entries on this disk
+        zs_put64(e + 32, z->entries);                           // total entries
+        zs_put64(e + 40, z->cdBytes);
+        zs_put64(e + 48, cdOffset);
+        zs_put32(e + 56, 0x07064b50);                           // ZIP64 end of central directory locator
+        zs_put32(e + 60, 0);
+        zs_put64(e + 64, eocd64Offset);
+        zs_put32(e + 72, 1);                                    // total number of disks
+        if (!zs_emit(z, e, sizeof(e))) {
+            return false;
+        }
+    }
+
+    uint8_t e[22];
+    uint16_t cnt = (z->entries >= 0xFFFFull) ? 0xFFFF : (uint16_t)z->entries;
+    zs_put32(e + 0, 0x06054b50);                                // end of central directory record
+    zs_put16(e + 4, 0);
+    zs_put16(e + 6, 0);
+    zs_put16(e + 8, cnt);
+    zs_put16(e + 10, cnt);
+    zs_put32(e + 12, (z->cdBytes >= 0xFFFFFFFFull) ? 0xFFFFFFFF : (uint32_t)z->cdBytes);
+    zs_put32(e + 16, (cdOffset >= 0xFFFFFFFFull) ? 0xFFFFFFFF : (uint32_t)cdOffset);
+    zs_put16(e + 20, 0);                                        // comment length
+    return zs_emit(z, e, sizeof(e));
+}
+// ZIPSTREAM_CORE_END
+
+// ---- ESP side: buffered chunked output + directory walk --------------------
+#define ZIPDIR_OUT_BUFSIZE  8192        // one HTTP chunk; headers/descriptors are coalesced with file data
+
+struct ZipHttpOut {
+    httpd_req_t *req;
+    uint8_t *buf;
+    size_t len;
+    bool failed;
+};
+
+static bool zipout_flush(ZipHttpOut *o)
+{
+    if (o->failed) {
+        return false;
+    }
+    if (o->len > 0) {
+        if (httpd_resp_send_chunk(o->req, (const char *)o->buf, o->len) != ESP_OK) {
+            o->failed = true;
+            return false;
+        }
+        o->len = 0;
+    }
+    return true;
+}
+
+static bool zipout_write(void *ctx, const uint8_t *data, size_t len)
+{
+    ZipHttpOut *o = (ZipHttpOut *)ctx;
+    while (len > 0) {
+        if (o->failed) {
+            return false;
+        }
+        size_t n = MIN(len, ZIPDIR_OUT_BUFSIZE - o->len);
+        memcpy(o->buf + o->len, data, n);
+        o->len += n;
+        data += n;
+        len -= n;
+        if (o->len == ZIPDIR_OUT_BUFSIZE && !zipout_flush(o)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Central directory blocks: PSRAM (8k entries ~ 700 KB), internal RAM only as a fallback.
+static void *zipdir_cd_alloc(size_t size)
+{
+    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : malloc(size);
+}
+
+static void zipdir_cd_free(void *ptr)
+{
+    free(ptr);
+}
+
+struct ZipDirJob {
+    ZipStreamWriter zw;
+    ZipHttpOut out;
+    uint32_t files;
+    uint64_t dataBytes;
+};
+
+// DOS date/time from a file's mtime; 1980-01-01 00:00 when unknown / out of range.
+static void zipdir_dos_datetime(time_t t, uint16_t *dosTime, uint16_t *dosDate)
+{
+    struct tm tm;
+    if (localtime_r(&t, &tm) != NULL && tm.tm_year >= 80 && tm.tm_year <= 207) {
+        *dosTime = (uint16_t)((tm.tm_hour << 11) | (tm.tm_min << 5) | (tm.tm_sec / 2));
+        *dosDate = (uint16_t)(((tm.tm_year - 80) << 9) | ((tm.tm_mon + 1) << 5) | tm.tm_mday);
+    } else {
+        *dosTime = 0;
+        *dosDate = (uint16_t)((1 << 5) | 1);
+    }
+}
+
+// Stream one file as a stored entry. Returns false only when the response is dead (send/ memory
+// failure); an unreadable file is skipped with a warning.
+static bool zipdir_add_file(ZipDirJob *job, const std::string &src, const std::string &arc, const struct stat &st)
+{
+    FILE *f = fopen(src.c_str(), "rb");
+    if (!f) {
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "zipdir: cannot open " + src + ", skipped");
+        return true;
+    }
+    uint16_t dosTime, dosDate;
+    zipdir_dos_datetime(st.st_mtime, &dosTime, &dosDate);
+    uint64_t expected = (uint64_t)st.st_size;
+    if (!zs_begin_entry(&job->zw, arc.c_str(), expected, dosTime, dosDate)) {
+        fclose(f);
+        return false;
+    }
+
+    // Read straight into the free tail of the output buffer, so file data and the surrounding
+    // headers leave in full-size chunks. Send at most the stat() size (snapshot of a growing log).
+    ZipHttpOut *o = &job->out;
+    uint32_t crc = MZ_CRC32_INIT;
+    uint64_t sent = 0;
+    while (sent < expected) {
+        if (o->len == ZIPDIR_OUT_BUFSIZE && !zipout_flush(o)) {
+            break;
+        }
+        size_t want = (size_t)MIN((uint64_t)(ZIPDIR_OUT_BUFSIZE - o->len), expected - sent);
+        size_t n = fread(o->buf + o->len, 1, want, f);
+        if (n == 0) {
+            LogFile.WriteToFile(ESP_LOG_WARN, TAG, "zipdir: short read on " + src);
+            break;
+        }
+        crc = (uint32_t)mz_crc32(crc, o->buf + o->len, n);
+        o->len += n;
+        sent += n;
+    }
+    fclose(f);
+    if (o->failed || !zs_end_entry(&job->zw, crc, sent)) {
+        return false;
+    }
+    job->files++;
+    job->dataBytes += sent;
+    if ((job->files % 16) == 0) {
+        vTaskDelay(1);   // let other tasks (and the idle task / watchdog) run
+    }
+    return true;
+}
 
 // Recursively add every file under fsDir into the archive under arcPrefix. wlan.ini (Wi-Fi
-// credentials) and our own in-progress temp archive are skipped; a missing dir adds nothing (not an
-// error). Returns false only on a real write failure.
-static bool zipdir_add_recursive(mz_zip_archive *zip, const std::string &fsDir, const std::string &arcPrefix)
+// credentials) is skipped; a missing dir adds nothing (not an error). Returns false when the
+// stream has failed (client gone / out of memory).
+static bool zipdir_add_recursive(ZipDirJob *job, const std::string &fsDir, const std::string &arcPrefix)
 {
     DIR *d = opendir(fsDir.c_str());
     if (!d) return true;
@@ -360,25 +753,21 @@ static bool zipdir_add_recursive(mz_zip_archive *zip, const std::string &fsDir, 
         std::string name = e->d_name;
         if (name == "." || name == "..") continue;
         if (toUpper(name) == "WLAN.INI") continue;              // never expose Wi-Fi credentials (any case)
-        if (name.rfind("ziptmp_dl", 0) == 0) continue;          // don't archive any in-progress temp archive
         std::string src = fsDir + "/" + name;
         struct stat st;
         if (stat(src.c_str(), &st) != 0) continue;
         std::string arc = arcPrefix + name;
         if (S_ISDIR(st.st_mode)) {
-            if (!zipdir_add_recursive(zip, src, arc + "/")) { ok = false; break; }
+            if (!zipdir_add_recursive(job, src, arc + "/")) { ok = false; break; }
         } else {
-            if (!mz_zip_writer_add_file(zip, arc.c_str(), src.c_str(), NULL, 0, MZ_BEST_SPEED)) {
-                LogFile.WriteToFile(ESP_LOG_ERROR, TAG, "zipdir: failed to add " + src);
-                ok = false; break;
-            }
+            if (!zipdir_add_file(job, src, arc, st)) { ok = false; break; }
         }
     }
     closedir(d);
     return ok;
 }
 
-// Build a zip of dirpath (recursively, incl. subfolders) and stream it as "<foldername>.zip".
+// Stream a zip of dirpath (recursively, incl. subfolders) as "<foldername>.zip".
 static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const char *uripath)
 {
     // Download name from the last path segment: "/log/data/" -> "data.zip"; root "/" -> "sdcard.zip".
@@ -393,40 +782,26 @@ static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const
     std::string root = dirpath;
     while (root.size() > 1 && root.back() == '/') root.pop_back();
 
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: building " + zipname + " from " + root);
-
-    // Per-request temp file so two concurrent downloads can't clobber each other's archive (the walk
-    // skips any "ziptmp_dl*" entry, so a temp left under the zipped tree is never archived).
-    std::string tmpPath = std::string(ZIPDIR_TMP_PREFIX) +
-                          std::to_string((unsigned)__atomic_fetch_add(&s_zipSeq, 1, __ATOMIC_RELAXED)) + ".zip";
-
-    mz_zip_archive zip;
-    memset(&zip, 0, sizeof(zip));
-    remove(tmpPath.c_str());
-    if (!mz_zip_writer_init_file(&zip, tmpPath.c_str(), 0)) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Could not create zip on SD card");
+    // Allocate everything BEFORE staging any response header, so a failure here returns a real 500
+    // instead of a 200 with zip headers and an empty body.
+    ZipDirJob *job = new (std::nothrow) ZipDirJob();
+    uint8_t *buf = (uint8_t *) malloc(ZIPDIR_OUT_BUFSIZE);
+    if (!job || !buf) {
+        delete job;
+        free(buf);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
         return ESP_FAIL;
     }
-    bool ok = zipdir_add_recursive(&zip, root, "");
-    if (ok) ok = mz_zip_writer_finalize_archive(&zip);
-    mz_zip_writer_end(&zip);
-    if (!ok) {
-        remove(tmpPath.c_str());
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build zip");
-        return ESP_FAIL;
-    }
+    job->out.req = req;
+    job->out.buf = buf;
+    job->out.len = 0;
+    job->out.failed = false;
+    job->files = 0;
+    job->dataBytes = 0;
+    zs_init(&job->zw, zipout_write, &job->out, zipdir_cd_alloc, zipdir_cd_free);
 
-    // Allocate the stream buffer and open the file BEFORE staging any response header, so a failure
-    // here returns a real 500 instead of a 200 with zip headers and an empty body.
-    char *buf = (char *) malloc(8192);
-    FILE *f = buf ? fopen(tmpPath.c_str(), "rb") : NULL;
-    if (!buf || !f) {
-        if (buf) free(buf);
-        if (f) fclose(f);
-        remove(tmpPath.c_str());
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Zip open failed");
-        return ESP_FAIL;
-    }
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: streaming " + zipname + " from " + root);
+    int64_t t0 = esp_timer_get_time();
 
     char dispo[160];
     snprintf(dispo, sizeof(dispo), "attachment; filename=\"%s\"", zipname.c_str());
@@ -435,17 +810,29 @@ static esp_err_t zip_dir_and_stream(httpd_req_t *req, const char *dirpath, const
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
-    esp_err_t res = ESP_OK;
-    size_t n;
-    while ((n = fread(buf, 1, 8192, f)) > 0) {
-        if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) { res = ESP_FAIL; break; }
-    }
+    bool ok = zipdir_add_recursive(job, root, "");
+    if (ok) ok = zs_finish(&job->zw) && zipout_flush(&job->out);
+
+    uint32_t files = job->files;
+    uint64_t total = job->zw.offset;
+    zs_free(&job->zw);
     free(buf);
-    fclose(f);
+    delete job;
+
+    int64_t ms = (esp_timer_get_time() - t0) / 1000;
+    char secs[16];
+    snprintf(secs, sizeof(secs), "%lld.%01lld", (long long)(ms / 1000), (long long)((ms % 1000) / 100));
+    if (!ok) {
+        // Headers (and part of the body) are already out: no error page possible. Returning ESP_FAIL
+        // makes httpd close the socket, so the client sees a truncated download instead of a "valid" zip.
+        LogFile.WriteToFile(ESP_LOG_WARN, TAG, "zipdir: " + zipname + " aborted after " + std::to_string(files) +
+                            " files, " + std::to_string(total) + " bytes, " + secs + " s (client gone or out of memory)");
+        return ESP_FAIL;
+    }
     httpd_resp_send_chunk(req, NULL, 0);   // signal end of response
-    remove(tmpPath.c_str());
-    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: sent " + zipname);
-    return res;
+    LogFile.WriteToFile(ESP_LOG_INFO, TAG, "zipdir: sent " + zipname + ": " + std::to_string(files) + " files, " +
+                        std::to_string(total) + " bytes in " + secs + " s");
+    return ESP_OK;
 }
 
 static esp_err_t logfileact_get_full_handler(httpd_req_t *req) {
