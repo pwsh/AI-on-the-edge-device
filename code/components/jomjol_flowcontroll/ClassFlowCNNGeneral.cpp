@@ -103,6 +103,28 @@ void ClassFlowCNNGeneral::fastReadUpdateCache(roi *r, int klasse, float value) {
     r->fastCacheValid = true;
 }
 
+// ROI image log (training-data collector). "all": every inferred ROI each round (legacy behaviour).
+// "changed": only when the label differs from the last label SAVED for this ROI (first round after
+// boot always saves, lastSavedLabel starts empty) or the read is unsure - so a static meter writes
+// almost nothing, while every transition and every doubtful read is still captured.
+void ClassFlowCNNGeneral::logRoiImage(const string &logPath, const string &imagename, roi *r, float *resultFloat, int *resultInt,
+                                      const string &time, float conf, bool unsure, bool applySelect) {
+    if (!isLogImage || (r == NULL) || (r->image_org == NULL)) {
+        return;
+    }
+    if (applySelect && isLogImageSelect && (LogImageSelect.find(r->name) == std::string::npos)) {
+        return;
+    }
+
+    string label = FormatImageLabel(resultFloat, resultInt);
+    if (roiImagesOnlyChanged && !unsure && !r->lastSavedLabel.empty() && (label == r->lastSavedLabel)) {
+        return;
+    }
+
+    LogImage(logPath, imagename, resultFloat, resultInt, time, r->image_org, conf);
+    r->lastSavedLabel = label;
+}
+
 void ClassFlowCNNGeneral::AppendDigitMatrixJson(std::string &json) {
     if (CNNType != Digit) return;   // only the digit-class flow keeps a per-digit class matrix
     for (int s = 0; s < (int)GENERAL.size(); ++s) {
@@ -634,6 +656,10 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
         return true;
     }
 
+    // Remember which section this instance serves ([Analog] vs [Digit]/[Digits]) before aktparamgraph
+    // is reused as the line buffer below - it picks the default ROIImagesLocation.
+    bool isAnalogSection = (toUpper(aktparamgraph) == "[ANALOG]");
+
     // Master "ROIImages = true/false" toggle (mirrors RawImages in ClassFlowTakeImage): wins regardless
     // of line order. -1 = unset -> fall back to the legacy "a configured location enables saving".
     int roiImagesExplicit = -1;
@@ -657,6 +683,10 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
             if (isStringNumeric(splitted[1])) {
                 this->imagesRetention = std::stoi(splitted[1]);
             }
+        }
+
+        if ((toUpper(splitted[0]) == "ROIIMAGESMODE") && (splitted.size() > 1)) {
+            roiImagesOnlyChanged = (toUpper(splitted[1]) == "CHANGED");   // anything else = "all"
         }
 
         if ((toUpper(splitted[0]) == "MODEL") && (splitted.size() > 1)) {
@@ -727,6 +757,12 @@ bool ClassFlowCNNGeneral::ReadParameter(FILE* pfile, string& aktparamgraph) {
         if ((toUpper(splitted[0]) == "RESOLVEUNKNOWNDIGITS") && (splitted.size() > 1)) {
             ResolveUnknownEnabled = alphanumericToBoolean(splitted[1]);
         }
+    }
+
+    // ROIImages = true without ROIImagesLocation used to leave imagesLocation empty, so the dated
+    // folders were created at the SD root. Fall back to the standard per-section log folder.
+    if (this->imagesLocation.empty()) {
+        this->imagesLocation = isAnalogSection ? "/sdcard/log/analog" : "/sdcard/log/digit";
     }
 
     if (!getNetworkParameter()) {
@@ -896,11 +932,12 @@ bool ClassFlowCNNGeneral::doAlignAndCut(string time) {
             GENERAL[_ana]->ROI[i]->image_org->Resize(modelxsize, modelysize, GENERAL[_ana]->ROI[i]->image);
             _acResizeUs += esp_timer_get_time() - _rs0;
             if (SaveAllFiles) {
+                // Resized model input gets its own "_in" name so it no longer overwrites the raw crop saved above.
                 if (GENERAL[_ana]->name == "default") {
-                    GENERAL[_ana]->ROI[i]->image->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->ROI[i]->name + ".jpg"));
+                    GENERAL[_ana]->ROI[i]->image->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->ROI[i]->name + "_in.jpg"));
                 }
                 else {
-                    GENERAL[_ana]->ROI[i]->image->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->name + "_" + GENERAL[_ana]->ROI[i]->name + ".jpg"));
+                    GENERAL[_ana]->ROI[i]->image->SaveToFile(FormatFileName("/sdcard/img_tmp/" + GENERAL[_ana]->name + "_" + GENERAL[_ana]->ROI[i]->name + "_in.jpg"));
                 }
             } 
         }
@@ -1122,7 +1159,13 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                               
                         ESP_LOGD(TAG, "General result (Analog)%i - CCW: %d -  %f", roi, GENERAL[n]->ROI[roi]->CCW, GENERAL[n]->ROI[roi]->result_float);
                         if (isLogImage) {
-                            LogImage(logPath, GENERAL[n]->ROI[roi]->name, &GENERAL[n]->ROI[roi]->result_float, NULL, time, GENERAL[n]->ROI[roi]->image_org);
+                            // The (sin, cos)-style output pair has unit length on a clean pointer; its
+                            // magnitude is the cheapest confidence proxy for this model.
+                            float _anaConf = sqrtf(f1 * f1 + f2 * f2);
+                            if (_anaConf > 1.0f) _anaConf = 1.0f;
+                            // Name keeps its historic form (ROI name only, no number prefix, no LogImageSelect).
+                            logRoiImage(logPath, GENERAL[n]->ROI[roi]->name, GENERAL[n]->ROI[roi], &GENERAL[n]->ROI[roi]->result_float, NULL,
+                                        time, _anaConf, false, false);
                         }
                     } break;
 
@@ -1160,6 +1203,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         _digitsAnalyzed++;
                         float _digitConf = 1.0f;
+                        bool _digitOverridden = false;   // ConfReject / TemporalVote replaced the raw CNN class
                         GENERAL[n]->ROI[roi]->result_klasse = 0;
                         if (!ensureModel()) return false;   // lazy model load: only here, when a digit actually needs inference
                         int64_t _ti = esp_timer_get_time();
@@ -1179,6 +1223,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                                 std::to_string(GENERAL[n]->ROI[roi]->result_klasse) + " conf " + std::to_string(_digitConf) +
                                 " < " + std::to_string(DigitConfidenceThreshold) + " -> mark N");
                             GENERAL[n]->ROI[roi]->result_klasse = 10;   // 10 = "N"/unknown for the 11-class Digit model
+                            _digitOverridden = true;
                         }
 
                         // Record only confident, in-range reads into the per-digit matrix (never the
@@ -1202,6 +1247,7 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
                                     std::to_string(GENERAL[n]->ROI[roi]->result_klasse) + " (conf " + std::to_string(_digitConf) +
                                     ") -> stable history majority " + std::to_string(_maj));
                                 GENERAL[n]->ROI[roi]->result_klasse = _maj;
+                                _digitOverridden = true;
                             }
                         }
 
@@ -1221,14 +1267,12 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         if (isLogImage) {
                             string _imagename = GENERAL[n]->name +  "_" + GENERAL[n]->ROI[roi]->name;
-                            if (isLogImageSelect) {
-                                if (LogImageSelect.find(GENERAL[n]->ROI[roi]->name) != std::string::npos) {
-                                    LogImage(logPath, _imagename, NULL, &GENERAL[n]->ROI[roi]->result_klasse, time, GENERAL[n]->ROI[roi]->image_org);
-                                }
-                            }
-                            else {
-                                LogImage(logPath, _imagename, NULL, &GENERAL[n]->ROI[roi]->result_klasse, time, GENERAL[n]->ROI[roi]->image_org);
-                            }
+                            // Unsure = below the history confidence floor, rejected/overridden (ConfReject,
+                            // TemporalVote) or an "N" read - the samples most worth labelling by hand.
+                            bool _unsure = (_digitConf < DigitHistoryConfidenceFloor) || _digitOverridden ||
+                                           (GENERAL[n]->ROI[roi]->result_klasse == 10);
+                            logRoiImage(logPath, _imagename, GENERAL[n]->ROI[roi], NULL, &GENERAL[n]->ROI[roi]->result_klasse,
+                                        time, _digitConf, _unsure);
                         }
                     } break;
 
@@ -1297,14 +1341,11 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         if (isLogImage) {
                             string _imagename = GENERAL[n]->name +  "_" + GENERAL[n]->ROI[roi]->name;
-                            if (isLogImageSelect) {
-                                if (LogImageSelect.find(GENERAL[n]->ROI[roi]->name) != std::string::npos) {
-                                    LogImage(logPath, _imagename, &_result_save_file, NULL, time, GENERAL[n]->ROI[roi]->image_org);
-                                }
-                            }
-                            else {
-                                LogImage(logPath, _imagename, &_result_save_file, NULL, time, GENERAL[n]->ROI[roi]->image_org);
-                            }
+                            float _hybConf = _fit;
+                            if (_hybConf < 0.0f) _hybConf = 0.0f;
+                            if (_hybConf > 1.0f) _hybConf = 1.0f;
+                            logRoiImage(logPath, _imagename, GENERAL[n]->ROI[roi], &_result_save_file, NULL,
+                                        time, _hybConf, GENERAL[n]->ROI[roi]->isReject);
                         }
                     } break;
                 case Digit100:
@@ -1364,14 +1405,12 @@ bool ClassFlowCNNGeneral::doNeuralNetwork(string time) {
 
                         if (isLogImage) {
                             string _imagename = GENERAL[n]->name +  "_" + GENERAL[n]->ROI[roi]->name;
-                            if (isLogImageSelect) {
-                                if (LogImageSelect.find(GENERAL[n]->ROI[roi]->name) != std::string::npos) {
-                                    LogImage(logPath, _imagename, &_result_save_file, NULL, time, GENERAL[n]->ROI[roi]->image_org);
-                                }
-                            }
-                            else {
-                                LogImage(logPath, _imagename, &_result_save_file, NULL, time, GENERAL[n]->ROI[roi]->image_org);
-                            }
+                            // Normalised winning-class probability over the 100 outputs (output tensor is
+                            // still populated from the Invoke above; this is just one more pass over it).
+                            float _c100Conf = -1.0f;
+                            tflite->GetClassAndConfidence(&_c100Conf);
+                            logRoiImage(logPath, _imagename, GENERAL[n]->ROI[roi], &_result_save_file, NULL,
+                                        time, _c100Conf, false);
                         }
 
                     } break;

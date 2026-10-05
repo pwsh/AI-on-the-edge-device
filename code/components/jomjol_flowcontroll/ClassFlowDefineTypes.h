@@ -35,6 +35,10 @@ struct roi {
     // Rolling matrix of CONFIDENTLY-read class values for this digit (no inferred/"N" values). Used
     // to resolve unknown digits and shown on the overview matrix.
     predictive::DigitHistory hist;
+
+    // ROIImagesMode = changed: label of the last ROI image actually written to the SD card for this
+    // ROI. Empty = nothing saved yet since boot, so the first inferred round always saves.
+    string lastSavedLabel;
 };
 
 /**

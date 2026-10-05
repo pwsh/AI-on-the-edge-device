@@ -58,30 +58,48 @@ string ClassFlowImage::CreateLogFolder(string time) {
 	return logPath;
 }
 
-void ClassFlowImage::LogImage(string logPath, string name, float *resultFloat, int *resultInt, string time, CImageBasis *_img) {
-	if (!isLogImage)
-		return;
-	
-    
-	char buf[10];
+string ClassFlowImage::FormatImageLabel(float *resultFloat, int *resultInt) {
+	char buf[24];
 
 	if (resultFloat != NULL) {
         if (*resultFloat < 0)
-            sprintf(buf, "N.N_");
+            snprintf(buf, sizeof(buf), "N.N");
         else
         {
-            sprintf(buf, "%.1f_", *resultFloat);
-            if (strcmp(buf, "10.0_") == 0)
-                sprintf(buf, "0.0_");
+            snprintf(buf, sizeof(buf), "%.1f", *resultFloat);
+            if (strcmp(buf, "10.0") == 0)
+                snprintf(buf, sizeof(buf), "0.0");
         }
-            
+
 	} else if (resultInt != NULL) {
-		sprintf(buf, "%d_", *resultInt);
+		snprintf(buf, sizeof(buf), "%d", *resultInt);
 	} else {
 		buf[0] = '\0';
 	}
 
-	string nm = logPath + "/" + buf + name + "_" + time + ".jpg";
+	return string(buf);
+}
+
+void ClassFlowImage::LogImage(string logPath, string name, float *resultFloat, int *resultInt, string time, CImageBasis *_img, float conf) {
+	if (!isLogImage)
+		return;
+
+	// Filename: <label>_[c<NN>_]<name>_<time>.jpg. The label stays the FIRST '_'-separated token
+	// (training tools parse split('_')[0]); the optional confidence token follows it.
+	string prefix = FormatImageLabel(resultFloat, resultInt);
+	if (!prefix.empty()) {
+		prefix += "_";
+		if (conf >= 0) {
+			int pct = (int)(conf * 100.0f);
+			if (pct > 99) pct = 99;     // always exactly 2 digits
+			if (pct < 0) pct = 0;
+			char cbuf[8];
+			snprintf(cbuf, sizeof(cbuf), "c%02d_", pct);
+			prefix += cbuf;
+		}
+	}
+
+	string nm = logPath + "/" + prefix + name + "_" + time + ".jpg";
 	nm = FormatFileName(nm);
 	string output = "/sdcard/img_tmp/" + name + ".jpg";
 	output = FormatFileName(output);

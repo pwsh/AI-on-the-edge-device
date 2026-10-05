@@ -31,6 +31,9 @@ protected:
     int modelxsize, modelysize, modelchannel;
     bool isLogImageSelect;
     string LogImageSelect;
+    // ROIImagesMode: false = "all" (save every inferred ROI each round, default), true = "changed"
+    // (save only when the label differs from the last saved one for that ROI, or the read is unsure).
+    bool roiImagesOnlyChanged = false;
     ClassFlowAlignment* flowpostalignment;
 
     bool SaveAllFiles;
@@ -81,6 +84,11 @@ protected:
     bool isDigitalCNN();                       // true for Digit / Digit100
     int  fastReadMeanDiff(roi *r);             // mean abs diff of current cut vs cached buffer
     void fastReadUpdateCache(roi *r, int klasse, float value); // copy current cut + store result
+
+    // Save one ROI's raw crop (image_org) to the ROI image log, honouring LogImageSelect (when
+    // applySelect) and ROIImagesMode. conf < 0 = unknown (no "_cNN" filename token).
+    void logRoiImage(const string &logPath, const string &imagename, roi *r, float *resultFloat, int *resultInt,
+                     const string &time, float conf, bool unsure, bool applySelect = true);
 
     int PointerEvalAnalogNew(float zahl, int numeral_preceder);
     int PointerEvalAnalogToDigitNew(float zahl, float numeral_preceder,  int eval_predecessors, float AnalogToDigitTransitionStart);
