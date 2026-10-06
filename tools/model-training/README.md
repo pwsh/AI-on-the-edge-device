@@ -91,13 +91,18 @@ crops, writes `data/review/<type>/predictions.csv` and copies (`--move`: moves) 
 images to `data/review/<type>/confident/` or `unsure/` (`--threshold`, default 0.9),
 renamed to `<prediction>_c<confidence>_<hash>.jpg`. `--dedupe` drops near-duplicate
 images, the most common dataset problem (a meter that does not move produces thousands
-of identical crops).
+of identical crops). Images you have already handled are skipped by content hash, so
+re-running it with new images or a new model only shows new ones: anything in
+`data/labeled/<type>/` (`--labeled`), anything still in `data/review/<type>/` and anything
+deleted in `label_tool.py`; `--no-skip-handled` turns this off.
 
 **`label_tool.py`** is a small local web page for labelling with the keyboard: `0`-`9`
 and `n` (digits) or two digits like `3` `7` = 3.7 / `+` `-` / slider (class100 and
 analog), `space`/`enter` accepts the shown value, `d` deletes, arrow keys navigate,
 `u` undoes. Accepted images are moved to `data/labeled/<type>/<label>_<hash>.jpg`;
-"Accept all remaining with confidence >= X" accepts the easy ones in one go.
+"Accept all remaining with confidence >= X" accepts the easy ones in one go. `d` moves
+the image to `data/review/<type>/_trash/` (not deleted), so `prelabel.py` remembers it and
+does not offer it again (empty that folder to have them offered again).
 
 **`train.py`** trains `--type dig-class11 | dig-class100 | ana-cont | ana-class100`
 (`--size s0..s3` for `ana-cont`, `s2` otherwise) from one or more `--data` folders. It

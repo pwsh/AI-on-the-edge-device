@@ -170,7 +170,8 @@ class Progress:
 
 _XY_RE = re.compile(r"^(\d)\.(\d)")
 _CONF_RE = re.compile(r"^c(\d\d)$")
-_HASH_RE = re.compile(r"^[0-9a-f]{16}$")
+_HASH_RE = re.compile(r"^([0-9a-f]{16})(?:-\d+)?$")
+HASH_LEN = 16   # hex digits of the SHA-1 used in privacy-renamed file names
 
 
 def label_token(filename: str) -> str:
@@ -229,7 +230,7 @@ def label_to_class(value, kind: str) -> int:
     return int(round(float(value) * 10)) % 100
 
 
-def file_sha1(path, n: int = 16) -> str:
+def file_sha1(path, n: int = HASH_LEN) -> str:
     h = hashlib.sha1()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(1 << 16), b""):
@@ -238,9 +239,36 @@ def file_sha1(path, n: int = 16) -> str:
 
 
 def hash_from_name(filename: str):
-    """Return the 16-hex-digit content hash at the end of a privacy-renamed file, or None."""
-    last = Path(filename).stem.split("_")[-1]
-    return last if _HASH_RE.match(last) else None
+    """Return the 16-hex-digit content hash at the end of a privacy-renamed file, or None.
+
+    Handles both `<label>_<hash>.jpg` (labelled) and `<label>_c<NN>_<hash>.jpg` (review),
+    plus the `<hash>-<n>` suffix label_tool.py adds when a name already exists.
+    """
+    m = _HASH_RE.match(Path(filename).stem.split("_")[-1])
+    return m.group(1) if m else None
+
+
+def hashes_in(folder, exclude_trash: bool = False) -> set[str]:
+    """Content hashes encoded in the names of all images under a folder (recursive).
+
+    Unlike iter_images() this includes `_trash*` folders unless exclude_trash is set.
+    Files whose name carries no hash (e.g. community collections) are ignored.
+    """
+    folder = Path(folder)
+    if not folder.is_dir():
+        return set()
+    out = set()
+    for f in folder.rglob("*"):
+        rel = f.relative_to(folder).parts
+        if any(part.startswith(".") for part in rel):
+            continue
+        if exclude_trash and any(part.startswith("_trash") for part in rel):
+            continue
+        if f.is_file() and f.suffix.lower() in IMAGE_EXTENSIONS:
+            h = hash_from_name(f.name)
+            if h:
+                out.add(h)
+    return out
 
 
 def iter_images(paths, recursive: bool = True):

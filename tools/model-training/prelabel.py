@@ -12,6 +12,11 @@ The file is renamed to its content hash (first 16 hex digits of the SHA-1) - the
 privacy convention of the upstream community image collections - so neither the
 date nor the meter position leaks. Then open label_tool.py to confirm/correct.
 
+Images that were already handled are skipped (compared by content hash, so a new
+model with different predictions does not bring them back): anything in
+data/labeled/<type>/, anything still under data/review/<type>/, and anything deleted
+in label_tool.py (data/review/<type>/_trash/). --no-skip-handled turns this off.
+
 --dedupe drops near-duplicates (perceptual hash distance <= 2, compared only among
 images with the same predicted label): a meter that sits still for hours produces
 thousands of identical crops, which is the most common dataset problem.
@@ -31,7 +36,8 @@ import time
 from pathlib import Path
 
 from common import (DEFAULT_RESIZE, RESIZE_METHODS, TFLiteModel, dedupe_indices, die, file_sha1,
-                    fmt_duration, format_label, iter_images, load_images, log, phash_images)
+                    fmt_duration, format_label, hashes_in, iter_images, load_images, log,
+                    phash_images)
 
 
 def main() -> None:
@@ -42,6 +48,11 @@ def main() -> None:
     ap.add_argument("--input", nargs="+", required=True, help="crop files or folders (recursive)")
     ap.add_argument("--out", default="data/review",
                     help="output base folder (a sub-folder per model type is created)")
+    ap.add_argument("--labeled", default="data/labeled",
+                    help="labelled images base folder (label_tool.py --out); images already "
+                         "in <labeled>/<type>/ are skipped")
+    ap.add_argument("--no-skip-handled", action="store_true",
+                    help="also process images that are already labelled, in review or deleted")
     ap.add_argument("--threshold", type=float, default=0.9,
                     help="confidence at or above which an image goes to confident/")
     ap.add_argument("--dedupe", action="store_true", help="drop near-duplicate images")
@@ -67,6 +78,31 @@ def main() -> None:
     if not files:
         die("no images found")
 
+    out = Path(args.out) / mt.name
+    skipped = {"labeled": 0, "review": 0, "deleted": 0}
+    sha = [file_sha1(f) for f in files]
+    if not args.no_skip_handled:
+        labeled = hashes_in(Path(args.labeled) / mt.name)
+        deleted = hashes_in(out / "_trash")
+        review = hashes_in(out, exclude_trash=True)
+        keep_files = []
+        for f, h in zip(files, sha):
+            why = ("labeled" if h in labeled else "deleted" if h in deleted
+                   else "review" if h in review else None)
+            if why:
+                skipped[why] += 1
+            else:
+                keep_files.append((f, h))
+        files, sha = [f for f, _ in keep_files], [h for _, h in keep_files]
+        log(f"{len(files)} new, {sum(skipped.values())} already handled "
+            f"({skipped['labeled']} labelled, {skipped['review']} in review, "
+            f"{skipped['deleted']} deleted)")
+        if not files:
+            log(f"\nNothing new to pre-label: {skipped['labeled']} already labelled, "
+                f"{skipped['review']} already in review, {skipped['deleted']} deleted earlier "
+                f"({fmt_duration(time.time() - t0)})")
+            return
+
     log(f"{len(files)} images, resize method: {args.resize}")
     images = load_images(files, mt.height, mt.width, resize=args.resize, progress="loading")
     values, confs = model.predict(images, progress="predicting")
@@ -81,7 +117,6 @@ def main() -> None:
         log(f"Dedupe: {n_dup} of {len(files)} images are near-duplicates "
             f"({100 * n_dup / len(files):.1f}%); {len(keep)} unique images kept")
 
-    out = Path(args.out) / mt.name
     for sub in ("confident", "unsure"):
         (out / sub).mkdir(parents=True, exist_ok=True)
     csv_path = out / "predictions.csv"
@@ -96,7 +131,7 @@ def main() -> None:
             src = files[i]
             sub = "confident" if confs[i] >= args.threshold else "unsure"
             pct = min(99, int(confs[i] * 100))
-            dest = out / sub / f"{labels[i]}_c{pct:02d}_{file_sha1(src)}{src.suffix.lower()}"
+            dest = out / sub / f"{labels[i]}_c{pct:02d}_{sha[i]}{src.suffix.lower()}"
             if dest.exists():
                 counts["exists"] += 1
                 continue
@@ -107,7 +142,8 @@ def main() -> None:
                         Path(args.model).name, str(src)])
 
     log(f"\n{counts['confident']} confident (>= {args.threshold}), {counts['unsure']} unsure, "
-        f"{counts['exists']} already in {out}/")
+        f"{counts['exists']} already at the same name, {skipped['labeled']} already labelled, "
+        f"{skipped['review']} already in review, {skipped['deleted']} deleted earlier")
     if per_label:
         log("Predicted label distribution: " +
             ", ".join(f"{k}: {v}" for k, v in sorted(per_label.items())))

@@ -332,13 +332,68 @@ Without `--activate` only steps 1–3 happen: the file is on the device and you 
 
 ---
 
-## 8. Iterate
+## 8. Iterate: feed the low-confidence reads back into the model
 
-Leave `ROIImages = true`, `ROIImagesMode = changed` on. The device now saves exactly the reads it is
-unsure about with the **new** model. Every few weeks: `fetch_images.py` → `prelabel.py` (now with
-**your** model as `--model`) → `label_tool.py` (mostly `unsure/`) → `train.py` on everything in
-`data/labeled/` with a new `--name` → `evaluate.py` → `deploy.py`. Keep the labelled images — they
-are the asset; models are cheap to regenerate.
+With `ROIImages = true` and `ROIImagesMode = changed`, the device keeps writing crops to
+`/log/digit/<day>/<hour>/` — but only when a ROI's read **changes** or the model was **unsure**
+(confidence below 0.70, rejected, `N`, or overruled by the temporal vote). Each file name carries the
+raw prediction and its confidence (`3_c54_main_main8_<ts>.jpg`), so the unsure ones are easy to spot.
+
+### Track what the model is unsure about
+
+```bash
+cd tools/model-training && source .venv/bin/activate
+
+# pull only what's new since the last run (incremental; pauses processing meanwhile)
+python fetch_images.py --device 10.0.42.12 --pause
+
+# list this week's low-confidence reads (c00–c69) by ROI
+find data/device/10.0.42.12/log/digit -name '*_c[0-6][0-9]_*' -mtime -7 \
+  | sed -E 's#.*/[0-9N.]+_c[0-9]+_([a-z]+_[a-z0-9]+)_.*#\1#' | sort | uniq -c
+```
+
+A ROI that keeps appearing there is either showing a digit the model has few examples of, or its box
+has drifted — open a few of the files before blaming the model. On the device itself, the same
+information is on the **Recognition** page (confidence bar per ROI) and in `/json` (`confidence`).
+
+### Add them to the training set
+
+`prelabel.py` only surfaces images you haven't dealt with yet: anything already in `data/labeled/`,
+already in `data/review/`, or deleted in the label tool is skipped automatically, so the second pass
+is just the new material. Use **your** model as the pre-labeller now — the stock model's mistakes are
+exactly what you've fixed.
+
+```bash
+# 1. pre-label the new crops with the model that is on the device
+python prelabel.py --model output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite --dedupe \
+                   --input data/device/10.0.42.12/log/digit
+
+# 2. label — unsure/ first (that's the point of this loop), then bulk-accept confident/
+python label_tool.py --dir data/review/dig-class11
+```
+
+Label the unsure images with what they **really** show (`n` only for genuinely unreadable frames).
+Those few images are worth more than hundreds of confident ones.
+
+### Retrain and redeploy
+
+```bash
+# 3. retrain on everything labelled so far, with a new version tag
+python train.py --type dig-class11 --name 2611 --data data/labeled/dig-class11 --balance
+
+# 4. make sure it is at least as good as the model currently on the device
+python evaluate.py output/dig-class11_2611_s2/dig-class11_2611_s2_q.tflite data/labeled/dig-class11
+python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11
+
+# 5. deploy (uploads + verifies, rewrites config.ini with a backup, asks before rebooting)
+python deploy.py output/dig-class11_2611_s2/dig-class11_2611_s2_q.tflite \
+                 --device 10.0.42.12 --section Digits --activate
+```
+
+Then watch `/log/digit` over the following days: fewer `_c0x_`–`_c6x_` files for the digits you just
+added means the loop worked. Repeat whenever the find command above shows something new. Keep the
+labelled images — they are the asset; models are cheap to regenerate. Old model files can stay in
+`/config/` on the device as instant roll-back options (**Configuration → Digits → Model**).
 
 ---
 
