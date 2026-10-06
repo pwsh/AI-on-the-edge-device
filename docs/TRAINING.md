@@ -176,7 +176,10 @@ Open <http://127.0.0.1:8765>. The tool shows one crop at a time, enlarged, with 
 | `d` | delete (unusable image) |
 | `←` / `→` | previous / next |
 | `u` | undo |
-| *Accept all ≥ X %* button | bulk-accept the confident remainder |
+| *Accept all ≥ X %* button | bulk-accept the confident remainder (review mode only) |
+
+The same tool fixes labels **in place** when pointed at a labelled folder (`--dir data/labeled/<type>`,
+optionally `--from-csv <false_predictions.csv>` to see only the disagreements) — see §5 and §8.
 
 Labelled files are **moved** to `data/labeled/<type>/<label>_<hash>.jpg`. Do the `unsure/` folder by
 hand (those are the valuable ones); for `confident/`, skim a few pages and then bulk-accept.
@@ -251,6 +254,21 @@ Deploy: python deploy.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite
 score on your images (§6). A `FIRMWARE CONTRACT VIOLATED` line means the file must not go on the
 device. If training stops after a handful of epochs with low accuracy, you have too few or badly
 balanced images — check the class counts printed at the start. **Use the `_q.tflite` on the device.**
+
+**Fix wrong labels before you trust the numbers.** `false_predictions.csv` lists every image the model
+disagreed with (train + validation). A confident disagreement is usually a *labelling* mistake, not a
+model mistake. Open exactly those images in the label tool, which now works **in place** on the
+labelled folder (renames the file, keeps the hash):
+
+```bash
+python label_tool.py --dir data/labeled/dig-class11 \
+                     --from-csv output/dig-class11_2610_s2/false_predictions.csv
+```
+
+Each image shows its *current label* and "model said X (confidence)"; press the correct digit to
+change it, `Enter` to keep it, `d` if the crop is unusable. Then retrain with the same command — ten
+seconds — and the model card is clean. (`python label_tool.py --dir data/labeled/dig-class11` with no
+CSV walks the whole labelled set, useful for a periodic audit.)
 
 * Architectures, augmentation and export settings follow the upstream training notebooks
   (`dig-class11_…_s2`, `ana-cont_…_s2`, …), so results are directly comparable with the stock models.
@@ -375,17 +393,40 @@ python label_tool.py --dir data/review/dig-class11
 Label the unsure images with what they **really** show (`n` only for genuinely unreadable frames).
 Those few images are worth more than hundreds of confident ones.
 
+### Re-check the existing labels (manual relabel)
+
+The deployed model is the best detector of labelling mistakes in your *old* data: run it over the
+labelled set and open only the disagreements, in place.
+
+```bash
+# 3. where does the current model disagree with the labels?
+python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11
+#    -> eval/dig-class11_2610_s2_q/false_predictions.csv
+
+# 4. fix the labels that are actually wrong (renames in place; Enter keeps, digit changes, d trashes)
+python label_tool.py --dir data/labeled/dig-class11 \
+                     --from-csv eval/dig-class11_2610_s2_q/false_predictions.csv
+```
+
+Images where the *model* is wrong and the label is right need no action — they are what the retrain
+learns from. If nothing is listed, skip to the next step.
+
 ### Retrain and redeploy
 
 ```bash
-# 3. retrain on everything labelled so far, with a new version tag
+# 5. retrain on everything labelled so far, with a new version tag
 python train.py --type dig-class11 --name 2611 --data data/labeled/dig-class11 --balance
 
-# 4. make sure it is at least as good as the model currently on the device
+# 6. look at the new run's disagreements once more (should be few), fix any real label errors
+python label_tool.py --dir data/labeled/dig-class11 \
+                     --from-csv output/dig-class11_2611_s2/false_predictions.csv
+#    ... and re-run step 5 if you changed anything
+
+# 7. make sure it is at least as good as the model currently on the device
 python evaluate.py output/dig-class11_2611_s2/dig-class11_2611_s2_q.tflite data/labeled/dig-class11
 python evaluate.py output/dig-class11_2610_s2/dig-class11_2610_s2_q.tflite data/labeled/dig-class11
 
-# 5. deploy (uploads + verifies, rewrites config.ini with a backup, asks before rebooting)
+# 8. deploy (uploads + verifies, rewrites config.ini with a backup, asks before rebooting)
 python deploy.py output/dig-class11_2611_s2/dig-class11_2611_s2_q.tflite \
                  --device 10.0.42.12 --section Digits --activate
 ```

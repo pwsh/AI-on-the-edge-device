@@ -104,12 +104,31 @@ analog), `space`/`enter` accepts the shown value, `d` deletes, arrow keys naviga
 the image to `data/review/<type>/_trash/` (not deleted), so `prelabel.py` remembers it and
 does not offer it again (empty that folder to have them offered again).
 
+*Fixing wrong labels.* Point `--dir` at a labelled folder and `label_tool.py` works in
+place (relabel mode, automatic for `<label>_<hash>.jpg` names, or force it with
+`--relabel`): the page shows the *current label*, a different label renames the file
+in the same folder (`3_<hash>.jpg` -> `5_<hash>.jpg`, the hash is kept),
+`space`/`enter` keeps the current label, `d` moves the file to `_trash/` inside that
+folder (train.py ignores it) and `u` undoes. `--from-csv` only shows the images in a
+`false_predictions.csv` from `train.py` / `evaluate.py`, the most confident
+disagreements first (those are the likely label errors), with what the model said:
+
+```bash
+python label_tool.py --dir data/labeled/dig-class11 --from-csv output/<run>/false_predictions.csv
+python label_tool.py --dir data/labeled/dig-class11      # go through the whole folder
+```
+
+`--model <file.tflite>` additionally runs a model over the shown images and shows its
+reading as a hint (needs the packages from `requirements.txt`; everything else in
+`label_tool.py` runs on plain Python).
+
 **`train.py`** trains `--type dig-class11 | dig-class100 | ana-cont | ana-class100`
 (`--size s0..s3` for `ana-cont`, `s2` otherwise) from one or more `--data` folders. It
 removes duplicates, makes a stratified 80/20 split (`--val-split`), trains with
 augmentation and early stopping, and writes to `output/<type>_<name>_<size>/`: the float
 `.tflite`, the int8 `_q.tflite` (recommended for the device), `metrics.json`,
-`false_predictions.csv` (check those images, they are often labelled wrong),
+`false_predictions.csv` (check those images with `label_tool.py --from-csv`, they are
+often labelled wrong),
 `model-card.md` and the Keras model. Both `.tflite` files are checked against what the
 firmware accepts and evaluated, so the quantisation loss is visible before deploying.
 `--optimizer adadelta` reproduces the original digit training; `--balance` weights rare
