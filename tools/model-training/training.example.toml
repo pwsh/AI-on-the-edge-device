@@ -1,0 +1,72 @@
+# Config for pipeline.py - the "collect -> relabel -> retrain -> redeploy" loop.
+#
+#   cp training.example.toml training.toml      # training.toml is git-ignored
+#   python pipeline.py training.toml             # run every enabled step
+#   python pipeline.py training.toml --steps fetch,prelabel,label_new
+#   python pipeline.py training.toml --dry-run   # only print the commands
+#
+# Every key is optional; the values shown are the defaults (except [device] ip).
+
+[device]
+ip = "192.168.1.50"           # address (or host name, or host:port) of your device
+section = "Digits"            # config.ini section the model belongs to: Digits | Analog
+                              #   (default: from [model] type)
+pause_during_transfer = true  # pause the device's processing while fetching images
+
+[model]
+type = "dig-class11"          # dig-class11 | dig-class100 | ana-cont | ana-class100
+size = "s2"                   # s2 (ana-cont: s0 = largest .. s3 = smallest)
+current = "auto"              # the model the device uses now (pre-labeller and baseline):
+                              #   "auto" = read the Model = line of [section] from the device's
+                              #   config.ini and use the local copy in <output>/*/, ../../sd-card/config/
+                              #   or <data>/models/ (downloaded from the device if not found);
+                              #   or an explicit .tflite path
+name = "auto"                 # version tag of the new model (output/<type>_<name>_<size>/):
+                              #   "auto" = YYMMDD, or YYMMDD-HHMM if that folder already exists;
+                              #   an unfinished run keeps its name when you re-run it the same day
+
+[paths]                       # relative to the toolkit folder unless absolute
+data = "data"                 # device/, review/, labeled/, models/ and state.json live here
+output = "output"             # trained models and pipeline-<timestamp>.log
+eval = "eval"                 # evaluate.py results (eval/<model>/metrics.json, false_predictions.csv)
+backups = "backups"           # config.ini backups written by deploy.py
+community = []                # extra labelled folders mixed into training, e.g.
+                              #   ["../../../neural-network-digital-counter-readout/images"]
+
+[prelabel]
+dedupe = true                 # drop near-duplicate crops (strongly recommended)
+dedupe_distance = 2           # max perceptual-hash distance that counts as duplicate
+threshold = 0.9               # confidence that splits confident/ and unsure/
+
+[train]
+epochs = 200                  # maximum; early stopping usually ends sooner
+balance = true                # weight rare classes up
+optimizer = "adam"            # adam | adadelta
+seed = 42                     # same seed + same data = same model
+extra_args = []               # passed through to train.py, e.g. ["--patience", "60"]
+
+[deploy]
+activate = true               # also switch config.ini's Model = line (with backup + verify)
+auto_reboot = false           # false = ask on the terminal before rebooting (--yes answers yes)
+min_gain = 0.0                # deploy only if the new model's accuracy (analog: within +-0.1)
+                              #   on data/labeled is >= current + min_gain (percentage points);
+                              #   -1 = always deploy, without comparing
+
+[steps]                       # run in this order; switch single steps off here or pick some
+                              # with --steps a,b,c   (MANUAL = you review in the browser)
+fetch = true                  # fetch_images.py: download new crops (incremental)
+prelabel = true               # prelabel.py with [model] current; skips already-handled images
+label_new = true              # MANUAL: label_tool.py on data/review/<type>
+evaluate_current = true       # evaluate.py: current model over data/labeled -> false_predictions.csv
+relabel = true                # MANUAL: label_tool.py --from-csv, in place (only if there are
+                              #   disagreements)
+train = true                  # train.py on data/labeled/<type> (+ [paths] community)
+relabel_after_train = true    # MANUAL: label_tool.py --from-csv on the new model's disagreements;
+                              #   if you changed anything, train again once (same name)
+compare = true                # evaluate.py new vs current on data/labeled; prints a table
+deploy = true                 # deploy.py (honours min_gain / activate / auto_reboot)
+
+[review]
+port = 8765                   # label_tool.py listens on http://127.0.0.1:<port>/
+open_browser = true           # open the page automatically
+# A manual step ends when its queue is empty or when you press Enter in the terminal.

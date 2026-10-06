@@ -15,6 +15,77 @@ TensorFlow must stay at 2.18 and Keras at <= 3.10: newer versions produce models
 firmware cannot load. On macOS replace `tensorflow-cpu` with `tensorflow` in
 `requirements.txt`.
 
+## One-command loop: pipeline.py
+
+Once you have a first model on the device, the whole "collect -> relabel -> retrain ->
+redeploy" loop (docs/TRAINING.md, section 8) runs from one config file:
+
+```bash
+cp training.example.toml training.toml      # then set [device] ip; training.toml is git-ignored
+python pipeline.py training.toml                                   # the whole loop
+python pipeline.py training.toml --steps fetch,prelabel,label_new  # only collect + label
+```
+
+```toml
+[device]
+ip = "192.168.1.50"
+section = "Digits"            # Digits | Analog
+pause_during_transfer = true
+
+[model]
+type = "dig-class11"          # dig-class11 | dig-class100 | ana-cont | ana-class100
+size = "s2"
+current = "auto"              # "auto" = the Model = line of [section] on the device (local copy
+                              #   from output/ or sd-card/config/, else downloaded); or a .tflite path
+name = "auto"                 # "auto" = YYMMDD (YYMMDD-HHMM if taken); or your own tag
+
+[paths]                       # relative to this folder unless absolute
+data = "data"
+output = "output"
+community = []                # extra labelled folders mixed into training
+
+[prelabel]
+dedupe = true
+dedupe_distance = 2
+threshold = 0.9
+
+[train]
+epochs = 200
+balance = true
+optimizer = "adam"
+seed = 42
+extra_args = []               # passed through to train.py
+
+[deploy]
+activate = true
+auto_reboot = false           # false = ask before rebooting (--yes answers yes)
+min_gain = 0.0                # deploy only if new >= current + min_gain (points); -1 = always
+
+[steps]                       # fixed order; switch steps off here, or pick some with --steps
+fetch = true                  # fetch_images.py (incremental)
+prelabel = true               # prelabel.py with the current model
+label_new = true              # MANUAL: label_tool.py on data/review/<type>
+evaluate_current = true       # evaluate.py: current model over data/labeled
+relabel = true                # MANUAL: label_tool.py --from-csv on its disagreements
+train = true                  # train.py
+relabel_after_train = true    # MANUAL: the new model's disagreements; retrains once if you changed any
+compare = true                # evaluate.py: new vs. current on data/labeled
+deploy = true                 # deploy.py (min_gain / activate / auto_reboot)
+
+[review]
+port = 8765
+open_browser = true
+```
+
+`training.example.toml` explains every key (plus `[paths] eval` and `backups`). The pipeline
+prints its plan, then each command before running it (`--dry-run` only prints them), and stops
+at the first step that fails. For a manual step it starts `label_tool.py`, opens the
+browser and continues by itself when the queue is empty, or when you press Enter in the
+terminal; a step with nothing to review is skipped. Everything is written to
+`output/pipeline-<timestamp>.log`, and `data/state.json` remembers the last run, the last
+trained and the last deployed model. Re-running after a stopped step is safe: fetching is
+incremental, prelabel skips handled images and train reuses the name of the unfinished run.
+
 ## Quick start (digits)
 
 ```bash

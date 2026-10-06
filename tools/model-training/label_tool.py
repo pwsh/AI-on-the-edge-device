@@ -547,6 +547,10 @@ def make_handler(store: Store, page: bytes):
             if path == "/api/items":
                 with store.lock:
                     return self._json({"items": [store.public(it) for it in store.items]})
+            if path == "/api/counts":   # cheap status poll (used by pipeline.py)
+                with store.lock:
+                    return self._json({**store.counts(), "total": len(store.items),
+                                       "relabel": store.relabel})
             if path.startswith("/img/"):
                 try:
                     it = store.items[int(path[5:])]

@@ -19,7 +19,9 @@ The whole loop is:
 7. **Deploy** to the device and switch the config to the new model.
 8. **Iterate** — keep collecting; the device keeps saving the reads it was unsure about.
 
-All scripts live in [`tools/model-training/`](../tools/model-training/) and have `--help`.
+All scripts live in [`tools/model-training/`](../tools/model-training/) and have `--help`. Once you
+have done the loop by hand once, **`pipeline.py training.toml` runs the whole thing from one config
+file** and pauses only where a human has to look at images (§8).
 
 ---
 
@@ -356,6 +358,63 @@ With `ROIImages = true` and `ROIImagesMode = changed`, the device keeps writing 
 `/log/digit/<day>/<hour>/` — but only when a ROI's read **changes** or the model was **unsure**
 (confidence below 0.70, rejected, `N`, or overruled by the temporal vote). Each file name carries the
 raw prediction and its confidence (`3_c54_main_main8_<ts>.jpg`), so the unsure ones are easy to spot.
+
+### The one-command loop: `pipeline.py`
+
+Put the variables in a config file once, then run the loop with a single command whenever the device
+has collected something new:
+
+```bash
+cd tools/model-training && source .venv/bin/activate
+cp training.example.toml training.toml      # first time only: set [device] ip, section, [model] type
+python pipeline.py training.toml
+```
+
+`training.example.toml` documents every key. The parts you'll touch:
+
+```toml
+[device]  ip = "10.0.42.12"   section = "Digits"
+[model]   type = "dig-class11"   current = "auto"   name = "auto"   # auto = model on the device / YYMMDD
+[deploy]  activate = true   auto_reboot = false   min_gain = 0.0    # deploy only if not worse
+[steps]   fetch = true  prelabel = true  label_new = true  evaluate_current = true  relabel = true
+          train = true  relabel_after_train = true  compare = true  deploy = true
+```
+
+What a run looks like: it prints the numbered plan (manual steps marked ✋), then runs the steps in
+order, streaming each script's output, and stops on the first failure:
+
+| # | Step | What it runs | Pauses? |
+| --- | --- | --- | --- |
+| 1 | `fetch` | `fetch_images.py` — new crops only | |
+| 2 | `prelabel` | `prelabel.py` with the model **currently on the device** (`current = "auto"` reads it from the device's `config.ini`); already-handled images are skipped | |
+| 3 | `label_new` | `label_tool.py` on `data/review/<type>` | ✋ |
+| 4 | `evaluate_current` | `evaluate.py` current model over `data/labeled` → `false_predictions.csv` | |
+| 5 | `relabel` | `label_tool.py --from-csv` in place — only if there are disagreements | ✋ |
+| 6 | `train` | `train.py` on everything labelled (+ `[paths] community`) | |
+| 7 | `relabel_after_train` | `label_tool.py --from-csv` on the new run's disagreements; if you change anything it **trains again** automatically | ✋ |
+| 8 | `compare` | `evaluate.py` new vs current → `current: 99.7 %  new: 100.0 %  (+0.3)` | |
+| 9 | `deploy` | `deploy.py` — only if the gain is ≥ `min_gain`; asks before rebooting unless `auto_reboot` / `--yes` | (asks) |
+
+At each ✋ the pipeline starts the label tool, opens the browser, and **waits until the queue is empty
+— or until you press Enter** in the terminal to stop early. If there is nothing to review it says so
+and moves on without opening anything.
+
+Useful variants:
+
+```bash
+python pipeline.py training.toml --dry-run                      # show the exact commands, run nothing
+python pipeline.py training.toml --steps fetch,prelabel,label_new   # just collect and label today
+python pipeline.py training.toml --steps train,compare          # retrain and compare, don't deploy
+python pipeline.py training.toml --yes                          # unattended: reboot without asking
+```
+
+Switching a step off in `[steps]` is permanent; `--steps` overrides it for one run. Re-running after
+a stop is safe: fetch is incremental, prelabel skips what you've handled, and a same-day retrain
+overwrites the same run name. Logs go to `output/pipeline-<timestamp>.log`.
+
+### The same loop by hand
+
+If you prefer to run the steps yourself, or want to understand what the pipeline does:
 
 ### Track what the model is unsure about
 
