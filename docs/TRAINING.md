@@ -515,6 +515,7 @@ in a sub-folder named after your meter type.
 | Accuracy 99 % in training, poor on the device | Duplicates leaked between train and validation (always run `prelabel.py --dedupe`), or the ROI boxes on the device changed since the images were collected. |
 | One class never predicted | Class imbalance — count files per label in `data/labeled/`; add community images or collect longer. |
 | Quantised model much worse than float | Rare with real representative data. Check `model-card.md` for the quantisation delta; if > 2 %, retrain with more varied images. |
+| The device's **value** is stuck or creeps away while **raw** (and the Recognition page) is correct | Not a model problem. Almost always `CheckDigitIncreaseConsistency = true` on a meter that is **not** a mechanical rolling counter (LCD / 7-segment): switch it off, then reset the pre-value to the current read with `http://<ip>/setPreValue?numbers=<name>&value=-1`. Compare `raw` vs `value` in `/log/data/data_<date>.csv` to confirm. |
 | `fetch_images.py` is slow / times out | Use `--pause`; the single web task on the device is otherwise shared with the processing round. |
 | ZIP download never starts (older firmware) | The old implementation builds the archive on the SD card first. Update the firmware or use `fetch_images.py` without `--zip`. |
 
