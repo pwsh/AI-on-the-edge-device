@@ -68,6 +68,10 @@ struct NumberPost {
     bool AllowNegativeRates;    // allowNegativeRate; defines if the consistency checks allow negative rates between consecutive meter readings.
     double NegRateCandidate;    // §10 confidence vote: the lower value currently being confirmed across rounds
     int NegRateVoteCount;       // §10 confidence vote: count of consecutive confirming lower reads
+    int ResyncVoteCount;        // re-sync vote: consecutive confident raw reads far (> 10x the rate bound) from PreValue
+    double ResyncCandidate;     // re-sync vote: the raw read currently being confirmed across rounds
+    bool unitsPerValueExplicit = false; // true when <NUMBER>.UnitsPerValue was set in the config (always wins
+                                        // over the value derived from the [MQTT] MeterType)
     bool IgnoreLeadingNaN;
     bool checkDigitIncreaseConsistency; // extendedConsistencyCheck; performs an additional consistency check to avoid wrong readings
     time_t timeStampLastValue;     // Timestamp for the last read value; is used for the log

@@ -30,7 +30,7 @@ protected:
     string ShiftDecimal(string in, int _decShift);
 
     string ErsetzteN(string, double _prevalue);
-    float checkDigitConsistency(double input, int _decilamshift, bool _isanalog, double _preValue);
+    double checkDigitConsistency(double input, int _decilamshift, bool _isanalog, double _preValue);
 
     void InitNUMBERS();
 	
@@ -52,6 +52,11 @@ protected:
     // next round's digit CNN can skip provably-static digits. No-op unless PredictiveRead is enabled
     // for the digit flow and a Utility model is configured for the sequence.
     void UpdatePredictiveReadPlan(int j);
+    // Resolve each sequence's PhysicalLimits.unitsPerValue (SI units per displayed unit) from the
+    // [MQTT] MeterType when no explicit UnitsPerValue was configured, and log the effective physics
+    // ceiling. Runs once after ALL config sections are parsed (first doFlow after a (re)load).
+    void ResolvePhysicsUnits();
+    bool PhysUnitsResolved;
 
     void WriteDataLog(int _index);
 

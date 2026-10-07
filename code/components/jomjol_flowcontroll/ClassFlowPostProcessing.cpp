@@ -15,6 +15,34 @@
 
 static const char* TAG = "POSTPROC";
 
+#ifdef ENABLE_MQTT
+// [MQTT] MeterType, as parsed by ClassFlowMQTT into server_mqtt.cpp (e.g. "water" + "gal"). Used only to
+// derive PhysicalLimits.unitsPerValue when no explicit <NUMBER>.UnitsPerValue is configured.
+extern std::string meterType;
+extern std::string valueUnit;
+#endif
+
+// Rate-limit confidence override bound: confident reads may vouch for a rate above the physical
+// ceiling / MaxRateValue, but never for a jump of more than this many times that bound - a jump that
+// large is a corrupted PreValue or a misread, not usage. Readings beyond it are instead eligible for
+// the re-sync vote below (so the two mechanisms cover disjoint ranges).
+#define RATE_CONF_OVERRIDE_MAX_FACTOR 10.0
+
+// Re-sync vote "far" distance (displayed units) when no rate bound (physics model / MaxRate) exists.
+#define RESYNC_NO_BOUND_DELTA 1000.0
+
+// Physical ceiling (displayed-value units) over `minutesElapsed`, gated exactly like
+// predictive::checkPlausibility (explicit supply model or user MaxRate, time reference > 0).
+// Returns -1 when no physical bound applies.
+static double physMaxPossible(const NumberPost* n, double minutesElapsed) {
+    if (n->PhysLimits.utility == predictive::Utility::Generic) return -1.0;
+    const predictive::RateBounds rb = predictive::deriveRateBounds(n->PhysLimits);
+    if (!rb.known || (rb.ceilingPerMin < 0.0)) return -1.0;
+    if (!n->PhysLimits.supplyModelExplicit && (n->PhysLimits.userMaxRatePerMin < 0.0)) return -1.0;
+    if (minutesElapsed <= 0.0) return -1.0;
+    return rb.ceilingPerMin * minutesElapsed;
+}
+
 std::string ClassFlowPostProcessing::getNumbersName() {
     std::string ret="";
 
@@ -343,6 +371,7 @@ ClassFlowPostProcessing::ClassFlowPostProcessing(std::vector<ClassFlow*>* lfc, C
     ListFlowControll = lfc;
     flowTakeImage = NULL;
     UpdatePreValueINI = false;
+    PhysUnitsResolved = false;
     flowAnalog = _analog;
     flowDigit = _digit;
 
@@ -573,9 +602,12 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
 
         if (_key == "UTILITY") {
             std::string v = toUpper(trim(_val));
-            if (v == "WATER")            { L.utility = predictive::Utility::Water;       if (L.unitsPerValue <= 0) L.unitsPerValue = 1000.0; }
-            else if (v == "ELECTRICITY") { L.utility = predictive::Utility::Electricity; L.unitsPerValue = 1.0; }
-            else if (v == "GAS")         { L.utility = predictive::Utility::Gas;         L.unitsPerValue = 1.0; }
+            // Utility only sets the unit DEFAULT (water m³ / kWh / gas m³); an explicit UnitsPerValue (which
+            // may come before or after this key) always wins, and ResolvePhysicsUnits() later refines the
+            // default from the [MQTT] MeterType (e.g. a gallon water meter).
+            if (v == "WATER")            { L.utility = predictive::Utility::Water;       if (!NUMBERS[j]->unitsPerValueExplicit) L.unitsPerValue = 1000.0; }
+            else if (v == "ELECTRICITY") { L.utility = predictive::Utility::Electricity; if (!NUMBERS[j]->unitsPerValueExplicit) L.unitsPerValue = 1.0; }
+            else if (v == "GAS")         { L.utility = predictive::Utility::Gas;         if (!NUMBERS[j]->unitsPerValueExplicit) L.unitsPerValue = 1.0; }
             else                          L.utility = predictive::Utility::Generic;
         }
         else if (isStringNumeric(_val)) {
@@ -590,8 +622,71 @@ void ClassFlowPostProcessing::handlePredictiveLimit(const std::string& _key, con
             else if (_key == "GASPRESSUREKPA")      { L.gasPressureKPa = d; }
             else if (_key == "SERVICEAMPS")         { L.elecServiceAmps = d;     L.supplyModelExplicit = true; }
             else if (_key == "SERVICEVOLTS")        { L.elecServiceVolts = d; }
-            else if (_key == "UNITSPERVALUE")       { if (d > 0) L.unitsPerValue = d; }
+            else if (_key == "UNITSPERVALUE")       { if (d > 0) { L.unitsPerValue = d; NUMBERS[j]->unitsPerValueExplicit = true; } }
         }
+    }
+}
+
+void ClassFlowPostProcessing::ResolvePhysicsUnits() {
+    PhysUnitsResolved = true;
+
+    // [MQTT] MeterType -> (category, value unit). Empty when MQTT is not built / not configured.
+    std::string _mtCategory = "";
+    std::string _mtUnit = "";
+#ifdef ENABLE_MQTT
+    _mtCategory = meterType;
+    _mtUnit = valueUnit;
+#endif
+
+    for (int j = 0; j < NUMBERS.size(); ++j) {
+        predictive::PhysicalLimits& L = NUMBERS[j]->PhysLimits;
+        std::string _source = "default";
+
+        if (NUMBERS[j]->unitsPerValueExplicit) {
+            _source = "explicit UnitsPerValue";
+        }
+        else if (L.utility != predictive::Utility::Generic) {
+            // unitsPerValue = SI units per displayed unit: water -> litres, gas -> m³, electricity -> kWh.
+            // Only applied when the MeterType category matches the sequence's Utility; unknown -> default.
+            double _derived = -1.0;
+            if ((L.utility == predictive::Utility::Water) && (_mtCategory == "water")) {
+                if      (_mtUnit == "m³")  _derived = 1000.0;     // water_m3
+                else if (_mtUnit == "L")   _derived = 1.0;        // water_l
+                else if (_mtUnit == "gal") _derived = 3.78541;    // water_gal / water_gal_min (US gallon)
+                else if (_mtUnit == "ft³") _derived = 28.3168;    // water_ft3
+            }
+            else if ((L.utility == predictive::Utility::Gas) && (_mtCategory == "gas")) {
+                if      (_mtUnit == "m³")  _derived = 1.0;        // gas_m3
+                else if (_mtUnit == "ft³") _derived = 0.0283168;  // gas_ft3
+            }
+            else if ((L.utility == predictive::Utility::Electricity) && (_mtCategory == "energy")) {
+                if      (_mtUnit == "kWh") _derived = 1.0;        // energy_kwh
+                else if (_mtUnit == "Wh")  _derived = 0.001;      // energy_wh
+                else if (_mtUnit == "MWh") _derived = 1000.0;     // energy_mwh
+                else if (_mtUnit == "GJ")  _derived = 277.778;    // energy_gj
+            }
+
+            if (_derived > 0.0) {
+                L.unitsPerValue = _derived;
+                _source = "MQTT MeterType " + _mtCategory + " " + _mtUnit;
+            }
+            else if (!_mtCategory.empty()) {
+                _source = "default (MQTT MeterType " + _mtCategory + " " + _mtUnit + " does not match the Utility)";
+            }
+        }
+
+        if (L.utility == predictive::Utility::Generic) {
+            continue;   // no physics model -> nothing to report
+        }
+
+        std::string _util = (L.utility == predictive::Utility::Water) ? "water" :
+                            ((L.utility == predictive::Utility::Gas) ? "gas" : "electricity");
+        const predictive::RateBounds _rb = predictive::deriveRateBounds(L);
+        std::string _ceil = (_rb.known && (_rb.ceilingPerMin >= 0.0)) ? (std::to_string(_rb.ceilingPerMin) + " units/min") : "n/a";
+        bool _rejects = _rb.known && (L.supplyModelExplicit || (L.userMaxRatePerMin >= 0.0));
+        LogFile.WriteToFile(ESP_LOG_INFO, TAG, NUMBERS[j]->name + ": physics model utility=" + _util +
+            ", unitsPerValue=" + std::to_string(L.unitsPerValue) + " (" + _source + "), ceiling=" + _ceil +
+            " in meter units" + (_rejects ? "" : " (prediction only - no explicit supply model, never rejects)"));
     }
 }
 
@@ -810,6 +905,8 @@ bool ClassFlowPostProcessing::ReadParameter(FILE* pfile, string& aktparamgraph) 
         }
     }
 
+    PhysUnitsResolved = false;   // (re)parsed -> re-derive unitsPerValue once [MQTT] is parsed too (first doFlow)
+
     if (PreValueUse) {
         return LoadPreValue();
     }
@@ -870,6 +967,8 @@ void ClassFlowPostProcessing::InitNUMBERS() {
         _number->AllowNegativeRates = false;
         _number->NegRateCandidate = 0;   // §10 confidence vote state
         _number->NegRateVoteCount = 0;
+        _number->ResyncCandidate = 0;    // re-sync vote state
+        _number->ResyncVoteCount = 0;
         _number->IgnoreLeadingNaN = false;
         _number->MaxRateValue = 0.1;
         _number->MaxRateType = AbsoluteChange;
@@ -961,6 +1060,10 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
     zwtime = std::string(strftime_buf);
 
     ESP_LOGD(TAG, "Quantity NUMBERS: %d", NUMBERS.size());
+
+    if (!PhysUnitsResolved) {
+        ResolvePhysicsUnits();   // all config sections ([MQTT] MeterType included) are parsed by now
+    }
 
     for (int j = 0; j < NUMBERS.size(); ++j) {
         bool confidenceOverride = false;   // §10: set when the confidence vote accepts a lower value
@@ -1082,7 +1185,12 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         #endif
 			
         NUMBERS[j]->Value = std::stod(NUMBERS[j]->ReturnValue);
-			
+
+        // The value the CNN actually read (after N-replacement / leading-zero removal, before any
+        // digit-consistency or other rewrite). Confident-read overrides may only vouch for THIS value.
+        double _rawValue = NUMBERS[j]->Value;
+        double _halfUnit = 0.5 * pow(10, -NUMBERS[j]->Nachkomma);   // half a displayed least-significant unit
+
         #ifdef SERIAL_DEBUG
             ESP_LOGD(TAG, "After setting the Value: Value %f and as double is %f", NUMBERS[j]->Value, std::stod(NUMBERS[j]->ReturnValue));
         #endif
@@ -1092,6 +1200,20 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "Before checkDigitConsistency: value=" + std::to_string(NUMBERS[j]->Value));
                 NUMBERS[j]->Value = checkDigitConsistency(NUMBERS[j]->Value, NUMBERS[j]->DecimalShift, NUMBERS[j]->analog_roi != NULL, NUMBERS[j]->PreValue);
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "After checkDigitConsistency: value=" + std::to_string(NUMBERS[j]->Value));
+
+                // Anti-snowball guard: a genuine rolling-counter fix only moves the lowest digit the check
+                // touches (10^_potLow; the one above the lowest digit when there are no analog pointers),
+                // driven by the mid-roll digit below it. A correction of a whole unit of the NEXT place or
+                // more is the check fighting a stale/wrong PreValue (seen on LCD/7-segment meters, where
+                // it escalated 289638.21 -> 390640.22 while the read never changed): keep the raw read.
+                int _potLow = NUMBERS[j]->DecimalShift + ((NUMBERS[j]->analog_roi != NULL) ? 0 : 1);
+                double _maxCorrection = pow(10, _potLow + 1);
+                if (fabs(NUMBERS[j]->Value - _rawValue) >= _maxCorrection) {
+                    LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": digit-consistency correction changed the read " +
+                        RundeOutput(_rawValue, NUMBERS[j]->Nachkomma) + " to " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) +
+                        " (PreValue " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + ") - this option is meant for mechanical rolling counters; for LCD/7-segment displays switch CheckDigitIncreaseConsistency off");
+                    NUMBERS[j]->Value = _rawValue;    // do not apply the correction
+                }
             }
             else {
         #ifdef SERIAL_DEBUG
@@ -1106,7 +1228,58 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         #endif
 
         if (PreValueUse && NUMBERS[j]->PreValueOkay) {
-            if ((NUMBERS[j]->Nachkomma > 0) && (NUMBERS[j]->ChangeRateThreshold > 0)) {
+            // Re-sync vote: the PreValue itself can be wrong (stuck high or low - e.g. corrupted by a bad
+            // correction). Then every correct read is rejected by the rate checks forever, and the bounded
+            // confident-read override below deliberately refuses jumps > RATE_CONF_OVERRIDE_MAX_FACTOR x the
+            // bound. Count consecutive rounds whose RAW read is (a) farther from PreValue than that factor x
+            // the tightest active bound (physics ceiling / MaxRateValue over the elapsed time; else
+            // RESYNC_NO_BOUND_DELTA units), (b) confident (>= DigitConfidenceThreshold when that is set), and
+            // (c) consistent with the previous counted read. After ConfidenceVotes such rounds (min. 2, so
+            // at least one is a FastRead full re-read: each counted round is rejected -> TriggerFullEval),
+            // accept the raw read. 0 = off. The counter survives rejected rounds (`continue`) and is reset
+            // when a value is accepted (end of loop) or a round does not qualify.
+            if (ConfidenceVotes > 0) {
+                double _rsMinutes = LastPreValueTimeDifference / 60;
+                double _rsBound = -1.0;                                           // tightest active bound (units)
+                double _rsPhys = physMaxPossible(NUMBERS[j], _rsMinutes);
+                if (_rsPhys > 0.0) _rsBound = _rsPhys;
+                if (NUMBERS[j]->useMaxRateValue && (NUMBERS[j]->MaxRateValue != 0)) {
+                    double _rsMax = fabs(NUMBERS[j]->MaxRateValue) * ((NUMBERS[j]->MaxRateType == RateChange) ? _rsMinutes : 1.0);
+                    if ((_rsMax > 0.0) && ((_rsBound < 0.0) || (_rsMax < _rsBound))) _rsBound = _rsMax;
+                }
+                double _rsFar = (_rsBound > 0.0) ? (RATE_CONF_OVERRIDE_MAX_FACTOR * _rsBound) : RESYNC_NO_BOUND_DELTA;
+                double _rsTol = (_rsFar / RATE_CONF_OVERRIDE_MAX_FACTOR) + 4 * _halfUnit;   // read-to-read agreement
+                float _rsThrPct = (flowDigit ? flowDigit->GetDigitConfidenceThreshold() : 0.0f) * 100.0f;
+                bool _rsConfident = (_rsThrPct <= 0.0f) || (NUMBERS[j]->ReturnConfidence >= _rsThrPct);
+
+                if ((fabs(_rawValue - NUMBERS[j]->PreValue) > _rsFar) && _rsConfident) {
+                    if ((NUMBERS[j]->ResyncVoteCount > 0) && (fabs(_rawValue - NUMBERS[j]->ResyncCandidate) <= _rsTol)) {
+                        NUMBERS[j]->ResyncVoteCount++;        // consistent with the running candidate
+                    } else {
+                        NUMBERS[j]->ResyncVoteCount = 1;      // start a new candidate
+                    }
+                    NUMBERS[j]->ResyncCandidate = _rawValue;
+
+                    int _rsNeeded = (ConfidenceVotes < 2) ? 2 : ConfidenceVotes;
+                    if (NUMBERS[j]->ResyncVoteCount >= _rsNeeded) {
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": value re-synchronised to the raw read after " +
+                            std::to_string(NUMBERS[j]->ResyncVoteCount) + " confident reads (PreValue " +
+                            RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " -> " + RundeOutput(_rawValue, NUMBERS[j]->Nachkomma) + ")");
+                        statusOverrideNote = "value re-synchronised to the raw read after " +
+                            std::to_string(NUMBERS[j]->ResyncVoteCount) + " confident reads (previous " +
+                            RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + ")";
+                        NUMBERS[j]->Value = _rawValue;
+                        NUMBERS[j]->ResyncVoteCount = 0;
+                        NUMBERS[j]->NegRateVoteCount = 0;
+                        confidenceOverride = true;            // accept; skip the negative-rate and rate checks below
+                    }
+                }
+                else {
+                    NUMBERS[j]->ResyncVoteCount = 0;          // not a confident far read -> streak broken
+                }
+            }
+
+            if (!confidenceOverride && (NUMBERS[j]->Nachkomma > 0) && (NUMBERS[j]->ChangeRateThreshold > 0)) {
                 double _difference1 = (NUMBERS[j]->PreValue - (NUMBERS[j]->ChangeRateThreshold / pow(10, NUMBERS[j]->Nachkomma)));
                 double _difference2 = (NUMBERS[j]->PreValue + (NUMBERS[j]->ChangeRateThreshold / pow(10, NUMBERS[j]->Nachkomma)));
 
@@ -1122,7 +1295,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 }
             }
 
-            if ((!NUMBERS[j]->AllowNegativeRates) && (NUMBERS[j]->Value < NUMBERS[j]->PreValue)) {
+            if (!confidenceOverride && (!NUMBERS[j]->AllowNegativeRates) && (NUMBERS[j]->Value < NUMBERS[j]->PreValue)) {
                 LogFile.WriteToFile(ESP_LOG_DEBUG, TAG, "handleAllowNegativeRate for device: " + NUMBERS[j]->name);
 
                 // §10 confidence vote: a single low read is rejected (below), but if the meter has
@@ -1200,6 +1373,11 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 (NUMBERS[j]->RateConfHistory[0] >= _confThrPct) &&
                 (NUMBERS[j]->RateConfHistory[1] >= _confThrPct) &&
                 (NUMBERS[j]->RateConfHistory[2] >= _confThrPct);
+            // ...but confident reads only vouch for the value that was actually READ: never for a value
+            // rewritten by the digit-consistency check (it can be far from the read), and never for an
+            // absurd jump (> RATE_CONF_OVERRIDE_MAX_FACTOR x the bound - that is handled by the re-sync vote).
+            bool _valueIsRaw = (fabs(NUMBERS[j]->Value - _rawValue) < _halfUnit);
+            double _jump = fabs(NUMBERS[j]->Value - NUMBERS[j]->PreValue);
 
             // Physics ceiling: when a utility model is configured, reject a jump that exceeds what the
             // supply could physically deliver in the elapsed time. This derives its own bound (so no
@@ -1210,8 +1388,23 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                 predictive::Plausibility _pl = predictive::checkPlausibility(
                     NUMBERS[j]->PhysLimits, NUMBERS[j]->PreValue, NUMBERS[j]->Value, LastPreValueTimeDifference,
                     NUMBERS[j]->AllowNegativeRates);   // symmetric +/- bound for flow-rate-style sequences
-                if ((_pl == predictive::Plausibility::ExceedsPhysicalMax) && !rateConfOverride) {
-                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate exceeds physical max - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma);
+                bool _physOverride = rateConfOverride;
+                std::string _physSuppressed = "";
+                if ((_pl == predictive::Plausibility::ExceedsPhysicalMax) && rateConfOverride) {
+                    double _physMax = physMaxPossible(NUMBERS[j], LastPreValueTimeDifference);   // minutes here
+                    if (!_valueIsRaw) {
+                        _physSuppressed = " (confident-read override not applicable: value altered by digit-consistency)";
+                    }
+                    else if ((_physMax >= 0.0) && (_jump > RATE_CONF_OVERRIDE_MAX_FACTOR * _physMax)) {
+                        _physSuppressed = " (confident-read override not applicable: jump > " + std::to_string((int)RATE_CONF_OVERRIDE_MAX_FACTOR) + "x physical max)";
+                    }
+                    if (!_physSuppressed.empty()) {
+                        _physOverride = false;
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": confident-read override suppressed" + _physSuppressed + " - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Raw: " + RundeOutput(_rawValue, NUMBERS[j]->Nachkomma) + ", Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma));
+                    }
+                }
+                if ((_pl == predictive::Plausibility::ExceedsPhysicalMax) && !_physOverride) {
+                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate exceeds physical max - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(NUMBERS[j]->FlowRateAct, NUMBERS[j]->Nachkomma) + _physSuppressed;
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
                     NUMBERS[j]->ReturnValue = ErrorMessage ? "" : RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma);
                     NUMBERS[j]->ReturnRateValue = "";
@@ -1243,8 +1436,23 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
                     _ratedifference = (NUMBERS[j]->Value - NUMBERS[j]->PreValue);
                 }
 
-                if ((abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) && !rateConfOverride) {
-                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate too high - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma);
+                bool _maxOverride = rateConfOverride;
+                std::string _maxSuppressed = "";
+                if ((abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) && rateConfOverride) {
+                    if (!_valueIsRaw) {
+                        _maxSuppressed = " (confident-read override not applicable: value altered by digit-consistency)";
+                    }
+                    else if (fabs(_ratedifference) > RATE_CONF_OVERRIDE_MAX_FACTOR * fabs(NUMBERS[j]->MaxRateValue)) {
+                        _maxSuppressed = " (confident-read override not applicable: jump > " + std::to_string((int)RATE_CONF_OVERRIDE_MAX_FACTOR) + "x MaxRateValue)";
+                    }
+                    if (!_maxSuppressed.empty()) {
+                        _maxOverride = false;
+                        LogFile.WriteToFile(ESP_LOG_WARN, TAG, NUMBERS[j]->name + ": confident-read override suppressed" + _maxSuppressed + " - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + ", Raw: " + RundeOutput(_rawValue, NUMBERS[j]->Nachkomma) + ", Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma));
+                    }
+                }
+
+                if ((abs(_ratedifference) > abs(NUMBERS[j]->MaxRateValue)) && !_maxOverride) {
+                    NUMBERS[j]->ErrorMessageText = NUMBERS[j]->ErrorMessageText + "Rate too high - Read: " + RundeOutput(NUMBERS[j]->Value, NUMBERS[j]->Nachkomma) + " - Pre: " + RundeOutput(NUMBERS[j]->PreValue, NUMBERS[j]->Nachkomma) + " - Rate: " + RundeOutput(_ratedifference, NUMBERS[j]->Nachkomma) + _maxSuppressed;
                     NUMBERS[j]->Value = NUMBERS[j]->PreValue;
                     // "Skip Messages on Error" (ErrorMessage): when true (default) skip the transmission
                     // for this reading (empty value); when false, transmit the last valid value instead.
@@ -1298,6 +1506,7 @@ bool ClassFlowPostProcessing::doFlow(string zwtime) {
         NUMBERS[j]->PreValue = NUMBERS[j]->Value;
         NUMBERS[j]->PreValueOkay = true;
         NUMBERS[j]->NegRateVoteCount = 0;   // §10: a value was accepted -> reset the confidence-vote streak
+        NUMBERS[j]->ResyncVoteCount = 0;    // re-sync vote: likewise (PreValue now matches an accepted read)
 
         NUMBERS[j]->timeStampLastValue = imagetime;    
         NUMBERS[j]->timeStampLastPreValue = imagetime;
@@ -1435,11 +1644,14 @@ string ClassFlowPostProcessing::ErsetzteN(string input, double _prevalue) {
     return input;
 }
 
-float ClassFlowPostProcessing::checkDigitConsistency(double input, int _decilamshift, bool _isanalog, double _preValue) {
+// Works in double end to end: a float return (24-bit mantissa) rounds e.g. 289638.21 to 289638.22, which
+// on the next round looks like the lowest digit went BACKWARDS (a fake zero crossing) and seeds a
+// runaway "add 1" cascade.
+double ClassFlowPostProcessing::checkDigitConsistency(double input, int _decilamshift, bool _isanalog, double _preValue) {
     int aktdigit, olddigit;
     int aktdigit_before, olddigit_before;
     int pot, pot_max;
-    float zw;
+    double zw;
     bool no_nulldurchgang = false;
 
     pot = _decilamshift;
@@ -1471,13 +1683,13 @@ float ClassFlowPostProcessing::checkDigitConsistency(double input, int _decilams
 
         if (no_nulldurchgang) {
             if (aktdigit != olddigit) {
-                input = input + ((float) (olddigit - aktdigit)) * pow(10, pot);     // New Digit is replaced by old Digit;
+                input = input + ((double) (olddigit - aktdigit)) * pow(10, pot);     // New Digit is replaced by old Digit;
             }
         }
         else {
             // despite zero crossing, digit was not incremented --> add 1
             if (aktdigit == olddigit) {
-                input = input + ((float) (1)) * pow(10, pot);   // add 1 at the point
+                input = input + 1.0 * pow(10, pot);   // add 1 at the point
             }
         }
 			
